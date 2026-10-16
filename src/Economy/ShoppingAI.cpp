@@ -262,28 +262,44 @@ namespace FollowerUnbound
         // 2. Aktör taban fraksiyonları kontrolü
         auto base = vendor->GetActorBase();
         if (base) {
+            bool factionWizard = false;
+            bool factionApothecary = false;
+            bool factionBlacksmith = false;
+            bool factionInnkeeper = false;
+            bool factionGeneral = false;
             for (auto& fInfo : base->factions) {
                 if (!fInfo.faction) continue;
-                std::string fName = fInfo.faction->GetName();
+                const auto factionID = fInfo.faction->GetFormID();
+                factionWizard |= factionID == 0x000513A6;
+                factionBlacksmith |= factionID == 0x000509FB;
+                factionApothecary |= factionID == 0x000509F9;
+                factionInnkeeper |= factionID == 0x000509FA;
+                factionGeneral |= factionID == 0x00051596;
+
+                const char* rawFactionName = fInfo.faction->GetName();
+                if (!rawFactionName) continue;
+                std::string fName(rawFactionName);
                 std::transform(fName.begin(), fName.end(), fName.begin(), ::tolower);
-                if (fName.find("blacksmith") != std::string::npos || fName.find("fletcher") != std::string::npos ||
-                    fName.find("weapon") != std::string::npos || fName.find("armor") != std::string::npos) {
-                    return VendorType::Blacksmith;
-                }
-                if (fName.find("apothecary") != std::string::npos || fName.find("alchem") != std::string::npos) {
-                    return VendorType::Apothecary;
-                }
-                if (fName.find("innkeeper") != std::string::npos || fName.find("food") != std::string::npos ||
-                    fName.find("tavern") != std::string::npos || fName.find("wench") != std::string::npos) {
-                    return VendorType::Innkeeper;
-                }
-                if (fName.find("merchant") != std::string::npos || fName.find("trader") != std::string::npos ||
+                factionWizard |= fName.find("court wizard") != std::string::npos || fName.find("courtwizard") != std::string::npos;
+                factionApothecary |= fName.find("apothecary") != std::string::npos || fName.find("alchem") != std::string::npos;
+                factionBlacksmith |= fName.find("blacksmith") != std::string::npos || fName.find("fletcher") != std::string::npos ||
+                    fName.find("weapon") != std::string::npos || fName.find("armor") != std::string::npos;
+                factionInnkeeper |= fName.find("innkeeper") != std::string::npos || fName.find("food") != std::string::npos ||
+                    fName.find("tavern") != std::string::npos || fName.find("wench") != std::string::npos;
+                factionGeneral |= fName.find("merchant") != std::string::npos || fName.find("trader") != std::string::npos ||
                     fName.find("general") != std::string::npos || fName.find("goods") != std::string::npos ||
                     fName.find("fence") != std::string::npos || fName.find("caravan") != std::string::npos ||
-                    fName.find("pawn") != std::string::npos) {
-                    return VendorType::GeneralMerchant;
-                }
+                    fName.find("pawn") != std::string::npos;
             }
+
+            // Base factions are not guaranteed to be stored in role order.
+            // Resolve specialist jobs before the generic merchant faction so
+            // apothecaries such as Arcadia do not get treated as food shops.
+            if (factionWizard) return VendorType::Wizard;
+            if (factionApothecary) return VendorType::Apothecary;
+            if (factionBlacksmith) return VendorType::Blacksmith;
+            if (factionInnkeeper) return VendorType::Innkeeper;
+            if (factionGeneral) return VendorType::GeneralMerchant;
         }
 
         // 3. Genel Tüccar Fraksiyonu (JobMerchantFaction — Belethor, Lucan Valerius, Sadri vb.)
@@ -937,8 +953,23 @@ namespace FollowerUnbound
             for (const auto& n : needs) if (n.cat == cat) order.push_back(&n);
         }
 
-        // Öncelik sırası: en acil sarf ihtiyacı (susuzluk/açlık) → diğeri →
-        // can/mana/dayanıklılık iksiri → zehir → ok/cıvata
+        // Keep restorative supplies, poisons and soul gems ahead of optional
+        // food purchases. Otherwise a follower can spend every purchase slot
+        // on potatoes/drinks at a general merchant and never reach the enabled
+        // alchemy or soul-gem categories during that shopping round.
+        constexpr SupplyCat urgentSupplies[] = {
+            SHealthMinor, SHealthStandard, SHealthPlentiful, SHealthVigorous, SHealthExtreme, SHealthUltimate,
+            SMagickaMinor, SMagickaStandard, SMagickaPlentiful, SMagickaVigorous, SMagickaExtreme, SMagickaUltimate,
+            SStaminaMinor, SStaminaStandard, SStaminaPlentiful, SStaminaVigorous, SStaminaExtreme, SStaminaUltimate,
+            SPoisonHealth, SPoisonMagicka, SPoisonStamina, SPoisonOther, SInvisibility,
+            SSoulPetty, SSoulLesser, SSoulCommon, SSoulGreater, SSoulGrand, SSoulBlack
+        };
+        for (SupplyCat cat : urgentSupplies) {
+            for (const auto& n : needs) if (n.cat == cat) order.push_back(&n);
+        }
+
+        // Food and drinks are lower priority than selected medical and magical
+        // supplies, but remain ahead of optional ammunition and utility items.
         auto pushGroup = [&](SupplyCat a, SupplyCat b) {
             for (const auto& n : needs) {
                 if (n.cat == a || n.cat == b) order.push_back(&n);
@@ -954,7 +985,7 @@ namespace FollowerUnbound
             for (const auto& n : needs) if (n.cat == SFoodS) order.push_back(&n);
             pushGroup(SDrinkN, SDrinkA);
         }
-        for (SupplyCat cat : { SHealth, SMagicka, SStamina, SPoison, SPoisonHealth, SPoisonMagicka, SPoisonStamina, SPoisonOther, SInvisibility, SArrow, SBolt, SSoulPetty, SSoulLesser, SSoulCommon, SSoulGreater, SSoulGrand, SSoulBlack }) {
+        for (SupplyCat cat : { SArrow, SBolt, STorch, SLanternOil, SSoap }) {
             for (const auto& n : needs) if (n.cat == cat) order.push_back(&n);
         }
 

@@ -182,13 +182,24 @@
     $('follower-count').textContent=`${state.followers.length} companion${state.followers.length===1?'':'s'} tracked`;
     document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
     if(page==='overview')renderOverview();else if(page==='equipment')renderEquipment();else if(page==='loot'||page==='economy')renderPrefs(page);else renderSettings();
+    document.querySelectorAll('input[type="number"][min][max]').forEach(input=>clampNumberInput(input));
+  };
+  const clampNumberInput = input => {
+    const min=Number(input.min),max=Number(input.max),raw=Number(input.value);
+    const fallback=Number.isFinite(min)?min:0;
+    let value=Number.isFinite(raw)?Math.min(Number.isFinite(max)?max:raw,Math.max(fallback,raw)):fallback;
+    const step=input.step==='any'?0:Number(input.step||1);
+    if(step>0)value=Math.round(value/step)*step;
+    value=Math.min(Number.isFinite(max)?max:value,Math.max(fallback,value));
+    input.value=String(value);
+    return value;
   };
   window.fuSetState=(next)=>{state={...state,...next};if(!selectedFollower&&state.followers.length)selectedFollower=state.followers[0].id;render();};
   $('navigation').addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(!b)return;page=b.dataset.page;pickerOpen=false;render();});
   const toggleGearCard=(gear)=>{const id=Number(gear.dataset.gearCard);if(selectedGear.has(id))selectedGear.delete(id);else selectedGear.add(id);render();};
   $('content').addEventListener('change',e=>{
-    const p=e.target.closest('[data-pref]'); if(p){const val=p.type==='checkbox'?p.checked:Number(p.value);send({kind:'preference',follower:Number(follower()?.id),key:p.dataset.pref,value:val});return;}
-    const s=e.target.closest('[data-setting]');if(s){send({kind:'setting',key:s.dataset.setting,value:s.type==='checkbox'?s.checked:Number(s.value)});return;}
+    const p=e.target.closest('[data-pref]'); if(p){const val=p.type==='checkbox'?p.checked:(p.type==='number'?clampNumberInput(p):Number(p.value));send({kind:'preference',follower:Number(follower()?.id),key:p.dataset.pref,value:val});return;}
+    const s=e.target.closest('[data-setting]');if(s){send({kind:'setting',key:s.dataset.setting,value:s.type==='checkbox'?s.checked:(s.type==='number'?clampNumberInput(s):Number(s.value))});return;}
     const protect=e.target.closest('[data-protect]');if(protect){send({kind:'protect',follower:Number(follower()?.id),item:Number(protect.dataset.protect),value:protect.checked});return;}
   });
   $('content').addEventListener('click',e=>{

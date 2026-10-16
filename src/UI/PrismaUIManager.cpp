@@ -10,6 +10,7 @@
 #include "AI/AnimationManager.h"
 #include "Core/TNGCompatibility.h"
 #include <cctype>
+#include <cmath>
 
 namespace FollowerUnbound
 {
@@ -100,17 +101,26 @@ namespace FollowerUnbound
             };
         }
 
+        uint32_t ReadBoundedUInt(const nlohmann::json& value, uint32_t minimum, uint32_t maximum)
+        {
+            if (!value.is_number()) return minimum;
+            const double number = value.get<double>();
+            if (!std::isfinite(number)) return minimum;
+            return static_cast<uint32_t>(std::clamp(std::trunc(number),
+                static_cast<double>(minimum), static_cast<double>(maximum)));
+        }
+
         void SetPreference(FollowerPreferences& p, const std::string& key, const nlohmann::json& value)
         {
 #define FU_BOOL_PREF(name, field) if (key == name) { p.field = value.get<bool>(); return; }
-#define FU_UINT_PREF(name, field, lo, hi) if (key == name) { p.field = std::clamp(value.get<uint32_t>(), uint32_t(lo), uint32_t(hi)); return; }
+#define FU_UINT_PREF(name, field, lo, hi) if (key == name) { p.field = ReadBoundedUInt(value, uint32_t(lo), uint32_t(hi)); return; }
             if (key == "savingsEnabled") {
                 p.savingsEnabled = value.get<bool>();
                 if (!p.savingsEnabled) { p.savedGold = 0; p.savingsRemainder = 0; } // Turning savings off releases the reserve.
                 return;
             }
             if (key == "savingsTarget") {
-                p.savingsTarget = std::clamp(value.get<uint32_t>(), 1u, 10000u);
+                p.savingsTarget = ReadBoundedUInt(value, 1u, 10000u);
                 p.savedGold = std::min(p.savedGold, p.savingsTarget);
                 if (p.savedGold >= p.savingsTarget) p.savingsRemainder = 0;
                 return;
