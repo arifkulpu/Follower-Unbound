@@ -226,7 +226,15 @@ namespace FollowerUnbound
         Apothecary,      // Sells potions, ingredients
         Innkeeper,       // Sells food, drinks
         GeneralMerchant, // Sells supplies, buys weapons, armor, potions, ammo, gems, etc.
-        Wizard           // Court wizard / enchanter — sells soul gems
+        Wizard,          // Court wizard / enchanter — sells soul gems
+        Healer           // Temple healers; only disease/poison cures are eligible
+    };
+
+    struct CandidateVendor
+    {
+        RE::Actor* actor{ nullptr };
+        VendorType type{ VendorType::Unknown };
+        float distance{ 0.0f };
     };
 
     // Satıcı tipi yetki maskesi: hangi kategori hangi satıcıdan alınabilir?
@@ -237,12 +245,41 @@ namespace FollowerUnbound
         kVendApothecary = 1 << 1, // Simyacı — iksir, zehir
         kVendInn = 1 << 2,        // Hancı — yemek, içecek
         kVendGeneral = 1 << 3,    // Genel tüccar — her şey
-        kVendWizard = 1 << 4      // Saray büyücüsü/büyücü — soul gem
+        kVendWizard = 1 << 4,     // Saray büyücüsü/büyücü — soul gem
+        kVendHealer = 1 << 5      // Rahip/şifacı — yalnızca tedavi iksirleri
     };
 
     static VendorType DetermineVendorType(RE::Actor* vendor)
     {
         if (!vendor) return VendorType::Unknown;
+
+        // Some vendor NPCs (especially DLC, stronghold and follower-mod
+        // merchants) do not expose the vanilla job faction consistently.
+        // Recognize the supplied vanilla merchant roster by name first; the
+        // actual inventory is still scanned before any transaction is allowed.
+        std::string vendorName = vendor->GetName();
+        std::transform(vendorName.begin(), vendorName.end(), vendorName.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        const auto nameMatches = [&vendorName](std::initializer_list<const char*> names) {
+            return std::any_of(names.begin(), names.end(), [&vendorName](const char* name) { return vendorName.find(name) != std::string::npos; });
+        };
+        if (nameMatches({ "arcadia", "lami", "bothela", "angeline morrard", "vivienne onis", "quintus navale", "nurelion", "elgrim", "frida", "zaria", "atub", "bolar", "murbul", "sharamph", "babette", "milore ienth", "elynea mothren", "feran sadri", "florentius baenius" })) {
+            return VendorType::Apothecary;
+        }
+        if (nameMatches({ "farengar", "sybille stentor", "wylandriah", "wuunferth", "calcelmo", "madena", "falion", "dravynea" })) {
+            return VendorType::Wizard;
+        }
+        if (nameMatches({ "adrianne avenicci", "ulfberth war-bear", "eorlund gray-mane", "beirand", "fihada", "balimund", "oengul war-anvil", "hermir strong-heart", "moth gro-bagol", "ghorza gra-bagol", "alvor", "rustleif", "seren", "lod", "dushnamub", "gharol", "shahu", "mahuwa", "yarlakh", "glover mallory", "baldor iron-shaper", "gunmar", "hestla" })) {
+            return VendorType::Blacksmith;
+        }
+        if (nameMatches({ "belethor", "sayma", "bersi honey-hand", "brand-shei", "grelka", "elrindir", "revyn sadri", "aval atheron", "niranye", "lucan valerius", "camilla valerius", "solaf", "birna", "ri'saad", "ahkari", "ma'dran", "tonilia", "mallus maccius", "endon", "fethis alor", "falas selvayn", "sorine jurard", "ronthil" })) {
+            return VendorType::GeneralMerchant;
+        }
+        if (nameMatches({ "hulda", "ysolda", "corpulus vinius", "keerava", "elda early-dawn", "ambrys rendar", "kleppr", "frabbi", "orgnar", "valga vinicia", "thoring", "jonna", "dagur", "faida", "hadring", "iddra", "voldsee", "kjeld", "gelmund", "vekel the man" })) {
+            return VendorType::Innkeeper;
+        }
+        if (nameMatches({ "heimskr", "danica pure-spring", "jensine", "ahlam", "ortus endario", "freir", "helgird", "runil", "alessandra", "maramal", "dinya balu", "hamal", "senna", "orla", "anwen", "brother verulus", "styrr", "nura snow-shod", "erandur" })) {
+            return VendorType::Healer;
+        }
 
         // 0. Court Wizard / Enchanter — soul gem satan satıcılar
         // (JobCourtWizardFaction 0x000513A6 + isim bazlı yedek)
@@ -338,6 +375,37 @@ namespace FollowerUnbound
         }
 
         return VendorType::Unknown;
+    }
+
+    static std::vector<CandidateVendor> FindNearbyVendors(RE::Actor* follower, RE::ProcessLists* processLists, float maxDistance)
+    {
+        std::vector<CandidateVendor> vendors;
+        if (!follower || !processLists) return vendors;
+
+        auto collect = [&](auto& handles) {
+            for (auto& handle : handles) {
+                auto actorPtr = handle.get();
+                auto* candidate = actorPtr ? actorPtr.get() : nullptr;
+                if (!candidate || candidate->IsDead() || candidate == follower || candidate->IsPlayerRef()) continue;
+                const float distance = follower->GetPosition().GetDistance(candidate->GetPosition());
+                if (distance > maxDistance) continue;
+                if (std::any_of(vendors.begin(), vendors.end(), [candidate](const CandidateVendor& existing) {
+                    return existing.actor == candidate;
+                })) continue;
+
+                const auto type = DetermineVendorType(candidate);
+                if (type != VendorType::Unknown) vendors.push_back({ candidate, type, distance });
+            }
+        };
+
+        // Vendors may be in either high or low process. Deduplicate because
+        // actors can move between those arrays as their process level changes.
+        collect(processLists->highActorHandles);
+        collect(processLists->lowActorHandles);
+        std::sort(vendors.begin(), vendors.end(), [](const CandidateVendor& a, const CandidateVendor& b) {
+            return a.distance < b.distance;
+        });
+        return vendors;
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -673,9 +741,9 @@ namespace FollowerUnbound
         // ahead of routine supply purchases so injured followers are prioritized.
         const uint32_t treatmentDemand = ClassInterface::GetSingleton()->GetTreatmentPotionDemand(formID);
         addNeed(STreatment, supplies.treatmentPotions, std::max(pref.maxTreatmentPotions, treatmentDemand), pref.buyTreatmentPotions, false,
-                kVendApothecary | kVendGeneral, "Cure Disease Potion");
+                kVendApothecary | kVendGeneral | kVendWizard | kVendHealer, "Cure Disease Potion");
         addNeed(SCurePoison, supplies.curePoisonPotions, pref.maxCurePoisonPotions, pref.buyCurePoisonPotions, false,
-                kVendApothecary | kVendGeneral, "Cure Poison Potion");
+                kVendApothecary | kVendGeneral | kVendWizard | kVendHealer, "Cure Poison Potion");
 
         // İçecekler ve yemekler → hancı veya genel tüccar
         addNeed(SDrinkN, supplies.drinkN, pref.maxDrinkNormal, pref.buyDrinkNormal, false, kVendInn | kVendGeneral, "Water/Milk");
@@ -767,33 +835,8 @@ namespace FollowerUnbound
         auto processLists = RE::ProcessLists::GetSingleton();
         if (!processLists) return;
 
-        struct CandidateVendor
-        {
-            RE::Actor* actor{ nullptr };
-            VendorType type{ VendorType::Unknown };
-            float distance{ 0.0f };
-        };
-        std::vector<CandidateVendor> nearbyVendors;
-        for (auto& handle : processLists->highActorHandles) {
-            auto actorPtr = handle.get();
-            if (!actorPtr) continue;
-            auto candidate = actorPtr.get();
-            if (!candidate || candidate->IsDead() || candidate == follower || candidate->IsPlayerRef()) continue;
-
-            float dist = follower->GetPosition().GetDistance(candidate->GetPosition());
-            if (dist > 1500.0f) continue;
-
-            VendorType vt = DetermineVendorType(candidate);
-            if (vt == VendorType::Unknown) continue;
-
-            nearbyVendors.push_back({ candidate, vt, dist });
-            if (nearbyVendors.size() >= 6) break;
-        }
+        auto nearbyVendors = FindNearbyVendors(follower, processLists, 1500.0f);
         if (nearbyVendors.empty()) return;
-
-        std::sort(nearbyVendors.begin(), nearbyVendors.end(), [](const CandidateVendor& a, const CandidateVendor& b) {
-            return a.distance < b.distance;
-        });
 
         // ── ADIM 3: UYUMLU SATICILARIN STOĞUNU TARA (en fazla 6 yakındaki aday) ──
         auto vendMaskFor = [](VendorType vt) -> uint32_t {
@@ -803,6 +846,7 @@ namespace FollowerUnbound
             case VendorType::Innkeeper:      return kVendInn;
             case VendorType::GeneralMerchant: return kVendGeneral;
             case VendorType::Wizard:         return kVendWizard;
+            case VendorType::Healer:         return kVendHealer;
             default: return kVendNone;
             }
         };
@@ -839,6 +883,7 @@ namespace FollowerUnbound
                 case VendorType::Innkeeper: return "inn";
                 case VendorType::GeneralMerchant: return "general";
                 case VendorType::Wizard: return "wizard";
+                case VendorType::Healer: return "healer";
                 default: return "unknown";
                 }
             };
@@ -1060,35 +1105,9 @@ namespace FollowerUnbound
         auto processLists = RE::ProcessLists::GetSingleton();
         if (!processLists) return;
 
-        struct CandidateVendor
-        {
-            RE::Actor* actor{ nullptr };
-            VendorType type{ VendorType::Unknown };
-            float distance{ 0.0f };
-        };
-
-        std::vector<CandidateVendor> nearbyVendors;
-        for (auto& handle : processLists->highActorHandles) {
-            auto actorPtr = handle.get();
-            if (!actorPtr) continue;
-            auto candidate = actorPtr.get();
-            if (!candidate || candidate->IsDead() || candidate == follower || candidate->IsPlayerRef()) continue;
-
-            float dist = follower->GetPosition().GetDistance(candidate->GetPosition());
-            if (dist > 1500.0f) continue;
-
-            VendorType vt = DetermineVendorType(candidate);
-            if (vt != VendorType::Unknown) {
-                nearbyVendors.push_back({ candidate, vt, dist });
-            }
-        }
+        auto nearbyVendors = FindNearbyVendors(follower, processLists, 1500.0f);
 
         if (nearbyVendors.empty()) return;
-
-        // En yakındaki satıcıdan uzağa doğru sırala
-        std::sort(nearbyVendors.begin(), nearbyVendors.end(), [](const CandidateVendor& a, const CandidateVendor& b) {
-            return a.distance < b.distance;
-        });
 
         auto econ = EconomyManager::GetSingleton();
         auto notifier = NotificationManager::GetSingleton();
@@ -1390,6 +1409,7 @@ namespace FollowerUnbound
 
             for (const auto& cand : nearbyVendors) {
                 VendorType vt = cand.type;
+                if (vt == VendorType::Healer) continue; // Clergy only supplies cure potions.
                 uint32_t vmask = (vt == VendorType::Blacksmith) ? kVendSmith :
                                  (vt == VendorType::Apothecary) ? kVendApothecary :
                                  (vt == VendorType::Innkeeper) ? kVendInn :
