@@ -203,3 +203,13 @@
 .gear-meta,.gear-state,.tag{font-size:12px}
 @media(max-width:850px){.gear-list{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}.gear-card{min-height:190px}}
 @media(max-width:640px){.gear-list{grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:9px}.gear-card{min-height:175px;padding:11px}.gear-name{font-size:13px}.gear-name .item-icon{width:31px;height:31px;flex-basis:31px}.follower-picker-menu{max-height:40vh}}
+
+/* Keep the equipment action beside its heading and avoid oversized empty grid tracks. */
+.equipment-panel>.equipment-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:18px;margin-bottom:16px}
+.equipment-toolbar>div{min-width:0}
+.equipment-toolbar .section-title{margin-bottom:7px}
+.equipment-toolbar .notice{max-width:880px;margin:0;font-size:12px;line-height:1.5;color:#b1bbae}
+.equipment-toolbar>[data-equip-selected]{align-self:start;justify-self:end;white-space:nowrap;margin:0}
+.equipment-gear-list{grid-template-columns:repeat(auto-fill,minmax(210px,240px));grid-auto-rows:min-content;align-content:start;justify-content:start;gap:13px;min-height:0;max-height:none;overflow-y:auto;overflow-x:hidden;padding:4px 10px 10px 2px}
+@media(max-width:760px){.equipment-panel>.equipment-toolbar{grid-template-columns:minmax(0,1fr);gap:12px}.equipment-toolbar>[data-equip-selected]{justify-self:start}}
+@media(max-width:640px){.equipment-gear-list{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px}}
