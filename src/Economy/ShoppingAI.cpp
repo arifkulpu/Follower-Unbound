@@ -662,7 +662,6 @@ namespace FollowerUnbound
             const char* label;
         };
 
-        bool thirstFirst = (profile.needs.thirst <= profile.needs.hunger);
         std::vector<Need> needs;
         needs.reserve(48);
 
@@ -687,49 +686,49 @@ namespace FollowerUnbound
         // Healing ingredients support autonomous potion crafting. Purchase only
         // the missing pair needed to reach each existing potion stock target.
         const bool craftPotions = pref.allowCraftPotions;
-        const auto ingredientNeed = [&](int32_t ingredientCount, int32_t partnerCount, int32_t potionCount, uint32_t potionTarget) {
+        const auto ingredientNeed = [&](int32_t ingredientCount, int32_t partnerCount, int32_t potionCount, uint32_t potionTarget, uint32_t ingredientTarget) {
             const uint32_t missingPotions = potionCount < static_cast<int32_t>(potionTarget)
                 ? potionTarget - static_cast<uint32_t>(potionCount) : 0u;
             const auto availablePairs = static_cast<uint32_t>(std::max(0, std::min(ingredientCount, partnerCount)));
             const uint32_t missingPairs = missingPotions > availablePairs ? missingPotions - availablePairs : 0u;
-            return static_cast<uint32_t>(std::max(0, ingredientCount)) + missingPairs;
+            return std::min(ingredientTarget, static_cast<uint32_t>(std::max(0, ingredientCount)) + missingPairs);
         };
         addNeed(SBlueMountainFlower, supplies.blueMountainFlowers,
-                ingredientNeed(supplies.blueMountainFlowers, supplies.wheat, supplies.health, pref.maxHealthPotions), craftPotions && supplies.health < static_cast<int32_t>(pref.maxHealthPotions), false, kVendApothecary, "Blue Mountain Flower");
+                ingredientNeed(supplies.blueMountainFlowers, supplies.wheat, supplies.healthStandard, pref.maxHealthStandard, pref.maxBuyBlueMountainFlowers), craftPotions && supplies.healthStandard < static_cast<int32_t>(pref.maxHealthStandard), false, kVendApothecary, "Blue Mountain Flower");
         addNeed(SWheat, supplies.wheat,
-                ingredientNeed(supplies.wheat, supplies.blueMountainFlowers, supplies.health, pref.maxHealthPotions), craftPotions && supplies.health < static_cast<int32_t>(pref.maxHealthPotions), false, kVendApothecary | kVendGeneral, "Wheat");
+                ingredientNeed(supplies.wheat, supplies.blueMountainFlowers, supplies.healthStandard, pref.maxHealthStandard, pref.maxBuyWheat), craftPotions && supplies.healthStandard < static_cast<int32_t>(pref.maxHealthStandard), false, kVendApothecary | kVendGeneral, "Wheat");
         addNeed(SRedMountainFlower, supplies.redMountainFlowers,
-                ingredientNeed(supplies.redMountainFlowers, supplies.whiteCaps, supplies.magicka, pref.maxMagickaPotions), craftPotions && supplies.magicka < static_cast<int32_t>(pref.maxMagickaPotions), false, kVendApothecary, "Red Mountain Flower");
+                ingredientNeed(supplies.redMountainFlowers, supplies.whiteCaps, supplies.magickaStandard, pref.maxMagickaStandard, pref.maxBuyRedMountainFlowers), craftPotions && supplies.magickaStandard < static_cast<int32_t>(pref.maxMagickaStandard), false, kVendApothecary, "Red Mountain Flower");
         addNeed(SWhiteCap, supplies.whiteCaps,
-                ingredientNeed(supplies.whiteCaps, supplies.redMountainFlowers, supplies.magicka, pref.maxMagickaPotions), craftPotions && supplies.magicka < static_cast<int32_t>(pref.maxMagickaPotions), false, kVendApothecary, "White Cap");
+                ingredientNeed(supplies.whiteCaps, supplies.redMountainFlowers, supplies.magickaStandard, pref.maxMagickaStandard, pref.maxBuyWhiteCaps), craftPotions && supplies.magickaStandard < static_cast<int32_t>(pref.maxMagickaStandard), false, kVendApothecary, "White Cap");
         addNeed(SPurpleMountainFlower, supplies.purpleMountainFlowers,
-                ingredientNeed(supplies.purpleMountainFlowers, supplies.pineThrushEggs, supplies.stamina, pref.maxStaminaPotions), craftPotions && supplies.stamina < static_cast<int32_t>(pref.maxStaminaPotions), false, kVendApothecary, "Purple Mountain Flower");
+                ingredientNeed(supplies.purpleMountainFlowers, supplies.pineThrushEggs, supplies.staminaStandard, pref.maxStaminaStandard, pref.maxBuyPurpleMountainFlowers), craftPotions && supplies.staminaStandard < static_cast<int32_t>(pref.maxStaminaStandard), false, kVendApothecary, "Purple Mountain Flower");
         addNeed(SPineThrushEgg, supplies.pineThrushEggs,
-                ingredientNeed(supplies.pineThrushEggs, supplies.purpleMountainFlowers, supplies.stamina, pref.maxStaminaPotions), craftPotions && supplies.stamina < static_cast<int32_t>(pref.maxStaminaPotions), false, kVendApothecary, "Pine Thrush Egg");
+                ingredientNeed(supplies.pineThrushEggs, supplies.purpleMountainFlowers, supplies.staminaStandard, pref.maxStaminaStandard, pref.maxBuyPineThrushEggs), craftPotions && supplies.staminaStandard < static_cast<int32_t>(pref.maxStaminaStandard), false, kVendApothecary, "Pine Thrush Egg");
 
         // İksirler ve zehirler → simyacı veya genel tüccar
-        addNeed(SHealthMinor, supplies.healthMinor, pref.maxHealthPotions, pref.buyHealthMinor, false, kVendApothecary | kVendGeneral, "Minor Health Potion");
-        addNeed(SHealthStandard, supplies.healthStandard, pref.maxHealthPotions, pref.buyHealthStandard, false, kVendApothecary | kVendGeneral, "Health Potion");
-        addNeed(SHealthPlentiful, supplies.healthPlentiful, pref.maxHealthPotions, pref.buyHealthPlentiful, false, kVendApothecary | kVendGeneral, "Plentiful Health Potion");
-        addNeed(SHealthVigorous, supplies.healthVigorous, pref.maxHealthPotions, pref.buyHealthVigorous, false, kVendApothecary | kVendGeneral, "Vigorous Health Potion");
-        addNeed(SHealthExtreme, supplies.healthExtreme, pref.maxHealthPotions, pref.buyHealthExtreme, false, kVendApothecary | kVendGeneral, "Extreme Health Potion");
-        addNeed(SHealthUltimate, supplies.healthUltimate, pref.maxHealthPotions, pref.buyHealthUltimate, false, kVendApothecary | kVendGeneral, "Ultimate Health Potion");
-        addNeed(SMagickaMinor, supplies.magickaMinor, pref.maxMagickaPotions, pref.buyMagickaMinor, false, kVendApothecary | kVendGeneral, "Minor Magicka Potion");
-        addNeed(SMagickaStandard, supplies.magickaStandard, pref.maxMagickaPotions, pref.buyMagickaStandard, false, kVendApothecary | kVendGeneral, "Magicka Potion");
-        addNeed(SMagickaPlentiful, supplies.magickaPlentiful, pref.maxMagickaPotions, pref.buyMagickaPlentiful, false, kVendApothecary | kVendGeneral, "Plentiful Magicka Potion");
-        addNeed(SMagickaVigorous, supplies.magickaVigorous, pref.maxMagickaPotions, pref.buyMagickaVigorous, false, kVendApothecary | kVendGeneral, "Vigorous Magicka Potion");
-        addNeed(SMagickaExtreme, supplies.magickaExtreme, pref.maxMagickaPotions, pref.buyMagickaExtreme, false, kVendApothecary | kVendGeneral, "Extreme Magicka Potion");
-        addNeed(SMagickaUltimate, supplies.magickaUltimate, pref.maxMagickaPotions, pref.buyMagickaUltimate, false, kVendApothecary | kVendGeneral, "Ultimate Magicka Potion");
-        addNeed(SStaminaMinor, supplies.staminaMinor, pref.maxStaminaPotions, pref.buyStaminaMinor, false, kVendApothecary | kVendGeneral, "Minor Stamina Potion");
-        addNeed(SStaminaStandard, supplies.staminaStandard, pref.maxStaminaPotions, pref.buyStaminaStandard, false, kVendApothecary | kVendGeneral, "Stamina Potion");
-        addNeed(SStaminaPlentiful, supplies.staminaPlentiful, pref.maxStaminaPotions, pref.buyStaminaPlentiful, false, kVendApothecary | kVendGeneral, "Plentiful Stamina Potion");
-        addNeed(SStaminaVigorous, supplies.staminaVigorous, pref.maxStaminaPotions, pref.buyStaminaVigorous, false, kVendApothecary | kVendGeneral, "Vigorous Stamina Potion");
-        addNeed(SStaminaExtreme, supplies.staminaExtreme, pref.maxStaminaPotions, pref.buyStaminaExtreme, false, kVendApothecary | kVendGeneral, "Extreme Stamina Potion");
-        addNeed(SStaminaUltimate, supplies.staminaUltimate, pref.maxStaminaPotions, pref.buyStaminaUltimate, false, kVendApothecary | kVendGeneral, "Ultimate Stamina Potion");
-        addNeed(SPoisonHealth, supplies.poisonHealth, pref.maxPoisons, pref.buyPoisons && pref.buyPoisonHealth, false, kVendApothecary | kVendGeneral, "Health Damage Poison");
-        addNeed(SPoisonMagicka, supplies.poisonMagicka, pref.maxPoisons, pref.buyPoisons && pref.buyPoisonMagicka, false, kVendApothecary | kVendGeneral, "Magicka Damage Poison");
-        addNeed(SPoisonStamina, supplies.poisonStamina, pref.maxPoisons, pref.buyPoisons && pref.buyPoisonStamina, false, kVendApothecary | kVendGeneral, "Stamina Damage Poison");
-        addNeed(SPoisonOther, supplies.poisonOther, pref.maxPoisons, pref.buyPoisons && pref.buyPoisonOther, false, kVendApothecary | kVendGeneral, "Other Poison");
+        addNeed(SHealthMinor, supplies.healthMinor, pref.maxHealthMinor, pref.buyHealthMinor, false, kVendApothecary | kVendGeneral, "Minor Health Potion");
+        addNeed(SHealthStandard, supplies.healthStandard, pref.maxHealthStandard, pref.buyHealthStandard, false, kVendApothecary | kVendGeneral, "Health Potion");
+        addNeed(SHealthPlentiful, supplies.healthPlentiful, pref.maxHealthPlentiful, pref.buyHealthPlentiful, false, kVendApothecary | kVendGeneral, "Plentiful Health Potion");
+        addNeed(SHealthVigorous, supplies.healthVigorous, pref.maxHealthVigorous, pref.buyHealthVigorous, false, kVendApothecary | kVendGeneral, "Vigorous Health Potion");
+        addNeed(SHealthExtreme, supplies.healthExtreme, pref.maxHealthExtreme, pref.buyHealthExtreme, false, kVendApothecary | kVendGeneral, "Extreme Health Potion");
+        addNeed(SHealthUltimate, supplies.healthUltimate, pref.maxHealthUltimate, pref.buyHealthUltimate, false, kVendApothecary | kVendGeneral, "Ultimate Health Potion");
+        addNeed(SMagickaMinor, supplies.magickaMinor, pref.maxMagickaMinor, pref.buyMagickaMinor, false, kVendApothecary | kVendGeneral, "Minor Magicka Potion");
+        addNeed(SMagickaStandard, supplies.magickaStandard, pref.maxMagickaStandard, pref.buyMagickaStandard, false, kVendApothecary | kVendGeneral, "Magicka Potion");
+        addNeed(SMagickaPlentiful, supplies.magickaPlentiful, pref.maxMagickaPlentiful, pref.buyMagickaPlentiful, false, kVendApothecary | kVendGeneral, "Plentiful Magicka Potion");
+        addNeed(SMagickaVigorous, supplies.magickaVigorous, pref.maxMagickaVigorous, pref.buyMagickaVigorous, false, kVendApothecary | kVendGeneral, "Vigorous Magicka Potion");
+        addNeed(SMagickaExtreme, supplies.magickaExtreme, pref.maxMagickaExtreme, pref.buyMagickaExtreme, false, kVendApothecary | kVendGeneral, "Extreme Magicka Potion");
+        addNeed(SMagickaUltimate, supplies.magickaUltimate, pref.maxMagickaUltimate, pref.buyMagickaUltimate, false, kVendApothecary | kVendGeneral, "Ultimate Magicka Potion");
+        addNeed(SStaminaMinor, supplies.staminaMinor, pref.maxStaminaMinor, pref.buyStaminaMinor, false, kVendApothecary | kVendGeneral, "Minor Stamina Potion");
+        addNeed(SStaminaStandard, supplies.staminaStandard, pref.maxStaminaStandard, pref.buyStaminaStandard, false, kVendApothecary | kVendGeneral, "Stamina Potion");
+        addNeed(SStaminaPlentiful, supplies.staminaPlentiful, pref.maxStaminaPlentiful, pref.buyStaminaPlentiful, false, kVendApothecary | kVendGeneral, "Plentiful Stamina Potion");
+        addNeed(SStaminaVigorous, supplies.staminaVigorous, pref.maxStaminaVigorous, pref.buyStaminaVigorous, false, kVendApothecary | kVendGeneral, "Vigorous Stamina Potion");
+        addNeed(SStaminaExtreme, supplies.staminaExtreme, pref.maxStaminaExtreme, pref.buyStaminaExtreme, false, kVendApothecary | kVendGeneral, "Extreme Stamina Potion");
+        addNeed(SStaminaUltimate, supplies.staminaUltimate, pref.maxStaminaUltimate, pref.buyStaminaUltimate, false, kVendApothecary | kVendGeneral, "Ultimate Stamina Potion");
+        addNeed(SPoisonHealth, supplies.poisonHealth, pref.maxPoisonHealth, pref.buyPoisons && pref.buyPoisonHealth, false, kVendApothecary | kVendGeneral, "Health Damage Poison");
+        addNeed(SPoisonMagicka, supplies.poisonMagicka, pref.maxPoisonMagicka, pref.buyPoisons && pref.buyPoisonMagicka, false, kVendApothecary | kVendGeneral, "Magicka Damage Poison");
+        addNeed(SPoisonStamina, supplies.poisonStamina, pref.maxPoisonStamina, pref.buyPoisons && pref.buyPoisonStamina, false, kVendApothecary | kVendGeneral, "Stamina Damage Poison");
+        addNeed(SPoisonOther, supplies.poisonOther, pref.maxPoisonOther, pref.buyPoisons && pref.buyPoisonOther, false, kVendApothecary | kVendGeneral, "Other Poison");
         addNeed(SInvisibility, supplies.invisibilityPotions, pref.maxInvisibilityPotions, pref.buyInvisibilityPotions, false, kVendApothecary | kVendGeneral, "Invisibility Potion");
         // Ok/cıvata → demirci veya genel tüccar
         addNeed(SArrow, supplies.arrows, pref.maxArrows, pref.buyArrows, true, kVendSmith | kVendGeneral, "Arrows");
@@ -827,6 +826,44 @@ namespace FollowerUnbound
             stockScans++;
         }
 
+        // Explain why a nearby merchant did or did not satisfy each enabled
+        // purchase target. This is rate-limited and makes seller classification
+        // and stock matching observable in the user's SKSE log.
+        static std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> lastSupplyCheckLog;
+        auto lastSupplyLog = lastSupplyCheckLog.find(formID);
+        if (lastSupplyLog == lastSupplyCheckLog.end() || std::chrono::duration<float>(now - lastSupplyLog->second).count() >= 30.0f) {
+            auto vendorLabel = [](VendorType type) -> const char* {
+                switch (type) {
+                case VendorType::Blacksmith: return "smith";
+                case VendorType::Apothecary: return "apothecary";
+                case VendorType::Innkeeper: return "inn";
+                case VendorType::GeneralMerchant: return "general";
+                case VendorType::Wizard: return "wizard";
+                default: return "unknown";
+                }
+            };
+            std::string vendorSummary;
+            for (const auto& vendor : nearbyVendors) {
+                if (!vendorSummary.empty()) vendorSummary += ", ";
+                vendorSummary += std::format("{}({})", vendor.actor->GetName(), vendorLabel(vendor.type));
+            }
+            std::string demandSummary;
+            for (const auto& need : needs) {
+                if (!isNeeded(need)) continue;
+                const auto& entries = stock.buckets[static_cast<int>(need.cat) - 1];
+                int32_t eligibleStock = 0;
+                for (const auto& entry : entries) {
+                    if ((entry.vendorMask & need.vendMask) != 0) eligibleStock += entry.stock;
+                }
+                if (!demandSummary.empty()) demandSummary += ", ";
+                demandSummary += std::format("{} {}/{} stock={}", need.label, need.current, need.limit, eligibleStock);
+            }
+            logger::info("Shopping scan: follower={} spendableGold={} vendors=[{}] unmet=[{}].",
+                follower->GetName(), std::max(0, invGold - static_cast<int32_t>(pref.savingsEnabled ? pref.savedGold : 0)),
+                vendorSummary.empty() ? "none" : vendorSummary, demandSummary.empty() ? "none" : demandSummary);
+            lastSupplyCheckLog[formID] = now;
+        }
+
         // If a recipe pair is already carried or stocked by an alchemist, defer
         // the finished-potion purchase so the next crafting tick can use it.
         auto available = [&](SupplyCat cat, int32_t carried, uint32_t vendorMask) {
@@ -836,14 +873,14 @@ namespace FollowerUnbound
                 return entry.stock > 0 && (entry.vendorMask & vendorMask) != 0;
             });
         };
-        auto deferPotionPurchase = [&](std::initializer_list<SupplyCat> potions, SupplyCat ingredientA, int32_t countA, uint32_t vendorsA,
+        auto deferPotionPurchase = [&](SupplyCat potion, SupplyCat ingredientA, int32_t countA, uint32_t vendorsA,
                                        SupplyCat ingredientB, int32_t countB, uint32_t vendorsB) {
             if (!craftPotions || !available(ingredientA, countA, vendorsA) || !available(ingredientB, countB, vendorsB)) return;
-            for (auto& need : needs) if (std::find(potions.begin(), potions.end(), need.cat) != potions.end()) need.enabled = false;
+            for (auto& need : needs) if (need.cat == potion) need.enabled = false;
         };
-        deferPotionPurchase({ SHealthMinor, SHealthStandard, SHealthPlentiful, SHealthVigorous, SHealthExtreme, SHealthUltimate }, SBlueMountainFlower, supplies.blueMountainFlowers, kVendApothecary, SWheat, supplies.wheat, kVendApothecary | kVendGeneral);
-        deferPotionPurchase({ SMagickaMinor, SMagickaStandard, SMagickaPlentiful, SMagickaVigorous, SMagickaExtreme, SMagickaUltimate }, SRedMountainFlower, supplies.redMountainFlowers, kVendApothecary, SWhiteCap, supplies.whiteCaps, kVendApothecary);
-        deferPotionPurchase({ SStaminaMinor, SStaminaStandard, SStaminaPlentiful, SStaminaVigorous, SStaminaExtreme, SStaminaUltimate }, SPurpleMountainFlower, supplies.purpleMountainFlowers, kVendApothecary, SPineThrushEgg, supplies.pineThrushEggs, kVendApothecary);
+        deferPotionPurchase(SHealthStandard, SBlueMountainFlower, supplies.blueMountainFlowers, kVendApothecary, SWheat, supplies.wheat, kVendApothecary | kVendGeneral);
+        deferPotionPurchase(SMagickaStandard, SRedMountainFlower, supplies.redMountainFlowers, kVendApothecary, SWhiteCap, supplies.whiteCaps, kVendApothecary);
+        deferPotionPurchase(SStaminaStandard, SPurpleMountainFlower, supplies.purpleMountainFlowers, kVendApothecary, SPineThrushEgg, supplies.pineThrushEggs, kVendApothecary);
 
         // Report medical stock only occasionally; this distinguishes an item
         // that a merchant does not carry from one blocked by funds or settings.
@@ -953,49 +990,27 @@ namespace FollowerUnbound
             return false;
         };
 
-        std::vector<const Need*> order;
-        for (const auto& n : needs) if (n.cat == STreatment) order.push_back(&n);
-        for (const auto& n : needs) if (n.cat == SCurePoison) order.push_back(&n);
-        for (SupplyCat cat : { SBlueMountainFlower, SWheat, SRedMountainFlower, SWhiteCap, SPurpleMountainFlower, SPineThrushEgg }) {
-            for (const auto& n : needs) if (n.cat == cat) order.push_back(&n);
-        }
-
-        // Purchase order remains based on the follower's thirst/hunger needs;
-        // individual stock entries are filtered by their actual vendor type.
-        auto pushGroup = [&](SupplyCat a, SupplyCat b) {
-            for (const auto& n : needs) {
-                if (n.cat == a || n.cat == b) order.push_back(&n);
-            }
-        };
-        if (thirstFirst) {
-            pushGroup(SDrinkN, SDrinkA);
-            pushGroup(SFoodL, SFoodM); // Large+Medium
-            // Small food ayrıca
-            for (const auto& n : needs) if (n.cat == SFoodS) order.push_back(&n);
-        } else {
-            pushGroup(SFoodL, SFoodM);
-            for (const auto& n : needs) if (n.cat == SFoodS) order.push_back(&n);
-            pushGroup(SDrinkN, SDrinkA);
-        }
-        for (SupplyCat cat : { SHealth, SMagicka, SStamina, SPoison, SPoisonHealth, SPoisonMagicka, SPoisonStamina, SPoisonOther, SInvisibility, SArrow, SBolt, SSoulPetty, SSoulLesser, SSoulCommon, SSoulGreater, SSoulGrand, SSoulBlack }) {
-            for (const auto& n : needs) if (n.cat == cat) order.push_back(&n);
-        }
-        for (SupplyCat cat : { STorch, SLanternOil, SSoap }) {
-            for (const auto& n : needs) if (n.cat == cat) order.push_back(&n);
-        }
-
-        for (const auto* n : order) {
+        // Rotate across every enabled product so early entries (typically food)
+        // cannot starve potions, ingredients, poisons, or utility supplies.
+        const size_t start = needs.empty() ? 0 : (_purchaseCursor[formID] % needs.size());
+        size_t nextCursor = needs.empty() ? 0 : (start + 1) % needs.size();
+        for (size_t offset = 0; offset < needs.size(); ++offset) {
             if (purchasesThisRound >= kMaxPurchasesPerRound) break;
-            if (!isNeeded(*n)) continue;
-            const uint32_t outstanding = n->limit - static_cast<uint32_t>(n->current);
-            const uint32_t purchaseTarget = (n->cat == STreatment) ? outstanding
-                : (n->isAmmo ? std::min<uint32_t>(outstanding, 15u * batchMult)
+            const size_t index = (start + offset) % needs.size();
+            const auto& n = needs[index];
+            if (!isNeeded(n)) continue;
+            const uint32_t outstanding = n.limit - static_cast<uint32_t>(n.current);
+            const uint32_t purchaseTarget = (n.cat == STreatment) ? outstanding
+                : (n.isAmmo ? std::min<uint32_t>(outstanding, 15u * batchMult)
                              : std::min<uint32_t>(outstanding, batchMult));
-            if (tryBuyStock(n->cat, purchaseTarget,
-                             n->isAmmo, n->vendMask, n->label)) {
+            if (tryBuyStock(n.cat, purchaseTarget,
+                             n.isAmmo, n.vendMask, n.label)) {
                 purchasesThisRound++;
+                nextCursor = (index + 1) % needs.size();
             }
         }
+
+        if (!needs.empty()) _purchaseCursor[formID] = nextCursor;
 
         if (purchasesThisRound > 0) {
             _lastShopTime[formID] = now;
@@ -1245,18 +1260,32 @@ namespace FollowerUnbound
             int32_t potionExcess = 0;
             if (settings->sellPotions && pref.allowSellPotions && cat != SOther) {
                 if (cat >= SHealthMinor && cat <= SHealthUltimate) {
-                    potionExcess = categoryExcess(cat, pref.maxHealthPotions, count);
+                    const uint32_t limits[] = { pref.maxHealthMinor, pref.maxHealthStandard, pref.maxHealthPlentiful,
+                        pref.maxHealthVigorous, pref.maxHealthExtreme, pref.maxHealthUltimate };
+                    potionExcess = categoryExcess(cat, limits[static_cast<size_t>(cat - SHealthMinor)], count);
                 } else if (cat >= SMagickaMinor && cat <= SMagickaUltimate) {
-                    potionExcess = categoryExcess(cat, pref.maxMagickaPotions, count);
+                    const uint32_t limits[] = { pref.maxMagickaMinor, pref.maxMagickaStandard, pref.maxMagickaPlentiful,
+                        pref.maxMagickaVigorous, pref.maxMagickaExtreme, pref.maxMagickaUltimate };
+                    potionExcess = categoryExcess(cat, limits[static_cast<size_t>(cat - SMagickaMinor)], count);
                 } else if (cat >= SStaminaMinor && cat <= SStaminaUltimate) {
-                    potionExcess = categoryExcess(cat, pref.maxStaminaPotions, count);
+                    const uint32_t limits[] = { pref.maxStaminaMinor, pref.maxStaminaStandard, pref.maxStaminaPlentiful,
+                        pref.maxStaminaVigorous, pref.maxStaminaExtreme, pref.maxStaminaUltimate };
+                    potionExcess = categoryExcess(cat, limits[static_cast<size_t>(cat - SStaminaMinor)], count);
                 } else if (cat == SHealth) {
                     potionExcess = categoryExcess(cat, pref.maxHealthPotions, count);
                 } else if (cat == SMagicka) {
                     potionExcess = categoryExcess(cat, pref.maxMagickaPotions, count);
                 } else if (cat == SStamina) {
                     potionExcess = categoryExcess(cat, pref.maxStaminaPotions, count);
-                } else if (cat == SPoison || cat == SPoisonHealth || cat == SPoisonMagicka || cat == SPoisonStamina || cat == SPoisonOther) {
+                } else if (cat == SPoisonHealth) {
+                    potionExcess = categoryExcess(cat, pref.maxPoisonHealth, count);
+                } else if (cat == SPoisonMagicka) {
+                    potionExcess = categoryExcess(cat, pref.maxPoisonMagicka, count);
+                } else if (cat == SPoisonStamina) {
+                    potionExcess = categoryExcess(cat, pref.maxPoisonStamina, count);
+                } else if (cat == SPoisonOther) {
+                    potionExcess = categoryExcess(cat, pref.maxPoisonOther, count);
+                } else if (cat == SPoison) {
                     potionExcess = categoryExcess(cat, pref.maxPoisons, count);
                 } else if (cat == SInvisibility) {
                     potionExcess = categoryExcess(cat, pref.maxInvisibilityPotions, count);

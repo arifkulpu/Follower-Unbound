@@ -197,6 +197,18 @@ namespace FollowerUnbound
         bool buyPoisonHealth{ true }, buyPoisonMagicka{ true }, buyPoisonStamina{ true }, buyPoisonOther{ true };
         bool buyInvisibilityPotions{ true };
         uint32_t maxInvisibilityPotions{ 3 };
+
+        // Independent target stock for each purchasable restorative potion tier.
+        uint32_t maxHealthMinor{ 5 }, maxHealthStandard{ 5 }, maxHealthPlentiful{ 5 };
+        uint32_t maxHealthVigorous{ 5 }, maxHealthExtreme{ 5 }, maxHealthUltimate{ 5 };
+        uint32_t maxMagickaMinor{ 5 }, maxMagickaStandard{ 5 }, maxMagickaPlentiful{ 5 };
+        uint32_t maxMagickaVigorous{ 5 }, maxMagickaExtreme{ 5 }, maxMagickaUltimate{ 5 };
+        uint32_t maxStaminaMinor{ 5 }, maxStaminaStandard{ 5 }, maxStaminaPlentiful{ 5 };
+        uint32_t maxStaminaVigorous{ 5 }, maxStaminaExtreme{ 5 }, maxStaminaUltimate{ 5 };
+        uint32_t maxPoisonHealth{ 5 }, maxPoisonMagicka{ 5 }, maxPoisonStamina{ 5 }, maxPoisonOther{ 5 };
+        uint32_t maxBuyBlueMountainFlowers{ 5 }, maxBuyWheat{ 5 };
+        uint32_t maxBuyRedMountainFlowers{ 5 }, maxBuyWhiteCaps{ 5 };
+        uint32_t maxBuyPurpleMountainFlowers{ 5 }, maxBuyPineThrushEggs{ 5 };
     };
 
     class FollowerProfile

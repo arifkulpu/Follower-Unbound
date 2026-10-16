@@ -81,12 +81,23 @@ namespace FollowerUnbound
                 {"maxPotionFlowers",p.maxPotionFlowers},
                 {"buyHealthMinor",p.buyHealthMinor},{"buyHealthStandard",p.buyHealthStandard},{"buyHealthPlentiful",p.buyHealthPlentiful},
                 {"buyHealthVigorous",p.buyHealthVigorous},{"buyHealthExtreme",p.buyHealthExtreme},{"buyHealthUltimate",p.buyHealthUltimate},
+                {"maxHealthMinor",p.maxHealthMinor},{"maxHealthStandard",p.maxHealthStandard},{"maxHealthPlentiful",p.maxHealthPlentiful},
+                {"maxHealthVigorous",p.maxHealthVigorous},{"maxHealthExtreme",p.maxHealthExtreme},{"maxHealthUltimate",p.maxHealthUltimate},
                 {"buyMagickaMinor",p.buyMagickaMinor},{"buyMagickaStandard",p.buyMagickaStandard},{"buyMagickaPlentiful",p.buyMagickaPlentiful},
                 {"buyMagickaVigorous",p.buyMagickaVigorous},{"buyMagickaExtreme",p.buyMagickaExtreme},{"buyMagickaUltimate",p.buyMagickaUltimate},
+                {"maxMagickaMinor",p.maxMagickaMinor},{"maxMagickaStandard",p.maxMagickaStandard},{"maxMagickaPlentiful",p.maxMagickaPlentiful},
+                {"maxMagickaVigorous",p.maxMagickaVigorous},{"maxMagickaExtreme",p.maxMagickaExtreme},{"maxMagickaUltimate",p.maxMagickaUltimate},
                 {"buyStaminaMinor",p.buyStaminaMinor},{"buyStaminaStandard",p.buyStaminaStandard},{"buyStaminaPlentiful",p.buyStaminaPlentiful},
                 {"buyStaminaVigorous",p.buyStaminaVigorous},{"buyStaminaExtreme",p.buyStaminaExtreme},{"buyStaminaUltimate",p.buyStaminaUltimate},
+                {"maxStaminaMinor",p.maxStaminaMinor},{"maxStaminaStandard",p.maxStaminaStandard},{"maxStaminaPlentiful",p.maxStaminaPlentiful},
+                {"maxStaminaVigorous",p.maxStaminaVigorous},{"maxStaminaExtreme",p.maxStaminaExtreme},{"maxStaminaUltimate",p.maxStaminaUltimate},
                 {"buyPoisonHealth",p.buyPoisonHealth},{"buyPoisonMagicka",p.buyPoisonMagicka},
                 {"buyPoisonStamina",p.buyPoisonStamina},{"buyPoisonOther",p.buyPoisonOther},
+                {"maxPoisonHealth",p.maxPoisonHealth},{"maxPoisonMagicka",p.maxPoisonMagicka},
+                {"maxPoisonStamina",p.maxPoisonStamina},{"maxPoisonOther",p.maxPoisonOther},
+                {"maxBuyBlueMountainFlowers",p.maxBuyBlueMountainFlowers},{"maxBuyWheat",p.maxBuyWheat},
+                {"maxBuyRedMountainFlowers",p.maxBuyRedMountainFlowers},{"maxBuyWhiteCaps",p.maxBuyWhiteCaps},
+                {"maxBuyPurpleMountainFlowers",p.maxBuyPurpleMountainFlowers},{"maxBuyPineThrushEggs",p.maxBuyPineThrushEggs},
                 {"buyInvisibilityPotions",p.buyInvisibilityPotions},{"maxInvisibilityPotions",p.maxInvisibilityPotions},
                 {"maxTorches",p.maxTorches},{"buyLanternOil",p.buyLanternOil},{"maxLanternOil",p.maxLanternOil},
                 {"buySoap",p.buySoap},{"maxSoap",p.maxSoap},
@@ -160,14 +171,28 @@ namespace FollowerUnbound
             FU_BOOL_PREF("buyHealthMinor", buyHealthMinor) FU_BOOL_PREF("buyHealthStandard", buyHealthStandard)
             FU_BOOL_PREF("buyHealthPlentiful", buyHealthPlentiful) FU_BOOL_PREF("buyHealthVigorous", buyHealthVigorous)
             FU_BOOL_PREF("buyHealthExtreme", buyHealthExtreme) FU_BOOL_PREF("buyHealthUltimate", buyHealthUltimate)
+            FU_UINT_PREF("maxHealthMinor", maxHealthMinor, 0, 25) FU_UINT_PREF("maxHealthStandard", maxHealthStandard, 0, 25)
+            FU_UINT_PREF("maxHealthPlentiful", maxHealthPlentiful, 0, 25) FU_UINT_PREF("maxHealthVigorous", maxHealthVigorous, 0, 25)
+            FU_UINT_PREF("maxHealthExtreme", maxHealthExtreme, 0, 25) FU_UINT_PREF("maxHealthUltimate", maxHealthUltimate, 0, 25)
             FU_BOOL_PREF("buyMagickaMinor", buyMagickaMinor) FU_BOOL_PREF("buyMagickaStandard", buyMagickaStandard)
             FU_BOOL_PREF("buyMagickaPlentiful", buyMagickaPlentiful) FU_BOOL_PREF("buyMagickaVigorous", buyMagickaVigorous)
             FU_BOOL_PREF("buyMagickaExtreme", buyMagickaExtreme) FU_BOOL_PREF("buyMagickaUltimate", buyMagickaUltimate)
+            FU_UINT_PREF("maxMagickaMinor", maxMagickaMinor, 0, 25) FU_UINT_PREF("maxMagickaStandard", maxMagickaStandard, 0, 25)
+            FU_UINT_PREF("maxMagickaPlentiful", maxMagickaPlentiful, 0, 25) FU_UINT_PREF("maxMagickaVigorous", maxMagickaVigorous, 0, 25)
+            FU_UINT_PREF("maxMagickaExtreme", maxMagickaExtreme, 0, 25) FU_UINT_PREF("maxMagickaUltimate", maxMagickaUltimate, 0, 25)
             FU_BOOL_PREF("buyStaminaMinor", buyStaminaMinor) FU_BOOL_PREF("buyStaminaStandard", buyStaminaStandard)
             FU_BOOL_PREF("buyStaminaPlentiful", buyStaminaPlentiful) FU_BOOL_PREF("buyStaminaVigorous", buyStaminaVigorous)
             FU_BOOL_PREF("buyStaminaExtreme", buyStaminaExtreme) FU_BOOL_PREF("buyStaminaUltimate", buyStaminaUltimate)
+            FU_UINT_PREF("maxStaminaMinor", maxStaminaMinor, 0, 25) FU_UINT_PREF("maxStaminaStandard", maxStaminaStandard, 0, 25)
+            FU_UINT_PREF("maxStaminaPlentiful", maxStaminaPlentiful, 0, 25) FU_UINT_PREF("maxStaminaVigorous", maxStaminaVigorous, 0, 25)
+            FU_UINT_PREF("maxStaminaExtreme", maxStaminaExtreme, 0, 25) FU_UINT_PREF("maxStaminaUltimate", maxStaminaUltimate, 0, 25)
             FU_BOOL_PREF("buyPoisonHealth", buyPoisonHealth) FU_BOOL_PREF("buyPoisonMagicka", buyPoisonMagicka)
             FU_BOOL_PREF("buyPoisonStamina", buyPoisonStamina) FU_BOOL_PREF("buyPoisonOther", buyPoisonOther)
+            FU_UINT_PREF("maxPoisonHealth", maxPoisonHealth, 0, 25) FU_UINT_PREF("maxPoisonMagicka", maxPoisonMagicka, 0, 25)
+            FU_UINT_PREF("maxPoisonStamina", maxPoisonStamina, 0, 25) FU_UINT_PREF("maxPoisonOther", maxPoisonOther, 0, 25)
+            FU_UINT_PREF("maxBuyBlueMountainFlowers", maxBuyBlueMountainFlowers, 0, 50) FU_UINT_PREF("maxBuyWheat", maxBuyWheat, 0, 50)
+            FU_UINT_PREF("maxBuyRedMountainFlowers", maxBuyRedMountainFlowers, 0, 50) FU_UINT_PREF("maxBuyWhiteCaps", maxBuyWhiteCaps, 0, 50)
+            FU_UINT_PREF("maxBuyPurpleMountainFlowers", maxBuyPurpleMountainFlowers, 0, 50) FU_UINT_PREF("maxBuyPineThrushEggs", maxBuyPineThrushEggs, 0, 50)
             FU_BOOL_PREF("buyInvisibilityPotions", buyInvisibilityPotions) FU_UINT_PREF("maxInvisibilityPotions", maxInvisibilityPotions, 0, 25)
             FU_UINT_PREF("maxTorches", maxTorches, 0, 20) FU_BOOL_PREF("buyLanternOil", buyLanternOil)
             FU_UINT_PREF("maxLanternOil", maxLanternOil, 0, 20) FU_BOOL_PREF("buySoap", buySoap)

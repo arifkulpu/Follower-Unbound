@@ -685,9 +685,9 @@ namespace FollowerUnbound
             struct PotionRecipe { RE::TESBoundObject* first; RE::TESBoundObject* second; RE::TESBoundObject* result; int32_t stock; uint32_t target; const char* label; };
             const auto stock = ShoppingAI::GetSupplyCounts(actor);
             const PotionRecipe recipes[] = {
-                { blueFlowerObj, wheatObj, healingPotionObj, stock.health, profile.preferences.maxHealthPotions, "Healing Potion" },
-                { redFlowerObj, whiteCapObj, magickaPotionObj, stock.magicka, profile.preferences.maxMagickaPotions, "Magicka Potion" },
-                { purpleFlowerObj, pineThrushEggObj, staminaPotionObj, stock.stamina, profile.preferences.maxStaminaPotions, "Stamina Potion" }
+                { blueFlowerObj, wheatObj, healingPotionObj, stock.healthStandard, profile.preferences.maxHealthStandard, "Healing Potion" },
+                { redFlowerObj, whiteCapObj, magickaPotionObj, stock.magickaStandard, profile.preferences.maxMagickaStandard, "Magicka Potion" },
+                { purpleFlowerObj, pineThrushEggObj, staminaPotionObj, stock.staminaStandard, profile.preferences.maxStaminaStandard, "Stamina Potion" }
             };
             for (const auto& recipe : recipes) {
                 if (!recipe.first || !recipe.second || !recipe.result || recipe.stock >= static_cast<int32_t>(recipe.target)) continue;

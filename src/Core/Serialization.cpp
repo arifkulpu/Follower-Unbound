@@ -479,6 +479,13 @@ namespace FollowerUnbound
                         const auto actual = a_intfc->ReadRecordData(&preferences, legacySize);
                         bytesRead += actual;
                         if (actual != legacySize) recordOK = false;
+                    } else if (version == 16 || version == 17) {
+                        // Version 18 appends independent purchase targets for
+                        // potion tiers, poison effects, and potion ingredients.
+                        constexpr auto legacySize = static_cast<uint32_t>(offsetof(FollowerPreferences, maxHealthMinor));
+                        const auto actual = a_intfc->ReadRecordData(&preferences, legacySize);
+                        bytesRead += actual;
+                        if (actual != legacySize) recordOK = false;
                     } else {
                         read(preferences);
                     }
@@ -511,6 +518,32 @@ namespace FollowerUnbound
                         preferences.buyGreaterSoulGems = true;
                         preferences.buyGrandSoulGems = true;
                         preferences.buyBlackSoulGems = true;
+                    }
+                    if (version < 18) {
+                        // Preserve the old shared targets as the initial value
+                        // for every newly independent tier/effect.
+                        preferences.maxHealthMinor = preferences.maxHealthPotions;
+                        preferences.maxHealthStandard = preferences.maxHealthPotions;
+                        preferences.maxHealthPlentiful = preferences.maxHealthPotions;
+                        preferences.maxHealthVigorous = preferences.maxHealthPotions;
+                        preferences.maxHealthExtreme = preferences.maxHealthPotions;
+                        preferences.maxHealthUltimate = preferences.maxHealthPotions;
+                        preferences.maxMagickaMinor = preferences.maxMagickaPotions;
+                        preferences.maxMagickaStandard = preferences.maxMagickaPotions;
+                        preferences.maxMagickaPlentiful = preferences.maxMagickaPotions;
+                        preferences.maxMagickaVigorous = preferences.maxMagickaPotions;
+                        preferences.maxMagickaExtreme = preferences.maxMagickaPotions;
+                        preferences.maxMagickaUltimate = preferences.maxMagickaPotions;
+                        preferences.maxStaminaMinor = preferences.maxStaminaPotions;
+                        preferences.maxStaminaStandard = preferences.maxStaminaPotions;
+                        preferences.maxStaminaPlentiful = preferences.maxStaminaPotions;
+                        preferences.maxStaminaVigorous = preferences.maxStaminaPotions;
+                        preferences.maxStaminaExtreme = preferences.maxStaminaPotions;
+                        preferences.maxStaminaUltimate = preferences.maxStaminaPotions;
+                        preferences.maxPoisonHealth = preferences.maxPoisons;
+                        preferences.maxPoisonMagicka = preferences.maxPoisons;
+                        preferences.maxPoisonStamina = preferences.maxPoisons;
+                        preferences.maxPoisonOther = preferences.maxPoisons;
                     }
 
                     // New defaults: routine arrow/bolt purchases are opt-in;

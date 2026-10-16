@@ -41,6 +41,7 @@ namespace FollowerUnbound
     private:
         ShoppingAI() = default;
         std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _lastShopTime;
+        std::unordered_map<RE::FormID, size_t> _purchaseCursor;
         std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _lastSellTime;
         // Takipçi + eşya -> son satın alma zamanı (yeni alınan eşyanın hemen
         // geri satılmasını önleyen alış-satış döngüsü koruması)
