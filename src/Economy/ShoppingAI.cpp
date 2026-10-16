@@ -559,6 +559,7 @@ namespace FollowerUnbound
         RE::TESBoundObject* obj{ nullptr };
         int32_t stock{ 0 };
         const char* vendorName{ nullptr };
+        uint32_t vendorMask{ kVendNone };
     };
 
     struct VendorStock
@@ -566,7 +567,7 @@ namespace FollowerUnbound
         std::vector<StockEntry> buckets[64]; // SupplyCat-1 indexli (SOther excluded)
     };
 
-    static void ScanVendorStock(RE::Actor* vendor, ItemEvaluator* ev, const char* vendorName, VendorStock& out)
+    static void ScanVendorStock(RE::Actor* vendor, ItemEvaluator* ev, const char* vendorName, uint32_t vendorMask, VendorStock& out)
     {
         if (!vendor) return;
         auto inventory = vendor->GetInventory();
@@ -575,30 +576,33 @@ namespace FollowerUnbound
             if (obj->GetFormID() == 0x0000000F) continue; // gold
             SupplyCat cat = ClassifySupply(ev, obj);
             if (cat == SOther) continue;
-            out.buckets[static_cast<int>(cat) - 1].push_back({ obj, invData.first, vendorName });
+            out.buckets[static_cast<int>(cat) - 1].push_back({ obj, invData.first, vendorName, vendorMask });
         }
     }
 
     // Ok/arbalet oku: takipçinin halihazırda kullandığı ok tipini tercih et
-    static StockEntry* PickAmmoEntry(std::vector<StockEntry>& stock, RE::Actor* follower)
+    static StockEntry* PickAmmoEntry(std::vector<StockEntry>& stock, RE::Actor* follower, uint32_t requiredMask)
     {
         if (stock.empty()) return nullptr;
         if (auto currentAmmo = follower->GetCurrentAmmo()) {
             for (auto& e : stock) {
-                if (e.obj->GetFormID() == currentAmmo->GetFormID()) return &e;
+                if ((e.vendorMask & requiredMask) && e.obj->GetFormID() == currentAmmo->GetFormID()) return &e;
             }
         }
         // Envanterinde en çok taşıdığı ok tipi
         StockEntry* best = nullptr;
+        StockEntry* firstEligible = nullptr;
         int32_t bestCount = 0;
         for (auto& e : stock) {
+            if ((e.vendorMask & requiredMask) == 0) continue;
+            if (!firstEligible) firstEligible = &e;
             int32_t c = ItemEvaluator::GetItemCount(follower, e.obj);
             if (c > bestCount) {
                 bestCount = c;
                 best = &e;
             }
         }
-        return best ? best : &stock.front();
+        return best ? best : firstEligible;
     }
 
     void ShoppingAI::ProcessShopping(RE::Actor* follower, FollowerProfile& profile)
@@ -819,24 +823,27 @@ namespace FollowerUnbound
             }
             if (!useful) continue;
 
-            ScanVendorStock(cand.actor, evaluator, cand.actor->GetName(), stock);
+            ScanVendorStock(cand.actor, evaluator, cand.actor->GetName(), vMask, stock);
             stockScans++;
         }
 
         // If a recipe pair is already carried or stocked by an alchemist, defer
         // the finished-potion purchase so the next crafting tick can use it.
-        auto available = [&](SupplyCat cat, int32_t carried) {
+        auto available = [&](SupplyCat cat, int32_t carried, uint32_t vendorMask) {
             if (carried > 0) return true;
             const auto& bucket = stock.buckets[static_cast<int>(cat) - 1];
-            return std::any_of(bucket.begin(), bucket.end(), [](const StockEntry& entry) { return entry.stock > 0; });
+            return std::any_of(bucket.begin(), bucket.end(), [vendorMask](const StockEntry& entry) {
+                return entry.stock > 0 && (entry.vendorMask & vendorMask) != 0;
+            });
         };
-        auto deferPotionPurchase = [&](std::initializer_list<SupplyCat> potions, SupplyCat ingredientA, int32_t countA, SupplyCat ingredientB, int32_t countB) {
-            if (!craftPotions || !available(ingredientA, countA) || !available(ingredientB, countB)) return;
+        auto deferPotionPurchase = [&](std::initializer_list<SupplyCat> potions, SupplyCat ingredientA, int32_t countA, uint32_t vendorsA,
+                                       SupplyCat ingredientB, int32_t countB, uint32_t vendorsB) {
+            if (!craftPotions || !available(ingredientA, countA, vendorsA) || !available(ingredientB, countB, vendorsB)) return;
             for (auto& need : needs) if (std::find(potions.begin(), potions.end(), need.cat) != potions.end()) need.enabled = false;
         };
-        deferPotionPurchase({ SHealthMinor, SHealthStandard, SHealthPlentiful, SHealthVigorous, SHealthExtreme, SHealthUltimate }, SBlueMountainFlower, supplies.blueMountainFlowers, SWheat, supplies.wheat);
-        deferPotionPurchase({ SMagickaMinor, SMagickaStandard, SMagickaPlentiful, SMagickaVigorous, SMagickaExtreme, SMagickaUltimate }, SRedMountainFlower, supplies.redMountainFlowers, SWhiteCap, supplies.whiteCaps);
-        deferPotionPurchase({ SStaminaMinor, SStaminaStandard, SStaminaPlentiful, SStaminaVigorous, SStaminaExtreme, SStaminaUltimate }, SPurpleMountainFlower, supplies.purpleMountainFlowers, SPineThrushEgg, supplies.pineThrushEggs);
+        deferPotionPurchase({ SHealthMinor, SHealthStandard, SHealthPlentiful, SHealthVigorous, SHealthExtreme, SHealthUltimate }, SBlueMountainFlower, supplies.blueMountainFlowers, kVendApothecary, SWheat, supplies.wheat, kVendApothecary | kVendGeneral);
+        deferPotionPurchase({ SMagickaMinor, SMagickaStandard, SMagickaPlentiful, SMagickaVigorous, SMagickaExtreme, SMagickaUltimate }, SRedMountainFlower, supplies.redMountainFlowers, kVendApothecary, SWhiteCap, supplies.whiteCaps, kVendApothecary);
+        deferPotionPurchase({ SStaminaMinor, SStaminaStandard, SStaminaPlentiful, SStaminaVigorous, SStaminaExtreme, SStaminaUltimate }, SPurpleMountainFlower, supplies.purpleMountainFlowers, kVendApothecary, SPineThrushEgg, supplies.pineThrushEggs, kVendApothecary);
 
         // Report medical stock only occasionally; this distinguishes an item
         // that a merchant does not carry from one blocked by funds or settings.
@@ -922,17 +929,17 @@ namespace FollowerUnbound
             return true;
         };
 
-        auto tryBuyStock = [&](SupplyCat cat, uint32_t desiredQty, bool isAmmo, const char* label) -> bool {
+        auto tryBuyStock = [&](SupplyCat cat, uint32_t desiredQty, bool isAmmo, uint32_t requiredMask, const char* label) -> bool {
             auto& bucket = stock.buckets[static_cast<int>(cat) - 1];
             if (bucket.empty() || desiredQty == 0) return false;
 
             StockEntry* entry = nullptr;
             if (isAmmo) {
-                entry = PickAmmoEntry(bucket, follower);
+                entry = PickAmmoEntry(bucket, follower, requiredMask);
             } else {
                 // En ucuz stoktan al (adet başı altın değeri)
                 for (auto& e : bucket) {
-                    if (e.stock <= 0) continue;
+                    if (e.stock <= 0 || (e.vendorMask & requiredMask) == 0) continue;
                     if (!entry || e.obj->GetGoldValue() < entry->obj->GetGoldValue()) entry = &e;
                 }
             }
@@ -953,23 +960,8 @@ namespace FollowerUnbound
             for (const auto& n : needs) if (n.cat == cat) order.push_back(&n);
         }
 
-        // Keep restorative supplies, poisons and soul gems ahead of optional
-        // food purchases. Otherwise a follower can spend every purchase slot
-        // on potatoes/drinks at a general merchant and never reach the enabled
-        // alchemy or soul-gem categories during that shopping round.
-        constexpr SupplyCat urgentSupplies[] = {
-            SHealthMinor, SHealthStandard, SHealthPlentiful, SHealthVigorous, SHealthExtreme, SHealthUltimate,
-            SMagickaMinor, SMagickaStandard, SMagickaPlentiful, SMagickaVigorous, SMagickaExtreme, SMagickaUltimate,
-            SStaminaMinor, SStaminaStandard, SStaminaPlentiful, SStaminaVigorous, SStaminaExtreme, SStaminaUltimate,
-            SPoisonHealth, SPoisonMagicka, SPoisonStamina, SPoisonOther, SInvisibility,
-            SSoulPetty, SSoulLesser, SSoulCommon, SSoulGreater, SSoulGrand, SSoulBlack
-        };
-        for (SupplyCat cat : urgentSupplies) {
-            for (const auto& n : needs) if (n.cat == cat) order.push_back(&n);
-        }
-
-        // Food and drinks are lower priority than selected medical and magical
-        // supplies, but remain ahead of optional ammunition and utility items.
+        // Purchase order remains based on the follower's thirst/hunger needs;
+        // individual stock entries are filtered by their actual vendor type.
         auto pushGroup = [&](SupplyCat a, SupplyCat b) {
             for (const auto& n : needs) {
                 if (n.cat == a || n.cat == b) order.push_back(&n);
@@ -985,7 +977,10 @@ namespace FollowerUnbound
             for (const auto& n : needs) if (n.cat == SFoodS) order.push_back(&n);
             pushGroup(SDrinkN, SDrinkA);
         }
-        for (SupplyCat cat : { SArrow, SBolt, STorch, SLanternOil, SSoap }) {
+        for (SupplyCat cat : { SHealth, SMagicka, SStamina, SPoison, SPoisonHealth, SPoisonMagicka, SPoisonStamina, SPoisonOther, SInvisibility, SArrow, SBolt, SSoulPetty, SSoulLesser, SSoulCommon, SSoulGreater, SSoulGrand, SSoulBlack }) {
+            for (const auto& n : needs) if (n.cat == cat) order.push_back(&n);
+        }
+        for (SupplyCat cat : { STorch, SLanternOil, SSoap }) {
             for (const auto& n : needs) if (n.cat == cat) order.push_back(&n);
         }
 
@@ -997,7 +992,7 @@ namespace FollowerUnbound
                 : (n->isAmmo ? std::min<uint32_t>(outstanding, 15u * batchMult)
                              : std::min<uint32_t>(outstanding, batchMult));
             if (tryBuyStock(n->cat, purchaseTarget,
-                             n->isAmmo, n->label)) {
+                             n->isAmmo, n->vendMask, n->label)) {
                 purchasesThisRound++;
             }
         }
