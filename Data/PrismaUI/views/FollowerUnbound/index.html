@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Follower Unbound</title><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="ui-polish.css">
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <main class="shell">
+    <aside class="rail">
+      <div class="brand"><div class="brand-mark"> <img class="brand-icon" src="assets/icons/icon-logo.png" alt=""></div><div><b>FOLLOWER</b><b class="brand-light">UNBOUND</b><small>COMPANION MANAGEMENT</small></div></div>
+      <div class="rail-label">MANAGEMENT</div>
+      <nav id="navigation">
+        <button class="nav-item active" data-page="overview"><img class="nav-icon" src="assets/icons/icon-followers.png" alt="">Overview</button>
+        <button class="nav-item" data-page="equipment"><img class="nav-icon" src="assets/icons/icon-armor.png" alt="">Equipment</button>
+        <button class="nav-item" data-page="loot"><img class="nav-icon" src="assets/icons/icon-skull.png" alt="">Loot rules</button>
+        <button class="nav-item" data-page="economy"><img class="nav-icon" src="assets/icons/icon-cart.png" alt="">Trade & supplies</button>
+        <button class="nav-item" data-page="settings"><img class="nav-icon" src="assets/icons/icon-settings.png" alt="">Systems</button>
+      </nav>
+      <div class="rail-bottom"><span class="status-dot"></span><span id="follower-count">Loading companions…</span></div>
+    </aside>
+    <section class="workspace">
+      <header class="topbar"><div><span class="eyebrow">YOUR COMPANY</span><div class="top-title" id="page-title">Overview</div></div>
+        <div class="top-actions"><button class="icon-button" id="refresh" title="Refresh followers"><img src="assets/icons/icon-refresh.png" alt=""></button><button class="close-button" id="close"><img src="assets/icons/icon-door.png" alt="">ESC <span>Close</span></button></div>
+      </header>
+      <div class="content" id="content"></div>
+      <footer><span>FOLLOWER UNBOUND</span><span>PRISMA UI <i>•</i> SHIFT + I</span></footer>
+    </section>
+  </main>
+  <div class="equip-prompt-backdrop" id="equip-prompt" hidden>
+    <section class="equip-prompt-card" role="dialog" aria-modal="true" aria-labelledby="equip-prompt-title">
+      <span class="eyebrow">FOLLOWER EQUIPMENT</span>
+      <h2 id="equip-prompt-title">A better item was found</h2>
+      <p><strong id="equip-prompt-follower"></strong> found <strong id="equip-prompt-item"></strong>.</p>
+      <p class="equip-prompt-reason" id="equip-prompt-reason"></p>
+      <p class="equip-prompt-copy">Equip and protect this item? The previous item may become available for sale.</p>
+      <div class="equip-prompt-actions"><button class="button secondary" id="equip-prompt-no">KEEP CURRENT</button><button class="button" id="equip-prompt-yes">EQUIP & PROTECT</button></div>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

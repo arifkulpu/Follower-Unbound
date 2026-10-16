@@ -1,0 +1,106 @@
+# Follower Unbound - Güncelleme Günlüğü v0.1.6 (Changelog)
+
+## Genel Bakış
+v0.1.6 güncellemesi; sınıfsız ve adil eşya dağıtımı, otomatik ceset yağması, yerden eşya toplama, çıplak gezen takipçi hatasının kökten çözümü, kalıcı yavaşlama hatasının düzeltilmesi, sınıfsız ve acil durum iksir sistemi, sıralı yeme/içme ve kıyafet koruma sistemini oyuna kazandırıyor. Son alt sürümde: satıcı tipi zorunluluğu, sonsuz alışveriş döngüsünün kökten çözümü, yağma öncelik/limitleri, sistem duraklatma yöneticisi ve bildirim kuyruğu eklendi.
+
+---
+
+## 🌟 Yeni Özellikler & Geliştirmeler
+
+### 0. Son Eklemeler (v0.1.6.x yamaları)
+- **Satıcı Tipi Zorunluluğu:** Takipçiler artık sadece doğru satıcıdan alışveriş yapar:
+  - Ok / arbalet oku → **demirci** (veya genel tüccar)
+  - İksir / zehir → **simyacı** (veya genel tüccar)
+  - Yemek / içecek → **hancı** (veya genel tüccar)
+  - **Genel tüccar her şeyi alıp satabilir.** Satışta da aynı eşleştirme geçerlidir.
+- **Sonsuz Alışveriş Döngüsü ÇÖZÜLDÜ:** Katalog yedeği tamamen kaldırıldı — takipçiler artık yalnızca satıcının gerçekte stokladığı ürünleri alır. Modlu (CACO vb.) oyunlarda sayıcın göremediği eşyalar yüzünden her 3 saniyede tekrar satın alma döngüsü ortadan kalktı. Alış-satış sınıflandırıcısı alış ve satış tarafında artık tek ve aynı.
+- **Yağma Ayarları:** "Auto Loot Corpses" (aç/kapa), "Player Loots First" (oyuncu yağmalamadan takipçiler dokunmaz), "Loot Delay After Combat" (varsayılan 10 sn, ayarlanabilir) slider'ı eklendi.
+- **Yağma Önceliği ve Limitleri:** Silah → cephane → iksir/yemek → zırh → diğer sırasıyla yağmalanır; takipçiler artık **yedek silah/zırh limitini** (varsayılan 3 silah / 2 zırh) aşan ekipman biriktirmez — "20 kask" sorunu bitti.
+- **İç Çamaşırı / Görev Eşyası Koruması:** "Underwear" itemleri ve görev (alias) eşyaları hiçbir şekilde yağmalanmaz — ölü NPC'ler çıplak kalmaz, görev eşyaları kaybolmaz.
+- **Sistem Duraklatma Yöneticisi:** Yükleme ekranı, takipçi envanteri (container), diyalog ve bekleme/uyuma menülerinde tüm arka plan sistemleri DURUR; menüler kapandıktan ~3 saniye sonra devam eder.
+- **Savaş Sonrası Yeme Gecikmesi:** Takipçiler savaş bittikten sonra hemen değil, ayarlanan süre (varsayılan 6 sn) sonra yemek yer/içer.
+- **Bildirim Kuyruğu:** HUD mesajları artık kuyruğa girer; saniyede en fazla 1 mesaj gösterilir, aynı mesajlar birleştirilir — bekleme/uyuma sonrası mesaj yığılması bitti.
+- **Animasyon Reset-Retry:** Yeme/içme animasyonu oynamazsa animasyon grafiği idle'a sıfırlanıp zincir tekrar denenir (EAS yoksa SunHelm/EAS-patch eventleri sırayla denenir).
+- **Performans:** Satıcı stoğu artık ihtiyaç yoksa hiç taranmaz; envanter sayımı tek geçişe indirildi; tekrarlayan log satırları debug seviyesine çekildi.
+
+### 1. Sınıfsız Round-Robin Eşya Dağıtımı (Çoklu Takipçi)
+- **Adil Paylaşım:** Takipçiler artık cesetlerden eşya alırken sınıf (rol) ayrımı YAPMAZ. Her takipçi sırayla birer birim alır.
+- **Örnek:** 3 takipçiniz ve öldürülen düşmanda 1 zırh, 1 ayakkabı, 1 eldiven, 1 kask, 3 iksir, 2 silah varsa:
+  - Zırh → 1. takipçi, Ayakkabı → 2. takipçi, Eldiven → 3. takipçi, Kask → 1. takipçi
+  - 3 iksir → her takipçiye 1'er adet
+  - 2 silah → sıradaki 2 takipçiye 1'er adet (3. takipçi almaz)
+  - Sıra göstergesi kalıcıdır; bir sonraki cesette kaldığı yerden devam eder (tam adalet).
+- Altın hâlâ tüm takipçilere eşit bölünür. Takipçi tercihleri (silah/zırh/ok yağmalasın mı) ve taşıma kapasitesi/ok limitleri yine de geçerlidir.
+
+### 2. Otomatik Ceset Yağması + Yerden Eşya Toplama
+- **Cesetleri Açmanıza Gerek Yok:** Düşman öldüğünde ceset otomatik olarak yağma kuyruğuna girer; savaş bittikten ~6 saniye sonra yakın takipçiler cesetleri kendiliğinden paylaşımlı şekilde yağmalar.
+- **Yerdeki Eşyalar:** Savaş sonrası yere düşen/düşmanların bıraktığı silah, zırh, ok ve iksirler artık yakındaki takipçiler tarafından toplanır.
+- **Savaş Alanı Kuralı:** Yerden toplama yalnızca yakında (2000 birim içinde) bir ceset varken çalışır — dükkan vitrinleri ve pazar tezgahlarındaki teşhir malları toplanmaz.
+- **Sahiplik Kuralı:** Sahiplikli eşyalar (dükkân malı, çalınma işaretli eşyalar) asla toplanmaz.
+- Her ikisi de Ayarlar menüsündeki **"Ground Loot System"** seçeneğiyle açılıp kapatılabilir.
+
+### 3. Kıyafet Koruma Sistemi (Takipçi Başına Kişisel)
+- **Yeni Ayar:** *"Protect Equipped Clothing"* açıkken her takipçinin üzerindeki kıyafet/zırh/silahlar **kişisel** olarak kaydedilir ve ASLA satılmaz.
+- Ayar açıldığı anda tüm takipçilerin üzerindekiler kaydedilir; yeni katılan takipçiler de otomatik kaydedilir.
+- **Reset Butonu:** Takipçi menüsündeki *"Reset && Capture Current Outfit"* butonu ile yeni kıyafetleri giydirdikten sonra kaydı yenileyebilirsiniz — yeni kıyafetler artık korunur, geri kalan her şey satılır.
+- Korunan listesi kayıt dosyasına (co-save) kaydedilir.
+
+### 4. Öncelikli Alışveriş Sırası
+- Takipçi alışverişe çıktığında artık şu sırayı izler:
+  1. En acil ihtiyaç (susuzluk/açlık oranına göre) → önce içecek veya yemek, ardından diğeri
+  2. Can iksiri → Mana iksiri → Dayanıklılık iksiri
+  3. Ok ve arbalet oku (okçu/arbalet kullanıcıları asla ihmal etmez; kullandıkları ok tipini tercih eder)
+- **Gerçek Satıcı Stoğu:** Takipçiler artık satıcının envanterinde gerçekte bulunan ürünleri (SunHelm mataraları/su şişeleri, modlu içecekler, süt vb. dahil) satın alır; stokta yoksa hazır katalog devreye girer.
+- Her turda 3 işlem yapılır — envanter limitleri çok daha hızlı dolar.
+
+### 5. Acil (Aşırı Yüklü) Satış Modu
+- Takipçi taşıma kapasitesini aştığında satış ACİLE döner: bekleme süresi atlanır ve tek seferde tam yığınlarla (3 yığına kadar) satış yapılır.
+
+### 6. Fazla Yiyecek/İçecek Satışı
+- **Yeni Ayar:** *"Sell Excess Food & Drinks"* — takipçiler kişisel stok limitlerinin üzerindeki yemek ve içecekleri satar (kendi kullanacakları kadarını saklarlar).
+- Simya malzemeleri de kişisel kullanım için saklanır, 10 adedin fazlası satılır.
+
+### 7. Sınıfsız İksir Sistemi + Acil Durum İçimi
+- Savaş iksir sistemi artık **sınıfsızdır**: can/mana/dayanıklılık eşiklerine ulaşan HER takipçi, sınıfına bakılmaksızın ihtiyacı olan iksiri içer.
+- **Acil Durum Eşikleri (cooldown yok):**
+  - Can %15 altına düşünce → arka arkaya can iksiri
+  - Mana %5 altına düşünce → arka arkaya mana iksiri
+  - Dayanıklılık %5 altına düşünce → arka arkaya dayanıklılık iksiri
+- Acil durumlarda bekleme süresi tamamen devre dışıdır; takipçi kritik değerden çıkana kadar seri şekilde iksir içer. Eşikler ayarlar menüsünden değiştirilebilir.
+
+### 8. Sıralı Yeme/İçme (Çoklu Takipçi Animasyon Düzeltmesi)
+- Aynı anda artık yalnızca **BİR takipçi** yer/içer: 1. takipçi **her zaman önce içecek** içer, sonra yemek yer; her işlem arasında 3 saniye bulunur ve %100 olana kadar devam eder.
+- 1. takipçinin seansı tamamen bitmeden 2. takipçi başlamaz. Bu, çoklu takipçilerde seri yeme/içmenin yol açtığı animasyon hatalarını önler.
+- Tıkanma koruması: aktif takipçi 30 saniye boyunca işlem yapmazsa sıra otomatik olarak devredebilir.
+
+### 9. Animasyon Fallback (Yedek) Zinciri
+- Yeme/içme/iksir animasyonu oynatılamazsa (mod yoksa veya event reddedilirse) alternatif eventler denenir: `IdleEat → IdleEating` (yemek), `IdleDrink → drinkPotion → IdleDrinking` (SunHelm matara/su içme), `drinkPotion → IdleDrink` (iksir).
+- Hiçbiri başarısız olursa log dosyasına uyarı yazılır.
+
+---
+
+## 🛠️ Hata Düzeltmeleri
+
+- **ÇIPLAK GEZEN TAKİPÇİLER (KÖKTEN ÇÖZÜM):** Satış sistemindeki "sınıfa uymayan ekipman" mantığı kaldırıldı. Eski kod, takipçinin kendi üstündeki kıyafeti/robunu "sınıfa uymuyor" diyerek **kuşanımını çıkarıp satıyordu**. Artık üzerinde GİYİLİ/KUŞANILMIŞ hiçbir eşya asla satılmaz ve asla kuşanımdan çıkarılmaz.
+- **KALICI YAVAŞLAMA HATASI (1 metreyi 10 saniyede koşma):** İhtiyaç cezası kodu `SetActorValue(SpeedMult)` ile takipçinin **kalıcı** taban hızını her çağrıda biraz aşağı yazıyordu; zamanla hız sürekli düşüyor, oyun yeniden başlatılınca düzeliyordu. Hız cezası tamamen kaldırıldı; taşıma kapasitesi cezası artık geçici (damage modifier) olarak uygulanır ve açlık düzelince otomatik geri yüklenir.
+- **Alışveriş hızlandırıldı:** Satıcı arama bekleme süresi 5 sn → 3 sn; her çağrıda tek kategori yerine 3 kategori doldurulur.
+- **Hayvanlar artık yağma yapmaz** (ceset yağmasında unutulan kontrol eklendi).
+- Zehir satın alma artık sınıfsızdır (limiti olan her takipçi alır).
+
+---
+
+## ⚙️ Yeni INI Ayarları
+
+```ini
+[Systems]
+EnableGroundLoot=1          ; Yerdeki eşyaları toplama
+ProtectEquippedClothing=1   ; Kuşanılmış kıyafet koruma (takipçi başına)
+
+[Selling]
+SellFood=1                  ; Fazla yiyecek/içecek satışı
+
+[Thresholds]
+EmergencyHealthPct=15.0     ; Acil can eşiği (cooldown yok)
+EmergencyMagickaPct=5.0     ; Acil mana eşiği (cooldown yok)
+EmergencyStaminaPct=5.0     ; Acil dayanıklılık eşiği (cooldown yok)
+```

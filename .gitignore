@@ -1,0 +1,21 @@
+# CMake / Visual Studio build output
+/build/
+/build-*/
+/CMakeFiles/
+/CMakeCache.txt
+/CMakeUserPresets.json
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.VC.db
+*.pdb
+*.ilk
+
+# Local dependency installation
+/vcpkg_installed/
+
+# Editor and OS files
+.vs/
+.idea/
+.DS_Store
+Thumbs.db

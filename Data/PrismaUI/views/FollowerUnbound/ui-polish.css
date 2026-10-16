@@ -1,0 +1,205 @@
+.follower-picker-wrap{display:grid;gap:6px;min-width:310px;color:#c7b27a;font-size:9px;font-weight:700;letter-spacing:1.1px}
+.select.follower-picker{width:100%;height:48px;min-width:310px;padding:0 15px;font-size:15px;font-weight:600;border-color:#75633d;background:#202821}
+.gear-list{grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:11px;align-content:start}
+.gear-list>.empty{grid-column:1/-1}
+.content{min-height:0;overscroll-behavior:contain}
+.toolbar{align-items:flex-start;flex-wrap:wrap}
+.equipment-content{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.equipment-content>.hero{flex:0 0 auto}
+.equipment-content>.equipment-panel{display:flex;flex:1 1 0;flex-direction:column;min-height:0;overflow:hidden;margin-bottom:0}
+.equipment-panel>.toolbar,.equipment-panel>.tabs{flex:0 0 auto}
+.equipment-panel>.gear-list{display:grid;flex:1 1 0;min-height:0;max-height:none;overflow-y:auto;overflow-x:hidden;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));grid-auto-rows:min-content;align-content:start;padding:3px 10px 8px 2px;scrollbar-width:thin;scrollbar-color:#59624c #171c18}
+.equipment-panel>.gear-list::-webkit-scrollbar{width:9px}
+.equipment-panel>.gear-list::-webkit-scrollbar-track{background:#171c18;border-radius:8px}
+.equipment-panel>.gear-list::-webkit-scrollbar-thumb{background:#59624c;border:2px solid #171c18;border-radius:8px}
+.gear-card{position:relative;min-height:158px;aspect-ratio:1/1;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:8px;padding:15px;text-align:left;color:var(--text);cursor:pointer;transition:border-color .15s,background .15s,transform .15s}
+.gear-card:hover{border-color:#9d854c;transform:translateY(-2px)}
+.gear-card:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.gear-card.chosen{border-color:#d2b575;background:linear-gradient(145deg,#3b3424,#20251e);box-shadow:inset 0 0 0 1px #d2b57555}
+.gear-check{position:absolute;top:12px;left:12px;width:25px;height:25px;display:grid;place-items:center;border:1px solid #536052;border-radius:6px;background:#111713;color:#1b2119;font-size:16px;font-weight:800}
+.gear-card.chosen .gear-check{border-color:#d2b575;background:#d2b575}
+.gear-name{padding-top:26px;font-size:13px;line-height:1.35}
+.gear-meta{font-size:11px}
+.gear-state{position:relative;z-index:1;display:flex;align-items:center;gap:6px;margin-top:3px;padding:6px 8px;border:1px solid #404837;border-radius:6px;background:#141a15;font-size:10px;cursor:pointer}
+.gear-state input{accent-color:#ceb06d}
+.toggle-row{min-height:54px;padding:13px 15px}
+.toggle-title{font-size:13px}
+.toggle input{width:19px;height:19px;cursor:pointer}
+.equip-prompt-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:24px;background:#050806d9;backdrop-filter:blur(8px)}
+.equip-prompt-backdrop[hidden]{display:none}
+.equip-prompt-card{width:min(520px,92vw);padding:30px;border:1px solid #877044;border-radius:14px;background:linear-gradient(145deg,#202720,#121713);box-shadow:0 24px 90px #000c}
+.equip-prompt-card h2{margin:8px 0 18px;font:700 23px Arial;color:#f0d89a}
+.equip-prompt-card p{margin:9px 0;color:#c8d0c5;font-size:14px;line-height:1.55}
+.equip-prompt-card strong{color:#fff0c4}
+.equip-prompt-card .equip-prompt-reason{color:#d2b575;font-size:12px}
+.equip-prompt-card .equip-prompt-copy{color:#8f9a8e;font-size:11px}
+.equip-prompt-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
+@media(max-width:850px){.follower-picker-wrap,.select.follower-picker{min-width:230px}}
+
+/* Larger race/sex portraits and selection cards on the follower overview. */
+.follower-card{min-height:190px;display:flex;align-items:stretch;gap:18px;padding:16px}
+.follower-portrait{width:100px;height:154px;flex:0 0 100px;object-fit:cover;object-position:center top;border:1px solid #77633d;border-radius:7px;background:linear-gradient(145deg,#34382d,#1d211c);box-shadow:0 4px 14px #0005}
+.follower-portrait.portrait-missing{display:none}
+.follower-card-body{min-width:0;flex:1;display:flex;flex-direction:column;justify-content:space-between}
+.follower-card-body .follower-sub{text-transform:capitalize}
+.toggle-row{cursor:pointer}
+.toggle input{accent-color:#d2b575}
+@media(max-width:640px){.follower-card{min-height:0;gap:12px;padding:12px}.follower-portrait{width:76px;height:116px;flex-basis:76px}}
+/* Controls and item identity across every PrismaUI page. */
+.follower-picker-wrap{display:grid;gap:7px;min-width:390px;color:#c7b27a;font-size:10px;font-weight:700;letter-spacing:1.2px}
+.follower-picker-control{display:flex;align-items:center;gap:10px;padding:7px;border:1px solid #75633d;border-radius:10px;background:#202821;min-height:76px}
+.select.follower-picker{width:100%;height:58px;min-width:0;padding:0 14px;font-size:17px;font-weight:650;border-color:#414b3c;background:#171e18}
+.picker-portrait{width:52px;height:60px;flex:0 0 52px;object-fit:cover;object-position:top center;border:1px solid #77633d;border-radius:6px;background:#171e18}
+.picker-placeholder{display:grid;place-items:center;color:#d2b575;font-size:28px}
+.follower-picker-wrap>span:first-child{font-size:10px}
+.item-icon{display:inline-grid;place-items:center;width:24px;height:24px;flex:0 0 24px;margin-right:8px;border:1px solid #a9905638;border-radius:6px;background:linear-gradient(145deg,#d2b57518,#ffffff04);font-size:15px;line-height:1}
+.toggle-title .item-icon{vertical-align:middle}
+.toggle-copy-wrap{min-width:0;display:block}
+.item-label{display:inline-flex;align-items:center;min-width:0}
+.gear-card{position:relative;min-height:158px;aspect-ratio:1/1;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:8px;padding:15px;text-align:left;color:var(--text);cursor:pointer;transition:border-color .15s,background .15s,transform .15s}
+.gear-card:hover{border-color:#9d854c;transform:translateY(-2px)}
+.gear-card:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.gear-card.chosen{border-color:#d2b575;background:linear-gradient(145deg,#3b3424,#20251e);box-shadow:inset 0 0 0 1px #d2b57555}
+.gear-check{position:absolute;top:12px;left:12px;width:30px;height:30px;display:grid;place-items:center;border:2px solid #8a987f;border-radius:7px;background:#0c120e;color:#172015;font-size:19px;font-weight:900;box-shadow:0 2px 8px #0009}
+.gear-card.chosen .gear-check{border-color:#f0d89a;background:#d2b575;color:#13170f}
+.equipped-tag{display:inline-flex;align-items:center;min-height:25px;padding:4px 9px;border:1px solid #78a9c9;border-radius:999px;background:#17364a;color:#c5eaff;font-size:11px;font-weight:800;letter-spacing:.7px;box-shadow:0 0 12px #2581b333}
+.gear-name{padding-top:30px;font-size:13px;line-height:1.35}
+.gear-name .item-icon{width:28px;height:28px;flex-basis:28px;font-size:17px}
+.gear-meta{font-size:11px}
+.gear-state{position:relative;z-index:1;display:flex;align-items:center;gap:7px;margin-top:3px;padding:7px 9px;border:1px solid #404837;border-radius:6px;background:#141a15;font-size:10px;cursor:pointer}
+.gear-state input{width:19px;height:19px;accent-color:#ceb06d}
+.toggle-row{min-height:58px;padding:14px 16px}
+.toggle input{width:23px;height:23px;flex:0 0 23px;cursor:pointer;accent-color:#d2b575}
+.trade-row{min-height:58px;grid-template-columns:minmax(0,1fr) 170px 42px;gap:16px;padding:9px 12px}
+.trade-row>.toggle{width:38px;height:38px;justify-content:center;border:1px solid #58674f;border-radius:8px;background:#111713}
+.trade-row>.toggle input{width:25px;height:25px}
+.trade-name{display:flex;align-items:center;font-size:13px}
+.stock-badge{font-size:9px}
+.trade-target .number-input{width:68px;height:34px;text-align:center;font-size:14px}
+.sale-row{min-height:48px;padding:9px 12px;font-size:12px}
+.sale-row .toggle{width:36px;height:36px;justify-content:center;border:1px solid #485444;border-radius:7px;background:#111713}
+.sale-row .toggle input{width:23px;height:23px}
+.follower-card{min-height:210px}
+.follower-portrait{width:112px;height:170px;flex-basis:112px}
+.follower-card-body .item-icon{width:20px;height:20px;flex-basis:20px;margin-right:5px}
+@media(max-width:850px){.follower-picker-wrap{min-width:280px}.follower-picker-control{min-height:66px}.picker-portrait{width:45px;height:52px;flex-basis:45px}.select.follower-picker{height:50px;font-size:15px}.trade-row{grid-template-columns:minmax(0,1fr) 142px 38px;gap:9px}}
+@media(max-width:640px){.follower-picker-wrap{min-width:0;width:100%}.hero{align-items:stretch;flex-direction:column;gap:14px}.follower-card{min-height:0}.follower-portrait{width:82px;height:126px;flex-basis:82px}.trade-row{grid-template-columns:minmax(0,1fr) 112px 36px;gap:6px}.trade-target{font-size:9px}.trade-target .number-input{width:48px;height:30px}.trade-name{font-size:11px}.stock-badge{font-size:7px}.trade-row>.toggle{width:34px;height:34px}}
+/* Keep the selection mark clear of the item icon and title. */
+.gear-check{left:auto;right:12px;top:12px;width:28px;height:28px;border-width:2px;z-index:2}
+.gear-name{display:flex;align-items:center;gap:7px;padding:34px 30px 0 0;min-width:0;overflow:visible}
+.gear-name .item-icon{width:30px;height:30px;flex:0 0 30px;margin:0;font-size:20px;line-height:1;overflow:visible}
+.gear-name>span:last-child{min-width:0;overflow-wrap:anywhere}
+.trade-name .item-icon,.item-label .item-icon,.toggle-title .item-icon{width:26px;height:26px;flex:0 0 26px;margin-right:9px;font-size:18px;line-height:1;overflow:visible}
+.gear-card input[data-gear-select]{position:absolute;top:12px;right:12px;left:auto;width:28px;height:28px;margin:0;z-index:2;accent-color:#d2b575}
+@media(max-width:850px){.gear-name{padding-right:28px}}
+/* Per-follower savings controls in Trade & Supplies. */
+.savings-panel{margin:10px 0 14px;padding:14px 16px;border:1px solid #665638;border-radius:10px;background:linear-gradient(130deg,#d2b57510,#ffffff02)}
+.savings-heading{display:flex;align-items:center;gap:12px}
+.savings-heading>div{min-width:0;flex:1}
+.savings-heading .section-title{display:flex;align-items:center;gap:8px;margin:0 0 4px}
+.savings-heading p{margin:0;color:#8f998d;font-size:10px;line-height:1.45}
+.savings-icon{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;border:1px solid #a9905648;border-radius:9px;background:#d2b57518;color:#e5cc89;font-size:22px}
+.savings-switch{width:42px;height:42px;justify-content:center;border:1px solid #58674f;border-radius:8px;background:#111713}
+.savings-switch input{width:24px;height:24px}
+.savings-controls{display:flex;align-items:end;gap:16px;margin:13px 0 0 46px;padding-top:11px;border-top:1px solid #ffffff0c}
+.savings-controls>label{display:grid;gap:5px;color:#899488;font-size:10px}
+.savings-controls .number-input{height:33px;width:125px;font-size:13px}
+.savings-controls .percent-input{display:flex;align-items:center;gap:6px}
+.savings-controls .percent-input .number-input{width:80px}
+.savings-controls .percent-input b{color:#d2b575;font-size:13px}
+.savings-balance{display:grid;gap:5px;margin-right:auto;color:#899488;font-size:10px}
+.savings-balance strong{color:#e2d1a6;font-size:13px}
+@media(max-width:640px){.savings-panel{padding:11px}.savings-controls{margin-left:0;gap:9px;flex-wrap:wrap}.savings-controls .number-input{width:96px}.savings-controls .percent-input .number-input{width:68px}.savings-balance{width:100%;margin:0}}
+.settings-actions{display:flex;align-items:flex-end;gap:12px}
+.settings-actions .follower-picker-wrap{min-width:330px}
+.savings-setting{display:flex;align-items:center;justify-content:space-between;gap:18px}
+.savings-setting>div{display:grid;gap:6px;color:#8d978c;font-size:11px}
+.savings-setting>div strong{color:var(--text);font-size:14px}
+.savings-setting label{display:grid;gap:6px;color:#c7b27a;font-size:10px;font-weight:700}
+.savings-target-input{width:145px;height:38px;font-size:15px}
+@media(max-width:850px){.settings-actions{align-items:stretch;flex-direction:column}.settings-actions .follower-picker-wrap{min-width:0}.savings-setting{align-items:flex-start;flex-direction:column}}
+.buy-supplies-list{max-height:min(58vh,560px);padding-right:8px}.purchase-category{padding:0 4px 10px;margin-bottom:4px;border-bottom:1px solid #2b352d}.purchase-category .group-label{position:sticky;top:0;z-index:2;margin:0;padding:11px 5px 8px;background:#171c18;border-bottom:1px solid #303a31}.purchase-category .trade-row:last-child{border-bottom:0}.ingredient-category p{margin:4px 5px 10px;color:#879387;font-size:10px;line-height:1.45}
+.buy-category-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:8px 2px 12px}.buy-category-card{aspect-ratio:1.45;min-height:150px;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:9px;padding:18px;border:1px solid #303a31;border-radius:13px;background:linear-gradient(145deg,#1d251f,#151a16);color:var(--text);text-align:left;cursor:pointer;transition:border-color .16s,transform .16s,background .16s}.buy-category-card:hover,.buy-category-card:focus-visible{border-color:#b39b62;background:linear-gradient(145deg,#252d24,#191f19);transform:translateY(-2px);outline:none}.buy-category-icon{font-size:25px;line-height:1}.buy-category-title{font-size:13px;font-weight:750;color:#e5d6b3}.buy-category-description{font-size:10px;line-height:1.4;color:#899488}.buy-category-arrow{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;margin-top:auto;padding-top:8px;border-top:1px solid #303a31;color:#a9986f;font-size:9px;font-weight:750;letter-spacing:.08em}.buy-category-arrow b{font-size:15px}.buy-category-view-head{display:flex;align-items:center;gap:16px;margin:4px 0 12px}.buy-category-view-head>div{display:grid;gap:4px}.buy-category-view-head p{margin:0;color:#879387;font-size:10px}.buy-category-view-head .section-title{margin:0}.craft-option{cursor:help}.recipe-tooltip{position:fixed;z-index:10000;display:none;max-width:min(410px,calc(100vw - 24px));padding:11px 13px;border:1px solid #a99460;border-radius:8px;background:#101511;color:#eee2c5;box-shadow:0 8px 28px #000b;font-size:11px;line-height:1.5;white-space:normal;pointer-events:none}.recipe-tooltip.visible{display:block}
+@media(max-width:920px){.buy-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.buy-category-grid{grid-template-columns:1fr}.buy-category-card{aspect-ratio:auto;min-height:126px}.buy-category-view-head{align-items:flex-start;flex-direction:column}}
+.brand-mark{overflow:hidden;padding:3px}.brand-icon{width:100%;height:100%;object-fit:contain;filter:sepia(.18) brightness(1.15)}
+.nav-icon{display:block;width:29px;height:29px;flex:0 0 29px;object-fit:contain;border-radius:0;filter:drop-shadow(0 1px 2px #0008)}
+.item-icon{display:block;object-fit:contain;border:0;border-radius:0;background:none;font-size:initial;line-height:normal}
+.inline-icon{display:inline-block;width:20px;height:20px;vertical-align:middle;object-fit:contain;margin-right:4px}
+.buy-category-icon{width:44px;height:44px;object-fit:contain;font-size:initial;line-height:normal}
+.savings-icon{object-fit:contain;border:0;border-radius:0;background:none;color:inherit;font-size:initial}
+.top-actions .icon-button{display:grid;place-items:center;padding:4px}.top-actions .icon-button img{width:25px;height:25px;object-fit:contain}
+.close-button{display:inline-flex;align-items:center;gap:6px}.close-button img{width:20px;height:20px;object-fit:contain}
+/* Larger, higher-contrast controls and scroll areas for comfortable reading. */
+.content{padding-right:42px;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:#9b895c #171d18}
+.content::-webkit-scrollbar{width:13px}
+.content::-webkit-scrollbar-track{background:#171d18;border-left:1px solid #313a31}
+.content::-webkit-scrollbar-thumb{background:#81734f;border:3px solid #171d18;border-radius:10px}
+.trade-list,.buy-supplies-list{padding:8px 18px 10px 5px;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:#a08e60 #131914}
+.trade-list::-webkit-scrollbar{width:13px}
+.trade-list::-webkit-scrollbar-track{background:#131914;border-left:1px solid #303a30;border-radius:8px}
+.trade-list::-webkit-scrollbar-thumb{background:#81734f;border:3px solid #131914;border-radius:10px}
+.trade-row,.sale-row,.toggle-row{background:#1b231d;color:#e8e9df;border-color:#3b473c}
+.trade-row:hover,.sale-row:hover,.toggle-row:hover{background:#252e26;border-color:#796a46}
+.group-label,.purchase-category .group-label{font-size:12px;color:#e0c983;letter-spacing:1.05px}
+.purchase-category .group-label{background:#171d18;border-bottom-color:#465144}
+.section-title{font-size:16px}
+.hero h1{font-size:30px}
+.hero p,.trade-panel-head p{font-size:13px;color:#bbc3b5}
+.trade-name,.toggle-title{font-size:15px}
+.sale-row,.trade-target,.toggle-row{font-size:13px}
+.toggle-copy{font-size:12px;color:#b0bbad}
+.stock-badge{font-size:10px;color:#b5c0b2}
+.stock-badge b{font-size:12px;color:#f0d89a}
+.trade-row{min-height:64px;grid-template-columns:minmax(0,1fr) 180px 44px;gap:18px;padding:10px 13px}
+.trade-target{gap:10px}
+.trade-target .number-input{width:76px;height:38px;font-size:15px}
+.trade-row>.toggle{width:42px;height:42px}
+.trade-row>.toggle input,.sale-row .toggle input,.toggle-row .toggle input{width:27px;height:27px}
+.sale-row{min-height:56px;padding:11px 13px}
+.item-icon{width:30px;height:30px;flex-basis:30px}
+.trade-name .item-icon,.item-label .item-icon,.toggle-title .item-icon{width:34px;height:34px;flex-basis:34px}
+.gear-name .item-icon{width:38px;height:38px;flex-basis:38px}
+.gear-name{font-size:15px}
+.gear-meta,.gear-state{font-size:12px}
+.buy-category-grid{gap:16px}
+.buy-category-card{gap:11px;padding:20px;background:#1c241e;border-color:#3b473c}
+.buy-category-icon{width:52px;height:52px}
+.buy-category-title{font-size:15px;color:#f0e3c3}
+.buy-category-description{font-size:12px;color:#b7c1b3}
+.buy-category-arrow{font-size:11px;color:#d7c184}
+.recipe-tooltip{font-size:13px;color:#fff1cc;max-width:min(460px,calc(100vw - 24px))}
+.follower-name{font-size:17px}
+.follower-sub,.bar-label,.card-foot{font-size:12px;color:#b3bdb0}
+.role-pill,.tag{font-size:10px}
+.nav-item{font-size:14px;color:#c0c9bc}
+.nav-icon{width:33px;height:33px;flex-basis:33px}
+.picker-portrait{width:58px;height:66px;flex-basis:58px}
+.select.follower-picker{font-size:18px}
+.savings-heading p,.savings-balance,.savings-controls>label{font-size:12px;color:#b2bcae}
+.savings-balance strong{font-size:15px}
+@media(max-width:850px){.content{padding-right:28px}.trade-row{grid-template-columns:minmax(0,1fr) 155px 42px;gap:10px}.trade-name{font-size:14px}}
+@media(max-width:640px){.content{padding-right:18px}.trade-list,.buy-supplies-list{padding-right:10px}.trade-row{grid-template-columns:minmax(0,1fr) 112px 36px;gap:7px}.trade-row>.toggle{width:35px;height:35px}.trade-name,.toggle-title{font-size:13px}.stock-badge{font-size:9px}.buy-category-card{padding:16px}}
+.trade-row[data-tooltip] .trade-name{cursor:help}.info-hint{width:18px;height:18px;flex:0 0 18px;display:inline-grid;place-items:center;margin-left:6px;border:1px solid #9d895c;border-radius:50%;color:#ecd697;font-size:11px;font-weight:800;line-height:1}
+.hero{position:relative;z-index:20}
+.follower-picker-wrap{position:relative;z-index:30}
+.follower-picker-trigger{width:100%;height:76px;min-width:0;color:#f0f1e9;text-align:left;cursor:pointer;font-size:18px;font-weight:650}
+.follower-picker-trigger:hover,.follower-picker-trigger:focus-visible{border-color:#d2b575;outline:none;box-shadow:0 0 0 2px #d2b57530}
+.follower-picker-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picker-chevron{padding:0 8px;color:#d7c184;font-size:12px}
+.follower-picker-menu{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:500;max-height:min(44vh,360px);overflow-y:auto;padding:5px;border:1px solid #817047;border-radius:9px;background:#111713;box-shadow:0 14px 32px #000c;scrollbar-width:thin;scrollbar-color:#8c7a50 #111713}
+.picker-option{width:100%;min-height:61px;display:flex;align-items:center;gap:11px;padding:6px 9px;border:1px solid transparent;border-radius:6px;background:#19211b;color:#e8e9df;text-align:left;cursor:pointer}
+.picker-option+.picker-option{margin-top:4px}
+.picker-option:hover,.picker-option:focus-visible,.picker-option.active{border-color:#9c854e;background:#272c21;outline:none}
+.picker-option-portrait{width:40px;height:48px;flex:0 0 40px;object-fit:cover;object-position:top center;border:1px solid #71603b;border-radius:5px;background:#171e18}
+.picker-option>span:not(.picker-option-portrait){display:grid;gap:3px;min-width:0}
+.picker-option b{font-size:14px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picker-option small{font-size:11px;color:#b4bfaf}
+.equipment-panel>.gear-list,.gear-list{grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:13px}
+.gear-card{min-height:205px;padding:14px;gap:9px}
+.gear-name{padding:34px 0 0;gap:7px;font-size:14px;line-height:1.3}
+.gear-name .item-icon{width:36px;height:36px;flex:0 0 36px}
+.gear-name>span:last-child{overflow-wrap:break-word;word-break:normal;hyphens:auto}
+.gear-meta,.gear-state,.tag{font-size:12px}
+@media(max-width:850px){.gear-list{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}.gear-card{min-height:190px}}
+@media(max-width:640px){.gear-list{grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:9px}.gear-card{min-height:175px;padding:11px}.gear-name{font-size:13px}.gear-name .item-icon{width:31px;height:31px;flex-basis:31px}.follower-picker-menu{max-height:40vh}}

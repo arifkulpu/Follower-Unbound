@@ -1,0 +1,92 @@
+# Follower Unbound - Güncelleme Günlüğü v0.2.0 (Changelog)
+
+## Genel Bakış
+v0.2.0 büyük güncellemesi; takipçi savaş ve tedavi iksiri tüketim mantığı, Ultimate Animated Potions NG (SKSE_UAPNG) animasyon desteği, tedavi/şifa iksiri tedariki, envanter yönetimi, silah/kıyafet koruma mekanizmaları, interaktif ekipman yükseltme onay kutuları, yeni "Follower Purchase Management" sayfası ve animasyonlu zehir uygulama sistemini baştan aşağı yeniler. 
+
+Takipçiler artık rastgele kıyafet ve silah satmayacak, daha iyi eşya bulduklarında oyuncuya soracak, alışveriş tercihleri bağımsız bir menüden yönetilecek, acil durumlarda seri iksir içebilecek, iksir içerken UAPNG animasyonlarını fiziksel olarak sergileyecek ve savaş öncesinde silahlarını animasyonla zehirleyip kınına alacaktır.
+
+---
+
+## 🌟 Yeni Özellikler & Geliştirmeler
+
+### 1. Yenilenen İksir Sistemi & Ultimate Animated Potions NG (SKSE_UAPNG) Desteği
+- **SKSE_UAPNG (Ultimate Animated Potions NG) Tam Entegrasyonu:**
+  - Takipçiler iksir kullandığında (sağlık/tedavi, büyü veya dayanıklılık), sistemde [QTR-Modding / SKSE_UAPNG](https://github.com/QTR-Modding/SKSE_UAPNG) (Mod 97674) kuruluysa animasyonlar doğrudan tetiklenir:
+    - `DrinkPotionStart`
+    - `DrinkPotion_Slow`
+    - `DrinkPotion_NoMove`
+  - Oyuncu artık takipçisinin eline şişeyi alıp iksiri fiziksel olarak içtiğini canlı animasyonla görebilir.
+  - Modun yüklü olmadığı durumlarda güvenli fallback zinciri (`drinkPotion`, `IdleDrink`) devreye girer.
+- **Tedavi / Şifa İksiri Satın Alma İşlemi:**
+  - Takipçilerin alışveriş mantığına ve "Follower Purchase Management" sayfasına sağlık ve tedavi iksiri satın alma kotaları tam entegre edildi.
+  - Takipçiler kasabalarda veya tüccar yakınındayken eksilen tedavi/şifa iksirlerini otomatik olarak satın alır ve çantalarında hazır bulundurur.
+- **Sınıfsız Aciliyet Sıralaması (Dynamic Urgency):**
+  - İksir içme sırası takipçinin rolüne göre kısıtlanmak yerine gerçek zamanlı sağlık, büyü ve dayanıklılık yüzdelerine göre anlık hesaplanır.
+  - Hangi stat eşiğin altındaysa ve hangisinin açığı en büyükse takipçi ilk olarak o iksiri tüketir.
+- **Acil Durum Modu (Emergency Potions):**
+  - Can <%15, Mana <%5 veya Dayanıklılık <%5 kritik seviyelerine indiğinde normal 4 saniyelik içme bekleme süresi (cooldown) bypass edilir.
+  - Takipçi hayatta kalabilmek için arka arkaya (seri şekilde) iksir tüketebilir.
+- **Akıllı Yedek Aday Mantığı (Fallback Mechanism):**
+  - Takipçinin canı kritik ama çantasında can iksiri yoksa sistem takılı kalmaz; sıradaki acil ihtiyaç olan büyü veya dayanıklılık iksirine geçiş yapar.
+
+### 2. Yeni Sayfalar: "Weapons" ve "Apparel" Yönetim Menüleri
+- SKSEMenuFramework arayüzüne 2 adet bağımsız ekipman yönetim sekmesi eklendi:
+  - **Weapons (Silahlar) Sekmesi:** Takipçinin envanterindeki tüm silahlar listelenir. Yanlarındaki onay kutuları (tik) ile istenen silahlar işaretlenebilir.
+  - **Apparel (Kıyafet ve Zırhlar) Sekmesi:** Takipçinin envanterindeki tüm zırh ve giysiler slotlarına göre listelenir.
+- **Koruma ve Kullanım İlkesi:**
+  - İşaretlenen silah ve kıyafetler takipçinin **korumalı eşyası** kabul edilir; takipçiler bu eşyaları pazarda **asla satmaz** ve bunları kuşanır.
+  - İşaretsiz olan eşyalar ise takipçi tüccara gittiğinde satılabilir envanter olarak kabul edilir.
+- **Performans Optimizasyonu:**
+  - Envanter taraması sürekli/her frame arka planda yapılmaz. Yalnızca menü sekmeleri açıldığında veya takipçi seçildiğinde dinamik olarak taranır ve arayüzde önbelleğe alınır.
+
+### 3. Akıllı Ekipman Yükseltme & Onay Kutusu (Equip Prompt System)
+- Takipçiler zindanlarda veya ganimet toplarken mevcut donanımlarından daha üstün (daha yüksek hasar, daha yüksek zırh puanı veya özel efsunlara sahip) bir eşya bulduklarında:
+  - Skyrim'in yerel mesaj kutusu (Native MessageBoxData) aracılığıyla oyuncuya bildirim penceresi gelir:
+    `"[Takipçi Adı] envanterinde daha iyi bir eşya buldu: [Yeni Eşya Adı]. Kuşanmasını onaylıyor musunuz?"`
+  - **Oyuncu Onaylarsa (Evet):** Takipçi eski eşyasını kınına alıp/çıkarıp yeni eşyayı kuşanır ve yeni eşyayı korumalı listesine alır; eski eşyayı pazarda satılabilir olarak bırakır.
+  - **Oyuncu Reddederse (Hayır):** Yeni eşya giyilmez ve uygun zamanda tüccarda satılacak eşyalar arasına gönderilir.
+- **Açılıp Kapatılabilir Ayar:** Bu onay sistemi SKSE ayarlarından istendiğinde tamamen kapatılabilir veya açılabilir (`bEnableEquipPrompts`).
+
+### 4. "Follower Overview" Menüsünün Sadeleştirilmesi
+- Follower Overview sekmesi karmaşadan arındırıldı ve tamamen temel takipçi durumuna odaklandı:
+  - **İhtiyaçlar:** Açlık, Susuzluk, Yorgunluk durumları anlık yüzde olarak gösterilir.
+  - **Sınıf (Class):** Classbound moduyla entegre seçilen takipçi sınıfı/rolü.
+  - **Mevcut Altın (Gold):** Takipçinin üzerinde bulunan toplam para miktarı ve altın aktarma butonları.
+  - **Envanter Doluluk Oranı:** Takipçinin ağırlık kapasitesi formatında gösterilir (Örn: `125 / 350`).
+
+### 5. Yeni Menü Sekmesi: "Follower Purchase Management"
+- Takipçi ihtiyaç menüsü altında bulunan tüm alışveriş ve bütçe/satın alma ayarları buradan kaldırıldı ve yeni **"Follower Purchase Management"** sayfasına taşındı.
+- Takipçi seçimi yapılarak her takipçinin alışveriş kotası bağımsız olarak özelleştirilebilir:
+  - İksirler (Tedavi/Sağlık, Büyü, Dayanıklılık kotaları)
+  - Yiyecek ve İçecek stok limitleri
+  - Ok ve Arbalet oku limitleri
+- **Yeni Tüketim & Yardımcı Ürünler Eklendi (1-20 Aralığı, Varsayılan: 5):**
+  - **Soul Gems (Ruh Taşları)**
+  - **Torches (Meşaleler - TESObjectLIGH)**
+  - **Lantern Oil (Fener Yağı)**
+  - **Soap (Sabun)**
+
+### 6. Otomatik Silah Zehirleme & Animated Poisons Redone Entegrasyonu
+- **Savaş Dışı Hazırlık (Pre-Combat Poisoning):**
+  - Takipçilerin savaş ortasında silah zehirlemeye çalışması kaldırıldı.
+  - Takipçiler artık savaş dışındayken/dinlenirken birincil silahlarını kontrol eder ve zehirli değilse envanterlerindeki zehirleri önceden sürerek savaşa hazır beklerler (`UpdateOutOfCombatPoison`).
+- **Elinde Takılı Kalma / Donma Sorunu Çözüldü:**
+  - Silaha zehir uygulandıktan sonra silahın elde çekili/donuk kalması engellendi. Zehir dozu motora (`InventoryEntryData::PoisonObject`) yazıldıktan sonra silah otomatik olarak kınına (`AnimationManager::SheatheWeapon`) alınır.
+- **Animated Poisons Redone (APR) Animasyon Tetikleyicisi:**
+  - [STB-Team / Animated-Poisons-Redone](https://github.com/STB-Team/Animated-Poisons-Redone) altyapısı doğrudan desteklendi:
+    - `APR_PoisonAnim`: Yakın dövüş için 60 (şişe), menzilli yay/arbalet için 61 (ok) değişkeni atanır.
+    - `APR_PoisonSpeed`: 1.0f oynatma hızı ayarlanır.
+    - Animasyon `APR_PoisonStart` grafiği üzerinden tetiklenir; sistemde mod yoksa uyumlu OAR fallback'leri devreye girer.
+
+---
+
+## 💾 Co-Save & Serileştirme (Serialization v4)
+- Co-save serileştirme sürümü **v4**'e yükseltildi.
+- Önceki kayıt dosyaları (v1, v2 ve v3) ile geriye dönük tam uyumluluk (backward compatibility) sağlandı; mevcut oyun kayıtlarında hiçbir veri kaybı yaşanmaz.
+- Takipçi başına korunan silahlar (`protectedWeapons`), korunan kıyafetler (`protectedApparel`) ve yeni alışveriş kotaları sorunsuz biçimde SKSE co-save dosyasına kaydedilmektedir.
+
+---
+
+## 🔧 Derleme ve Uyumluluk
+- CommonLibSSE-NG ile Skyrim SE/AE sürümleri için eksiksiz C++23 derlemesi sağlandı.
+- Kod optimizasyonları ve null-pointer kontrolleriyle envanter döngülerindeki olası crash riskleri giderildi.

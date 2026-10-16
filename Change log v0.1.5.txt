@@ -1,0 +1,50 @@
+# Follower Unbound - Güncelleme Günlüğü v0.1.5 (Changelog)
+
+## Genel Bakış
+v0.1.5 güncellemesi; takipçilerin ticaret hızını artıran toplu işlem sistemini, fazla eşyaların satılmasını engelleyen hataların çözümünü, modlu evcil hayvanların (kedi, köpek, at) akıllı takibini ve popüler modlarla (SoulKeeper, SunHelm) tam uyumluluğu oyuna kazandırıyor.
+
+---
+
+## 🌟 Yeni Özellikler & Geliştirmeler
+
+### 1. Toplu Alışveriş & Hızlı Satış Sistemi (1x, 3x, 5x, 10x)
+- **Hızlı Ticaret:** Takipçiler artık tüccarlardan iksir, yiyecek veya ok alırken ya da envanterlerindeki fazlalıkları satarken tek tek beklemek zorunda değil.
+- **İşlem Çarpanı Ayarı:** Menüye hazır butonlar (`1x`, `3x`, `5x`, `10x`) ve isteğe bağlı bir kaydırma çubuğu (Slider) eklendi.
+  - Örneğin çarpan 5x veya 10x seçildiğinde, takipçi 10 adet kılıcı dakikalarca beklemek yerine saniyeler içinde topluca satar.
+- **Akıllı İşlem Sırası:** Takipçi satıcı yanına geldiğinde **önce** üzerindeki ağır ve gereksiz eşyaları satarak ceplerini hafifletir ve altın kazanır; **sonra** kazandığı altınla ihtiyaç duyduğu iksir veya yemekleri satın alır.
+- **Daha Hızlı Tepki:** Satış bekleme süresi 15 saniyeden 3 saniyeye, alışveriş bekleme süresi 30 saniyeden 5 saniyeye düşürüldü.
+
+### 2. Evcil Hayvan Desteği (Kedi, Köpek, At vb.)
+- **Ayrı Hayvan Kategorisi:** Modlar veya oyun tarafından eklenen evcil hayvan yoldaşlarınız (A Cat's Life kedileri, köpekler, atlar vb.) için özel sistem eklendi.
+- **Sadece Temel İhtiyaçlar:** Hayvanlar sadece açlık, susuzluk ve yorgunluk ihtiyaçlarına sahiptir. İnsanlar gibi eşya satmaz, yağma yapmaz veya iksir içmezler. Menüde sınıf yerine doğrudan **[Animal]** olarak listelenirler.
+- **İsteğe Bağlı:** Ayarlar menüsünden *"Pet & Animal Needs System"* seçeneğini kapattığınız anda evcil hayvanlar sistemden ve menüden tamamen çıkarılır.
+
+### 3. SoulKeeper Uyumluluğu & Satış Filtreleri
+- **Ruh Taşlarını Koruma:** "SoulKeeper" veya benzeri ruh taşı toplayan modlarla çakışma olmaması için *"Ruh Taşlarını Asla Satma"* seçeneği eklendi. Takipçiler dolu veya boş hiçbir ruh taşını satmaz.
+- **Kategori Bazlı Satış:** Takipçilerinizin neleri satabileceğine artık siz karar verebilirsiniz:
+  - Fazla Silahları Sat
+  - Fazla Zırhları Sat
+  - Fazla Okları Sat
+  - Fazla İksirleri Sat
+  - Değerli Taşları Sat
+
+### 4. SunHelm İçecek İçme Animasyonu
+- SunHelm modundaki su mataraları ve su şişeleri kullanılırken içme animasyonunun (`IdleDrink`) sorunsuz şekilde oynaması sağlandı.
+
+### 5. Çorba, Güveç ve Çiğ Et Mantığı
+- **Çorbalar Çift Etkili:** Çorba ve güveç tarzı sulu yemekler hem açlığı hem de susuzluğu aynı anda giderir.
+- **Çiğ Et Engeli:** Takipçiler çiğ etleri (çiğ geyik, sığır, tavşan eti vb.) pişirilmeden doğrudan yemezler.
+
+### 6. Gelişmiş Zehir Kullanımı
+- Savaştayken silahına zehir sürme özelliği yalnızca suikastçılara değil, elinde silah ve envanterinde zehir olan tüm takipçilere açıldı. Zehir satın alma işlemi ise yine uzman sınıflara (Suikastçı, Hırsız, Simyacı) bırakıldı.
+
+---
+
+## 🛠️ Hata Düzeltmeleri & İyileştirmeler
+
+- **Kuşanılmış Eşyaların Kopyalarının Satılmaması Hatası Çözüldü:**
+  - Takipçiye örneğin 10 adet gümüş kılıç verildiğinde, 1 tanesini eline kuşandığı an sistem diğer 9 kılıcı da kuşanılmış sayarak satmayı tamamen durduruyordu.
+  - Artık takipçinin sadece elinde/üzerinde takılı olan eşyası korunur, envanterinde boşta duran diğer tüm fazla kopyalar satıcıya satılır.
+- **A Cat's Life ve Modlu Hayvanların "İnsan" Görünmesi Düzeltildi:**
+  - "A Cat's Life" modundaki kediler oyuncuyla diyalog kurabildiği için sistem onları insan sanıyordu. Yeni tespit sistemi (ırk, FaceGen, anahtar kelimeler ve kapı açamama kontrolleri) sayesinde bu hayvanlar artık kesin olarak evcil hayvan olarak tanınır ve ayar kapatıldığında menüden anında kaybolur.
+- **Ölen Takipçilerin Sistemden Düşmesi:** Takipçi öldüğünde arkaplan takibinden otomatik olarak güvenle çıkarılır.

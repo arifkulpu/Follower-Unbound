@@ -1,0 +1,55 @@
+﻿# Follower Unbound - Changelog v0.1.1
+
+## Overview
+This update focuses on making follower needs consumption reliable, adding combat potion usage with configurable thresholds, supporting modded waterskins/drinks (SunHelm), and polishing companion behavior after sleeping and waiting.
+
+---
+
+## What's New & Improvements
+
+### 1. Reliable Autonomous Eating & Drinking Loop
+- **Background Active Loop:** Added a periodic background tick that checks follower needs and inventory every second. Companions no longer get stuck waiting for a menu or event to trigger their meals.
+- **Gradual Consumption (Hysteresis Sessions):** Followers start eating or drinking once their need drops below the configured threshold (default 50%) and continue until they are full (100%), taking natural pauses between items.
+
+### 2. Delay After Sleeping & Waiting
+- Followers will no longer immediately eat or drink right after waking up or finishing a wait session.
+- A built-in **5-second cooldown** ensures companions transition naturally after sleep/wait before consuming items.
+
+### 3. Missing Food & Drink HUD Alerts
+- If a follower is hungry or thirsty but lacks food or drinks in their inventory, a notification appears in the top-left corner of your screen (e.g., "Goblina is thirsty, but has nothing to drink!").
+- An alert cooldown (60 seconds per follower) prevents notification spam.
+
+### 4. Need Priority Ordering
+- Follower processing now prioritizes the companion with the greatest need first (the one with the lowest hunger or thirst score acts before others).
+
+### 5. Full SunHelm Waterskin & Custom Drink Compatibility
+- Added full support for SunHelm waterskins (1-use, 2-use, 3-use waterskins including FormID 714DE9B0) and modded water bottles.
+- Followers can now detect and drink from waterskins and water bottles to quench their thirst.
+
+### 6. In-Combat Potion Usage & Configurable Thresholds
+- **Dynamic Combat Potions:** During combat, followers automatically drink Health, Magicka, or Stamina potions when their stats drop below configured percentages.
+- **Inventory Removal & Cooldowns:** Potions are consumed, animated, and properly removed from follower inventories, with safety cooldowns to prevent spam.
+- **Customizable Thresholds:** Added configurable sliders in SKSE Menu Framework / INI settings:
+  - Health Potion Threshold (default: 40%)
+  - Magicka Potion Threshold (default: 30%)
+  - Stamina Potion Threshold (default: 30%)
+
+### 7. Yapılan Akıllı Düzenleme: iksir kullanımı iyikeştirmesi:
+İhtiyaç Açığına (Aciliyet Puanına) Göre Öncelik:
+
+Sabit "Can > Magicka > Stamina" sırası kaldırıldı. Artık takipçinin o an hangi değeri eşiğe göre daha çok düşmüşse (yani hangisi daha acilse) ilk o iksiri içmeyi dener.
+Büyücü sınıflarında (Mage, Necromancer vb.) büyü atamaz hale gelmemeleri için Magicka ihtiyacına ek aciliyet bonusu verildi. Savaşçılarda da Stamina açığı gözetildi.
+Ardışık Aynı İksir Önleme (Rotasyon):
+
+Takipçi az önce Can İksiri içtiyse ve canı kritik/ölümcül (%20 altı) değilse, sistem doğrudan yine Can İksiri içmek yerine sıradaki tükenmiş ihtiyaca (Magicka veya Stamina) şans verir.
+Böylece büyücüler bir tur can iksiri içtikten sonra büyüleri bittiğinde sonraki turda manasız kalmayıp hemen Magicka iksirini içerler.
+Acil Hayatta Kalma Koruması (%20 Altı):
+
+Eğer takipçinin canı %20 veya altına inmişse, hayatta kalma her şeyden önce gelir ve Can İksiri mutlak birinciliği alır.
+
+---
+
+## Bug Fixes & Stability
+- **Fixed Eating Freeze After Sleep:** Resolved an issue where the 5-second sleep cooldown permanently prevented eating because there was no recurring check to resume consumption after the timer expired.
+- **Dialogue Safety Check:** Follower consumption animations and messages are paused while talking with NPCs to avoid animation cuts or UI conflicts.
+- **Inventory Trading Cooldown:** A short 3-second delay is applied after closing container or barter menus before companions resume eating.

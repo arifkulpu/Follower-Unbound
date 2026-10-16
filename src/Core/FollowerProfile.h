@@ -1,0 +1,238 @@
+#pragma once
+#include "PCH.h"
+#include "Core/ClassInterface.h"
+
+namespace FollowerUnbound
+{
+    enum class FollowerPersonality : uint32_t
+    {
+        Balanced = 0,
+        Frugal,
+        Generous,
+        Warrior,
+        Adventurer,
+        Alchemist,
+        Blacksmith,
+        Drunkard,
+        Survivalist
+    };
+
+    enum class FollowerState : uint32_t
+    {
+        Idle = 0,
+        Traveling,
+        Combat,
+        PostCombat,
+        Looting,
+        NeedsCheck,
+        Shopping,
+        Crafting,
+        Resting,
+        FollowPlayer
+    };
+
+    struct FollowerNeeds
+    {
+        float hunger{ 100.0f };   // 100 = tam dolu, 0 = aç
+        float thirst{ 100.0f };   // 100 = susuzluk yok, 0 = dehidre
+        float fatigue{ 100.0f };  // 100 = dinlenmiş, 0 = bitik
+        float alcohol{ 0.0f };    // sarhoşluk seviyesi
+
+        // deltaHours: geçen oyun saati
+        // hungerRate, thirstRate, fatigueRate: saatte kaç puan düşeceği (Settings'den gelir)
+        void Tick(float deltaHours, float hungerRate, float thirstRate, float fatigueRate)
+        {
+            hunger  = std::max(0.0f, hunger  - (deltaHours * hungerRate));
+            thirst  = std::max(0.0f, thirst  - (deltaHours * thirstRate));
+            fatigue = std::max(0.0f, fatigue - (deltaHours * fatigueRate));
+            alcohol = std::max(0.0f, alcohol - (deltaHours * 10.0f));
+        }
+
+        // Eski imza — Settings olmadan çağrılanlar için geriye dönük uyumluluk
+        void Tick(float deltaHours)
+        {
+            Tick(deltaHours, 12.5f, 16.67f, 10.0f); // varsayılan: 8h, 6h, 10h
+        }
+
+        // Oyuncu uyuduğunda çağrılır — takipçi de uyudu sayılır
+        void RestoreFromSleep()
+        {
+            fatigue = 100.0f;
+        }
+    };
+
+    struct FollowerPreferences
+    {
+        // Loot settings (Items to be looted)
+        bool allowLoot{ true };
+        bool allowLootGold{ true };
+        bool allowLootWeapons{ true };
+        bool allowLootArmor{ true };
+        bool allowLootClothing{ true };
+        bool allowLootJewelry{ true };
+        bool allowLootPotions{ true };
+        bool allowLootFood{ true };
+        bool allowLootDrinks{ true };
+        bool allowLootArrows{ true };
+        bool allowLootIngredients{ true };
+        bool allowLootSoulGems{ true };
+        bool allowLootGems{ true };
+        bool allowLootBooks{ true };
+        bool allowLootScrolls{ true };
+
+        // Sell settings (Items to be sold)
+        bool allowSellWeapons{ true };
+        bool allowSellArmor{ true };
+        bool allowSellClothing{ true };
+        bool allowSellJewelry{ true };
+        bool allowSellAmmo{ true };
+        bool allowSellPotions{ true };
+        bool allowSellFood{ true };
+        bool allowSellDrinks{ true };
+        bool allowSellIngredients{ true };
+        bool allowSellSoulGems{ true };
+        bool allowSellGems{ true };
+        bool allowSellBooks{ true };
+        bool allowSellScrolls{ true };
+
+        // Legacy / General Shopping settings
+        bool allowBuyFood{ true };
+        bool allowBuyPotions{ true };
+        bool allowBuyEquipment{ true };
+        bool allowBuyAmmunition{ true };
+
+        // Potions (3 types, limits 0-25)
+        bool buyHealthPotions{ false }; // Legacy, kept for save compatibility.
+        uint32_t maxHealthPotions{ 5 };
+        bool buyMagickaPotions{ false }; // Legacy, kept for save compatibility.
+        uint32_t maxMagickaPotions{ 5 };
+        bool buyStaminaPotions{ false }; // Legacy, kept for save compatibility.
+        uint32_t maxStaminaPotions{ 5 };
+        uint32_t maxPoisons{ 5 };
+
+        // Food (3 sizes, limits 0-25)
+        bool buyFoodLarge{ true };
+        uint32_t maxFoodLarge{ 3 };
+        bool buyFoodMedium{ true };
+        uint32_t maxFoodMedium{ 5 };
+        bool buyFoodSmall{ true };
+        uint32_t maxFoodSmall{ 5 };
+
+        // Drinks (2 types, limits 0-25)
+        bool buyDrinkNormal{ true };
+        uint32_t maxDrinkNormal{ 5 };
+        bool buyDrinkAlcohol{ false };
+        uint32_t maxDrinkAlcohol{ 2 };
+
+        // Ammunition (Arrows and Bolts, limits 0-250)
+        bool buyArrows{ false };
+        uint32_t maxArrows{ 50 };
+        uint32_t minArrows{ 20 };
+        bool buyBolts{ false };
+        uint32_t maxBolts{ 50 };
+
+        // Legacy aggregate stock retained for loot/sale compatibility.
+        bool buySoulGems{ true };
+        uint32_t maxSoulGems{ 5 };
+
+        // Extra Utilities: Meşale, Fener Yağı, Sabun (1-20, default 5)
+        bool buyTorches{ true };
+        uint32_t maxTorches{ 5 };
+        bool buyLanternOil{ true };
+        uint32_t maxLanternOil{ 5 };
+        bool buySoap{ true };
+        uint32_t maxSoap{ 5 };
+
+        // Crafting settings
+        bool allowCraftArrows{ false };
+        bool allowCraftPotions{ true };
+        bool allowUpgradeEquipment{ true };
+
+        // Economy
+        bool receiveQuestRewards{ true };
+        float rewardSharePercent{ 25.0f };
+
+        // Appended in serialization version 6 for backward-compatible saves.
+        bool buyTreatmentPotions{ true };
+        uint32_t maxTreatmentPotions{ 3 };
+        bool buyCurePoisonPotions{ true };
+        uint32_t maxCurePoisonPotions{ 3 };
+
+        // Independently enable/disable routine poison purchases.
+        bool buyPoisons{ true };
+
+        // Bolt production is separate from arrow production and shopping.
+        bool allowCraftBolts{ false };
+
+        // Torch production is independently configurable per follower.
+        bool allowCraftTorches{ true };
+
+        // Personal gold savings: earnings are reserved until this target is met.
+        bool savingsEnabled{ true };
+        uint32_t savingsTarget{ 1000 };
+        uint32_t savingsPercent{ 30 };
+        uint32_t savedGold{ 0 };
+        uint32_t savingsRemainder{ 0 }; // Fractional percentage carry, 0-99.
+
+        // Per-capacity soul gem purchasing; all types start enabled.
+        bool buyPettySoulGems{ true }; uint32_t maxPettySoulGems{ 5 };
+        bool buyLesserSoulGems{ true }; uint32_t maxLesserSoulGems{ 1 };
+        bool buyCommonSoulGems{ true }; uint32_t maxCommonSoulGems{ 1 };
+        bool buyGreaterSoulGems{ true }; uint32_t maxGreaterSoulGems{ 1 };
+        bool buyGrandSoulGems{ true }; uint32_t maxGrandSoulGems{ 1 };
+        bool buyBlackSoulGems{ true }; uint32_t maxBlackSoulGems{ 1 };
+
+        // Per-follower cap for the three restorative flowers used in potion recipes.
+        uint32_t maxPotionFlowers{ 30 };
+
+        // Per-tier potion purchasing. Minor is the default; higher tiers are opt-in.
+        bool buyHealthMinor{ true }, buyHealthStandard{ false }, buyHealthPlentiful{ false };
+        bool buyHealthVigorous{ false }, buyHealthExtreme{ false }, buyHealthUltimate{ false };
+        bool buyMagickaMinor{ true }, buyMagickaStandard{ false }, buyMagickaPlentiful{ false };
+        bool buyMagickaVigorous{ false }, buyMagickaExtreme{ false }, buyMagickaUltimate{ false };
+        bool buyStaminaMinor{ true }, buyStaminaStandard{ false }, buyStaminaPlentiful{ false };
+        bool buyStaminaVigorous{ false }, buyStaminaExtreme{ false }, buyStaminaUltimate{ false };
+
+        // Per-effect poison purchasing and combat invisibility stock.
+        bool buyPoisonHealth{ true }, buyPoisonMagicka{ true }, buyPoisonStamina{ true }, buyPoisonOther{ true };
+        bool buyInvisibilityPotions{ true };
+        uint32_t maxInvisibilityPotions{ 3 };
+    };
+
+    class FollowerProfile
+    {
+    public:
+        RE::FormID formID{ 0 };
+        std::string name{ "Follower" };
+        uint32_t gold{ 250 };
+        FollowerRole role{ FollowerRole::None }; // Managed or overridden by King Core / Classbound
+        std::string classBoundDisplayName;        // ClassBound/KingCore'un atadığı orijinal sınıf adı (UI için)
+        bool isAnimal{ false };                    // Evcil hayvan (kedi, köpek, at vb.) — class ve ekonomi yok, sadece ihtiyaçlar
+        FollowerPersonality personality{ FollowerPersonality::Balanced };
+        FollowerState currentState{ FollowerState::Idle };
+
+        FollowerNeeds needs;
+        FollowerPreferences preferences;
+
+        // Protected equipment designated by player
+        std::unordered_set<RE::FormID> protectedEquipment;
+
+        FollowerProfile() = default;
+        explicit FollowerProfile(RE::FormID a_formID, std::string_view a_name = "")
+            : formID(a_formID), name(a_name) {}
+
+        bool IsProtected(RE::FormID itemID) const
+        {
+            return protectedEquipment.contains(itemID);
+        }
+
+        void ProtectItem(RE::FormID itemID, bool protect = true)
+        {
+            if (protect) {
+                protectedEquipment.insert(itemID);
+            } else {
+                protectedEquipment.erase(itemID);
+            }
+        }
+    };
+}

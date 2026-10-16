@@ -1,0 +1,94 @@
+# Follower Unbound - Güncelleme Günlüğü v0.1.7 (Changelog)
+
+## Genel Bakış
+v0.1.7 güncellemesi, yağma (loot) sisteminin post-combat davranışını olgunlaştırır: takipçiler artık yalnızca **gerçekten savaştıkları düşmanların** cesetlerini yağmalar, kimse savaşmazken yağmaya başlar, sarf malzemesi stoklarını aşmaz ve ihtiyacı en yüksek olan takipçi yemek/içecekte önce alır. Ayrıca tüm yağma kategorileri global INI/menu anahtarlarına bağlandı.
+
+---
+
+## 🌟 Yeni Özellikler & Geliştirmeler
+
+### 1. CombatTracker — "Sadece Düşman Cesetleri" (Hostiles Only)
+- Yeni `src/AI/CombatTracker` bileşeni, TESCombatEvent üzerinden **kimin oyuncuya/takipçiye savaş olduğunu** izler ve ölen düşmanları savaş kaybı (casualty) olarak işaretler.
+- **LootHostilesOnly** (varsayılan: AÇIK) ayarı ile:
+  - Masum şehir NPC'leri, pasif hayvanlar (geyik vb.) ve dost birimler **asla otomatik yağmalanmaz**.
+  - Savaşta oyuncuya/takipçiye saldıran düşmanlar (baldıran, kurt, ejderha, haydut...) normal şekilde yağmalanır.
+  - Event kaçırma toleransı: savaş event'i kaçırsa bile ölüm anında oyuncuya düşman olan aktör (`IsHostileToActor`) yine yakalanır.
+- Ayar menüsünde: "Hostiles Only (Sadece Dusman Cesetleri)" onay kutusu. INI: `[Looting] LootHostilesOnly`.
+
+### 2. Çift Taraflı Savaş Sonu Kontrolü
+- Yağma artık yalnızca **oyuncu değil, hiçbir takipçi de savaşmazken** başlar. Takipçi hâlâ bir düşmanla uğraşırken ceset yağmalamaya kalkmaz (istek listesindeki "savaş gerçekten bitti mi?" doğrulaması).
+
+### 3. Yağma Kategori Anahtarları (Global)
+- Artık her kategori global olarak açılıp kapatılabilir (INI + menü):
+  - `LootGold` (altın paylaşımı)
+  - `LootWeapons` / `LootArmor` / `LootArrows` / `LootPotions` / `LootFood`
+  - `LootIngredients` (varsayılan: KAPALI — bitki/mineral takipçi işi değil)
+  - `LootSoulGems` (varsayılan: KAPALI — ruh taşları oyuncuya kalsın, SoulKeeper dostu)
+  - `LootMisc` (varsayılan: AÇIK — ejderha kemiği/pullanı, mücevher gibi değerli MISC eşyalar; kapatırsanız takipçiler dokunmaz)
+- Global anahtarlar, menüdeki takipçi başına tercihlerle **birlikte** (VE) geçerlidir. Yerden toplama (ground loot) da aynı kategori anahtarlarına uyar.
+
+### 4. Sarf Stok Farkındalığı — "Yağma → Sat" Döngüsü Bitti
+- Takipçiler artık iksir/zehir/yemek/içecek yağmalarken **kişisel stok limitlerini** (alışveriş tarafındakiyle aynı sınıflandırıcı ve limitler) aşmaz:
+  - Sağlık/büyü/dayanıklılık iksiri → `maxHealthPotions` vb. limitler
+  - Zehir → `maxPoisons`
+  - Yemek → büyük/orta/küçük yemek limitleri, içecek → normal/alkollü limitler (alkol ancak `buyDrinkAlcohol` açıkken alınır)
+- Böylece yağmalanan fazlalıklar satıcıya geri satılarak "al 5 → sat 2" huzursuzluğu oluşmaz; envanter gereksiz dolmaz.
+
+### 5. İhtiyaç Öncelikli Yemek Dağıtımı (Sınıfsal Değil, Durumsal)
+- Yemek/içecek dağıtımında **aç veya susuz takipçi öne alınır**: birimi, ihtiyacı en düşük olan (en aç / en susuz) takipçi alır; ihtiyaç eşitse klasik round-robin sırası korunur.
+- Diğer tüm kategorilerde (silah, zırh, ok...) dağıtım aynen sınıfsız round-robin'dir. Sınıf/rol kuralı YOKTUR — ihtiyaç, sınıfın yerini almıştır.
+
+### 6. Yağma Animasyonu (Kozmetik, Güvenli Fallback)
+- Cesede yakın (≤ 400 units) katılımcı takipçiler yağma sırasında kısa bir "toplama" animasyonu dener (`IdleActivatePickLow` → `IdleActivatePick` → `IdleLoot` zinciri).
+- Hiçbir event oynatılamazsa **hiçbir şey yapılmaz**: graph reset yok, uyarı yok, transfer zaten tamamlanmıştır. Animasyon modlarına bağımlılık sıfırdır.
+- Ayar: `[Looting] UseLootAnimation` + menü onay kutusu.
+
+### 7. Ayarlanabilir Yağma Menzili
+- `LootSearchRadius` (varsayılan 3000, 500–8000 arası slider): cesedin takipçiye en fazla ne kadar yakında olması gerektiği artık INI'den/menüden ayarlanabilir (eskiden sabit koddu).
+
+---
+
+## 🔧 Düzeltmeler & Temizlik
+
+- **Gizli sınıf kapısı kaldırıldı:** `ItemEvaluator::EvaluateItem` içindeki (kullanılmayan) rol-uymayan-eşya→0 kapısı sınıfsızlık politikasıyla çeliştiği için etkisizleştirildi; ileride kullanılacaksa artık güvenli.
+- **Ölü bildirim temizlendi:** Header'da tanımlı olup hiç var olmayan `TryGiveToGroundFollower` bildirimi silindi.
+- **Bellek hijyeni:** İşlenmiş ceset seti (`_lootedCorpses`) 4096 kaydı aşarsa sıfırlanır — çok uzun oturumlarda FormID birikimi önlenir.
+- Menüdeki "Reset to Default" artık tüm yeni yağma ayarlarını da fabrika değerlerine döndürür.
+
+---
+
+## ⚠️ Bilinen Sınırlar / Bilinçli Atamalar
+- **"Cesede yürüme + etkileşim" (walk-to-corpse) bu sürümde YOK.** Yağma, cesedin yakınında (LootSearchRadius içinde) takipçi varken anında ve sessizce yapılır. Motor tarafında güvenli hareket/paket API'si olmadan körlemesine eklenmesi takipçilerin takılmasına/çökmelere yol açabilir — ayrı bir geliştirme fazı olarak planlandı.
+- `LootMisc` varsayılanı istek listesindeki "false" yerine **true** bırakıldı: ejderha kemiği/pullanı ve mücevher TESObjectMISC sınıfındadır; kapalı başlasaydı takipçiler en değerli ganimetleri kaçıracaktı. Menüden tek tıkla kapatılabilir.
+
+---
+
+## 🧪 Test Önerileri (v0.1.7)
+1. **Masum test:** Şehirde bir NPC'yi savaşsız öldürün → takipçiler cesede dokunmamalı (Hostiles Only açıkken).
+2. **Düşman test:** Haydut kampı temizleyin → savaş bitiminde tüm düşman cesetleri normal yağmalanmalı.
+3. **Geç yaşayan düşman:** 3 düşmandan 1'ü ölünce yağma BAŞLAMAMALI; hepsi ölünce ve takipçiler savaştan çıkınca başlamalı.
+4. **Stok limiti:** Takipçinin 5 sağlık iksiri varken iksir dolu ceset yağmalanırsa iksir alınmamalı.
+5. **Aç takipçi:** Çok aç takipçi, yemek dağıtımında ilk birimleri almalı.
+6. **Kategori:** `LootSoulGems=false` iken cesetteki ruh taşı yerinde kalmalı.
+7. **Ejderha:** Ejderha cesedi normal yağmalanmalı (hostile), kemik/pul `LootMisc=true` iken alınmalı.
+
+---
+
+## 🔥 Yama (v0.1.7a) — Yeni Oyun Testi Geri Bildirimi
+
+İlk yeni-oyun testinden gelen üç sorunun kök nedeni log analiziyle bulundu ve düzeltildi:
+
+### 1. "İhtiyaçlar %100'de takılı kaldı" → Yoldaş alınca otomatik kayıt YOKTU
+- **Kök neden:** Bu CommonLib sürümünde takip-etme eventi (TESFollowEvent) bulunmuyor; tarama yalnızca save yüklenince ve menüdeki "Scan" butonuyla çalışıyordu. Log: yoldaş ~17 dakika boyunca kayıt dışı kaldı, yapılan 3 kaydın 3'ü de "0 follower profiles" yazdı. Kayıtlı olmayan takipçinin ihtiyaçları/yağması/alışverişi tabii ki çalışmaz.
+- **Düzeltme:** Arka plan döngüsüne ~5 saniyelik hafif periyodik tarama eklendi. Yoldaş artık yanınıza alındıktan en geç birkaç saniye sonra sisteme kaydedilir; ihtiyaçlar hemen çalışmaya başlar.
+- **Not:** İhtiyaçların düşme hızı ayarlarla belirlenir (varsayılan: açlık 8 oyun saatinde %100→0, susuzluk 6 saatte). Normal oynanışta gerçek 1 dakika ≈ 20 oyun dakikası olduğundan menüdeki değerler yavaş oynar; hızlandırmak isterseniz `HungerDepletionHours` / `ThirstDepletionHours` değerlerini küçültün.
+
+### 2. "Zırh/silah almadı, sadece ayakkabı aldı" → Yedek limiti giyili parçaları sayıyordu
+- **Kök neden:** `LootMaxSpareArmor` (varsayılan 2) sayacı takipçinin ÜZERİNDEKİ giyili zırh parçalarını da sayıyordu. Giyili 1-2 parçalı bir takipçinin limiti baştan dolu olduğundan hiç zırh yağmalayamıyordu ("ayakkabı" tek istisnaydı — limit dolmadan alınan son parça).
+- **Düzeltme:** Yedek sayacı artık yalnızca sırtındaki fazlalıkları sayar (giyili zırh + kuşanılmış silah hariç). Dolu donanımlı takipçi artık daha iyi zırh/silah bulunca yağmalayıp anında kuşanabilir; "20 kask" koruması yine geçerli (en fazla 2 yedek).
+
+### 3. "Kuşanım save sonrası 15 saniye gecikmeli oldu" → Açıklama
+- Kuşanım aslında yağma anında yapılır. Gecikmenin sebebi: takipçi kayıt dışıyken hiçbir sistem çalışmıyordu; save yükleyince kayıt co-save'den geri gelince sistem başladı ve yerden toplama (ground loot) kalan eşyaları aldı. 1. düzeltmeyle (otomatik tarama) bu gecikme ortadan kalktı.
+
+### Ek
+- CombatTracker'ın bir cesedi reddetmesi artık debug loga düşer ("masum/dusman-degil olarak isaretlendi") — olası yanlış-red şikâyetlerinde logdan teşhis edilebilir.

@@ -1,0 +1,9 @@
+{
+  "name": "follower-unbound",
+  "version-string": "1.0.0",
+  "dependencies": [
+    "spdlog",
+    "rapidcsv",
+    "nlohmann-json"
+  ]
+}
