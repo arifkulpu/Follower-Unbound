@@ -222,7 +222,17 @@ namespace FollowerUnbound
             auto* button = current->AsButtonEvent();
             if (!button) continue;
             const auto key = button->GetIDCode();
-            if (key == RE::BSKeyboardDevice::Keys::kLeftShift) {
+            auto* self = GetSingleton();
+            if (key == RE::BSKeyboardDevice::Keys::kEscape && button->IsPressed() &&
+                self->IsAvailable() && !self->_api->IsHidden(self->_view)) {
+                // PrismaUI may not deliver keyboard events to its JS document
+                // while another SKSE menu owns focus. Handle Escape natively so
+                // the overlay can always be dismissed without trapping input.
+                if (auto* tasks = SKSE::GetTaskInterface()) {
+                    tasks->AddTask([]() { OnClose(nullptr); });
+                    return true;
+                }
+            } else if (key == RE::BSKeyboardDevice::Keys::kLeftShift) {
                 if (button->IsUp()) g_leftShiftDown.store(false, std::memory_order_relaxed);
                 else if (button->IsPressed()) g_leftShiftDown.store(true, std::memory_order_relaxed);
             } else if (key == RE::BSKeyboardDevice::Keys::kRightShift) {
