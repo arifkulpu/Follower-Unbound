@@ -1,6 +1,7 @@
 #include "UI/EquipPrompt.h"
 #include "Core/FollowerManager.h"
 #include "UI/PrismaUIManager.h"
+#include "UI/SKSEMenuFramework.h"
 #include "AI/AnimationManager.h"
 
 namespace FollowerUnbound
@@ -22,9 +23,28 @@ namespace FollowerUnbound
         bool g_waitingForLootCompletion{ false };
         std::chrono::steady_clock::time_point g_showAt{};
 
+        bool IsAnotherMenuOpen()
+        {
+            if (SKSEMenuFramework::IsInstalled() && SKSEMenuFramework::IsAnyBlockingWindowOpened()) return true;
+            auto* ui = RE::UI::GetSingleton();
+            if (!ui) return true;
+            constexpr std::array<std::string_view, 19> blockingMenus{
+                "Dialogue Menu", "ContainerMenu", "InventoryMenu", "MessageBoxMenu", "BarterMenu",
+                "GiftMenu", "Journal Menu", "MapMenu", "MagicMenu", "FavoritesMenu", "TweenMenu",
+                "Sleep/Wait Menu", "Loading Menu", "Crafting Menu", "Book Menu", "Lockpicking Menu",
+                "Training Menu", "StatsMenu", "Console"
+            };
+            return std::ranges::any_of(blockingMenus, [ui](std::string_view name) { return ui->IsMenuOpen(name); });
+        }
+
         void PresentNext()
         {
             if (g_activePrompt || g_promptQueue.empty()) return;
+            if (IsAnotherMenuOpen()) {
+                g_waitingForLootCompletion = true;
+                g_showAt = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+                return;
+            }
             g_activePrompt = std::move(g_promptQueue.front());
             g_promptQueue.pop_front();
             const auto& prompt = *g_activePrompt;
@@ -112,6 +132,9 @@ namespace FollowerUnbound
         } else {
             logger::info("EquipPrompt: PrismaUI declined {}; item remains in follower inventory.", prompt.newObjName);
         }
-        PresentNext();
+        if (!g_promptQueue.empty()) {
+            g_waitingForLootCompletion = true;
+            g_showAt = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        }
     }
 }

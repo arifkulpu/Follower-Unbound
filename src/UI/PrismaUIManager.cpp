@@ -245,7 +245,7 @@ namespace FollowerUnbound
     {
         if (!IsAvailable()) return;
         if (!_api->IsHidden(_view)) {
-            if (EquipPrompt::HasActivePrompt()) return;
+            if (EquipPrompt::HasActivePrompt()) EquipPrompt::Resolve(false);
             _api->Unfocus(_view);
             _api->Hide(_view);
             return;
@@ -299,7 +299,10 @@ namespace FollowerUnbound
     void PrismaUIManager::OnClose(const char*)
     {
         auto* self = GetSingleton();
-        if (!self->IsAvailable() || EquipPrompt::HasActivePrompt()) return;
+        if (!self->IsAvailable()) return;
+        // Closing the overlay while an equipment decision is active dismisses
+        // that decision as declined. Never trap the player behind a modal.
+        if (EquipPrompt::HasActivePrompt()) EquipPrompt::Resolve(false);
         self->_api->Unfocus(self->_view);
         self->_api->Hide(self->_view);
     }

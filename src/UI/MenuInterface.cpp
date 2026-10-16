@@ -12,6 +12,7 @@
 #include "AI/DroppedItemRecovery.h"
 #include "AI/AnimationManager.h"
 #include "UI/PrismaUIManager.h"
+#include "UI/EquipPrompt.h"
 
 namespace FollowerUnbound
 {
@@ -1502,6 +1503,9 @@ namespace FollowerUnbound
     void __stdcall MenuInterface::RenderBackgroundTick()
     {
         // SKSEMenuFramework her frame HUD çiziminde bu fonksiyonu çağırır.
+        // Delayed equipment prompts are polled here so they wait until the
+        // player closes any blocking game or SKSE menu before opening PrismaUI.
+        EquipPrompt::Update();
         static auto lastConsumptionTime = std::chrono::steady_clock::now();
         static auto lastNeedsTickTime = std::chrono::steady_clock::now();
         static std::chrono::steady_clock::time_point lastPausedTime{};
