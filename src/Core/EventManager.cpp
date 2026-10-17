@@ -115,9 +115,6 @@ namespace FollowerUnbound
                 auto target = RE::TESObjectREFR::LookupByHandle(handle);
                 if (target) {
                     _lastContainerOpened = target->GetFormID();
-                } else if (auto* pickData = RE::CrosshairPickData::GetSingleton()) {
-                    auto crosshairTarget = pickData->target.get();
-                    if (crosshairTarget) _lastContainerOpened = crosshairTarget->GetFormID();
                 }
             } else {
                 RE::FormID containerID = _lastContainerOpened;
@@ -126,9 +123,6 @@ namespace FollowerUnbound
                     auto target = RE::TESObjectREFR::LookupByHandle(handle);
                     if (target) {
                         containerID = target->GetFormID();
-                    } else if (auto* pickData = RE::CrosshairPickData::GetSingleton()) {
-                        auto crosshairTarget = pickData->target.get();
-                        if (crosshairTarget) containerID = crosshairTarget->GetFormID();
                     }
                 }
                 if (containerID != 0) {

@@ -537,7 +537,10 @@ namespace FollowerUnbound
             logger::info("LootShare: skipped container {:08X} because autoLootCorpses setting is false.", corpseRef->GetFormID());
             return true;
         }
-        if (IsQuestItem(corpseRef)) {
+        // Static quest containers (chests tied to a quest alias) are protected.
+        // Dead actors/NPCs are enemy corpses and must NEVER be skipped by alias checks!
+        auto* corpseActor = corpseRef->As<RE::Actor>();
+        if (!corpseActor && IsQuestItem(corpseRef)) {
             logger::info("LootShare: skipped container {:08X} because it is a quest item / alias.", corpseRef->GetFormID());
             return true;
         }
@@ -552,7 +555,6 @@ namespace FollowerUnbound
         auto* cell = corpseRef->GetParentCell();
 
         // For dead actors/NPCs, NEVER skip based on cell ownership! They are dead enemies in the world.
-        auto* corpseActor = corpseRef->As<RE::Actor>();
         if (!corpseActor) {
             if (isPlayerOwner(corpseRef->GetOwner()) || isPlayerOwner(corpseRef->GetFactionOwner())) {
                 logger::info("LootShare: skipped explicitly player-owned container {:08X}.", corpseRef->GetFormID());
@@ -973,10 +975,7 @@ namespace FollowerUnbound
             }
 
             _processingScheduled.store(false, std::memory_order_release);
-            logger::info("LootTask: UI task finished; scheduled flag cleared.");
-            if (HasPendingLootWork()) {
-                ScheduleProcessing();
-            }
+            logger::debug("LootTask: UI task finished; scheduled flag cleared.");
         });
         logger::debug("LootTask: UI task queued.");
     }
