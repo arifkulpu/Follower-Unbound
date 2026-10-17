@@ -229,6 +229,10 @@ namespace FollowerUnbound
         // Protected equipment designated by player
         std::unordered_set<RE::FormID> protectedEquipment;
 
+        // Vendor gear offers declined by this follower. Saved per profile so
+        // the same item is never offered again after loading the save.
+        std::unordered_set<RE::FormID> declinedEquipmentPurchases;
+
         FollowerProfile() = default;
         explicit FollowerProfile(RE::FormID a_formID, std::string_view a_name = "")
             : formID(a_formID), name(a_name) {}

@@ -23,6 +23,7 @@ namespace FollowerUnbound
 
         void QueueLootNotification(std::string_view followerName, std::string_view itemName, uint32_t count);
         void FlushLootNotifications();
+        void Clear();
 
     private:
         NotificationManager() = default;

@@ -6,6 +6,7 @@
 #include "Core/Settings.h"
 #include "AI/DroppedItemRecovery.h"
 #include "AI/ItemEvaluator.h"
+#include "Economy/EconomyManager.h"
 #include "UI/NotificationManager.h"
 #include "RE/T/TESFlora.h"
 #include "KingCore/KingCoreAPI.h"
@@ -24,6 +25,47 @@ namespace FollowerUnbound
             event.type = a_type;
             event.gameDaysPassed = calendar->GetDaysPassed();
             messaging->Dispatch(KingCore::MESSAGE_TYPE_FOLLOWER_RESTED, &event, sizeof(event), "KingCore");
+        }
+
+        bool IsOreOrGem(RE::TESBoundObject* item)
+        {
+            if (!item) return false;
+            auto* misc = item->As<RE::TESObjectMISC>();
+            if (!misc) return false;
+
+            if (auto* kw = misc->As<RE::BGSKeywordForm>()) {
+                if (kw->HasKeywordID(0x000914ED)) return true; // VendorItemGem
+                if (kw->HasKeywordID(0x000914EA)) { // VendorItemOreIngot
+                    std::string name = misc->GetName() ? misc->GetName() : "";
+                    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+                    if (name.find("ingot") == std::string::npos && name.find("külçe") == std::string::npos && name.find("kulce") == std::string::npos) {
+                        return true;
+                    }
+                }
+            }
+            std::string name = misc->GetName() ? misc->GetName() : "";
+            std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+            if (name.find("ore") != std::string::npos || name.find("cevher") != std::string::npos || name.find("maden") != std::string::npos || name.find("stalhrim") != std::string::npos) {
+                return true;
+            }
+            return false;
+        }
+
+        bool IsFirewood(RE::TESBoundObject* item)
+        {
+            if (!item) return false;
+            if (item->GetFormID() == 0x0006F993) return true;
+            if (auto* misc = item->As<RE::TESObjectMISC>()) {
+                if (auto* kw = misc->As<RE::BGSKeywordForm>()) {
+                    if (kw->HasKeywordID(0x0008F959)) return true; // VendorItemFirewood
+                }
+                std::string name = misc->GetName() ? misc->GetName() : "";
+                std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+                if (name.find("firewood") != std::string::npos || name.find("yakacak") != std::string::npos || name.find("odun") != std::string::npos) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 
@@ -71,15 +113,28 @@ namespace FollowerUnbound
                 _lastContainerOpened = 0;
                 const auto handle = RE::ContainerMenu::GetTargetRefHandle();
                 auto target = RE::TESObjectREFR::LookupByHandle(handle);
-                if (target) _lastContainerOpened = target->GetFormID();
+                if (target) {
+                    _lastContainerOpened = target->GetFormID();
+                } else if (auto* pickData = RE::CrosshairPickData::GetSingleton()) {
+                    auto crosshairTarget = pickData->target.get();
+                    if (crosshairTarget) _lastContainerOpened = crosshairTarget->GetFormID();
+                }
             } else {
                 RE::FormID containerID = _lastContainerOpened;
                 if (containerID == 0) {
                     const auto handle = RE::ContainerMenu::GetTargetRefHandle();
                     auto target = RE::TESObjectREFR::LookupByHandle(handle);
-                    if (target) containerID = target->GetFormID();
+                    if (target) {
+                        containerID = target->GetFormID();
+                    } else if (auto* pickData = RE::CrosshairPickData::GetSingleton()) {
+                        auto crosshairTarget = pickData->target.get();
+                        if (crosshairTarget) containerID = crosshairTarget->GetFormID();
+                    }
                 }
-                if (containerID != 0) LootManager::GetSingleton()->QueuePlayerLootDistribution(containerID);
+                if (containerID != 0) {
+                    LootManager::GetSingleton()->QueuePlayerLootDistribution(containerID);
+                    LootManager::GetSingleton()->ScheduleProcessing();
+                }
                 _lastContainerOpened = 0;
             }
         }
@@ -166,6 +221,77 @@ namespace FollowerUnbound
         auto* player = RE::PlayerCharacter::GetSingleton();
         const auto playerID = player ? player->GetFormID() : 0;
         if (playerID && a_event->newContainer == playerID) {
+            auto* ui = RE::UI::GetSingleton();
+            const bool inMenu = ui && (ui->IsMenuOpen(RE::BarterMenu::MENU_NAME) || ui->IsMenuOpen(RE::ContainerMenu::MENU_NAME));
+
+            // Gold purse / loose world gold bonus split:
+            // Player keeps 100% of the gold, and active followers get equal bonus shares.
+            if (!inMenu && a_event->baseObj == 0x0000000F && a_event->oldContainer == 0) {
+                const auto totalGold = a_event->itemCount;
+                if (totalGold > 0) {
+                    if (auto* tasks = SKSE::GetTaskInterface()) {
+                        tasks->AddTask([totalGold]() {
+                            auto* manager = FollowerManager::GetSingleton();
+                            if (!manager) return;
+                            auto followers = manager->GetActiveFollowers();
+                            followers.erase(std::remove_if(followers.begin(), followers.end(), [](RE::Actor* actor) {
+                                return !actor || actor->IsDead() || FollowerManager::IsAnimalActor(actor);
+                            }), followers.end());
+                            if (followers.empty()) return;
+
+                            const int32_t share = totalGold / static_cast<int32_t>(followers.size());
+                            if (share <= 0) return;
+
+                            auto* goldItem = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0000000F);
+                            if (!goldItem) return;
+
+                            for (auto* follower : followers) {
+                                follower->AddObjectToContainer(goldItem, nullptr, share, nullptr);
+                                EconomyManager::GetSingleton()->AddGold(follower->GetFormID(), share);
+                            }
+                            if (Settings::GetSingleton()->notifyLoot) {
+                                NotificationManager::GetSingleton()->ShowHUDMessage(
+                                    std::format("Altın paylaşıldı: Takipçilerin her biri {} altın aldı.", share));
+                            }
+                            logger::info("GoldPurseShare: Player found {} gold; gave {} bonus gold each to {} active followers.",
+                                totalGold, share, followers.size());
+                        });
+                    }
+                }
+            }
+
+            // Mining ore/gems and chopping firewood:
+            // Followers receive matching amounts of the harvested resources.
+            if (!inMenu && a_event->baseObj != 0x0000000F && a_event->oldContainer == 0) {
+                const auto resourceID = static_cast<RE::FormID>(a_event->baseObj);
+                auto* resourceItem = RE::TESForm::LookupByID<RE::TESBoundObject>(resourceID);
+                const auto resourceCount = std::clamp(std::abs(a_event->itemCount), 1, 50);
+                if (resourceItem && (IsOreOrGem(resourceItem) || IsFirewood(resourceItem))) {
+                    if (auto* tasks = SKSE::GetTaskInterface()) {
+                        tasks->AddTask([resourceID, resourceCount]() {
+                            auto* item = RE::TESForm::LookupByID<RE::TESBoundObject>(resourceID);
+                            auto* manager = FollowerManager::GetSingleton();
+                            if (!item || !manager) return;
+                            auto followers = manager->GetActiveFollowers();
+                            followers.erase(std::remove_if(followers.begin(), followers.end(), [](RE::Actor* actor) {
+                                return !actor || actor->IsDead() || FollowerManager::IsAnimalActor(actor);
+                            }), followers.end());
+                            if (followers.empty()) return;
+
+                            for (auto* follower : followers) {
+                                follower->AddObjectToContainer(item, nullptr, resourceCount, nullptr);
+                            }
+                            if (Settings::GetSingleton()->notifyLoot) {
+                                NotificationManager::GetSingleton()->ShowHUDMessage(
+                                    std::format("Madencilik/Odun: Takipçilere {}x {} verildi.", resourceCount, item->GetName()));
+                            }
+                            logger::info("ResourceShare: Player gathered {}x {}; gave matching amount to {} followers.",
+                                resourceCount, item->GetName(), followers.size());
+                        });
+                    }
+                }
+            }
+
             const auto ingredientID = static_cast<RE::FormID>(a_event->baseObj);
             auto* ingredient = RE::TESForm::LookupByID<RE::TESBoundObject>(ingredientID);
             const auto harvestedCount = std::clamp(std::abs(a_event->itemCount), 1, 50);

@@ -1,0 +1,55 @@
+# Follower Unbound - Güncelleme Günlüğü v0.2.1 (Changelog)
+
+## Genel Bakış
+v0.2.1 güncellemesi; Prisma UI bildirim yönetimi, yağma hızlandırması ve derinlemesine optimizasyonları, taşıma kapasitesi sınırları ve önceliklendirme mantığı, altın ve maden/odun kaynak paylaşımı ile detaylı eşya türü/slot etiketlerini oyuna kazandırır.
+
+---
+
+## 🌟 Yeni Özellikler & Geliştirmeler
+
+### 1. Prisma UI Bildirim Yönetim Sistemi & Crash Önleme
+- **Toplu ve Ayrıntılı Bildirim Kontrolü:**
+  - Prisma UI **Systems** sekmesine tek tıkla tüm bildirimleri açıp kapatabilen `ENABLE ALL` ve `DISABLE ALL` butonları eklendi.
+  - Yağma, alışveriş, satış, ihtiyaçlar (açlık/susuzluk), savaş iksirleri ve otomatik kuşanma bildirimleri bağımsız anahtarlarla açılıp kapatılabilir.
+- **Bildirim Yığılması Kaynaklı Çökme (Crash) Engellendi:**
+  - Üst üste çok hızlı gelen bildirimlerin oyun motorunu dondurmasını veya çökertmesini önlemek amacıyla bağımsız ve şeffaf bir PrismaUI bildirim katmanı (`notifications.html`), güvenli DOM kaldırma mekanizması ve kare başına döngü kilidi entegre edildi.
+
+### 2. Daha İyi Ekipman Bildirim Sıklığı & Şans Oranı (`equipmentUpgradeChance`)
+- Takipçilerin zindanlarda veya ganimetlerde çok sık daha iyi ekipman bularak oyuncuya sürekli bildirim göndermesini önlemek amacıyla şans tabanlı kontrol mekanizması getirildi.
+- Prisma UI Systems sekmesine **Gear upgrade check chance (%)** ayarı eklendi (Varsayılan: **%35**, 1–100 arası ayarlanabilir).
+- Hem cesetlerden yağmalanan yükseltmeler hem de tüccarlardaki ekipman satın alma teklifleri bu şans oranına tabi tutulur; böylece bildirim spamı ortadan kalkar.
+
+### 3. Ekipman Karşılaştırma Ekranında Tür ve Slot Göstergesi
+- Ekipman karşılaştırma penceresinin (`EquipPrompt`) en üstüne ilgili eşyanın türünü ve kullanım yuvasını açıkça gösteren altın sarısı belirgin bir rozet eklendi:
+  - **Silahlar için:** Silah türü (Örn: `SİLAH: KILIÇ`, `SİLAH: YAY`, `SİLAH: HANÇER`, `SİLAH: SAVAŞ BALTASI`, `SİLAH: GÜRZ`, `SİLAH: ASA`).
+  - **Zırh ve Kıyafetler için:** Vücut parçası yuvası (Örn: `ZIRH: GÖVDE`, `ZIRH: KASK`, `ZIRH: AYAK`, `ZIRH: ELDİVEN`, `ZIRH: TAKI`, `KALKAN`).
+
+### 4. Prisma UI Equipment Sekmesinde Slot/Tür Rozetleri
+- Prisma UI **Equipment** sekmesinde takipçinin envanterindeki eşyalar incelenirken her giysi ve silah kartının üzerine parça türü rozeti (`Kask`, `Gövde`, `Ayak`, `Eldiven`, `Takı`, `Kalkan`, `Kılıç`, `Yay`, vb.) eklendi. Oyuncu hangi eşyanın hangi kategoriye ait olduğunu anında görebilir.
+
+### 5. Ceset Yağmalama Zamanlaması & Gecikme Düzeltmeleri
+- **FormID Kaçırma Sorunu Giderildi:** Oyuncu bir cesedi yağmalayıp kapattığında hedef aktörün motor tarafından anında temizlenmesi sebebiyle kalan eşyaların takipçilerce alınamaması sorunu, `CrosshairPickData` yedekleme sistemi ile kalıcı olarak çözüldü.
+- **Yapay Bekleme Süresi Kaldırıldı:** Menü kapandıktan sonraki 3 saniyelik genel sistem duraklaması yağma işlemleri için baypas edildi; transferler menü kapandığı salise başlar.
+- **Hızlı ve Kesintisiz Aktarım:** Saniyede 1 eşya aktarım darboğazı kaldırılarak kare başına 6 eşyaya çıkarıldı ve kuyruk bitene kadar UI görevleri ardışık olarak zincirlendi; cesetler anında ve eksiksiz yağmalanır.
+
+### 6. Yağmada Stok Sınırının Kaldırılması, Önceliklendirme & Taşıma Kapasitesi
+- Yağmadaki yapay stok kısıtlamaları kaldırıldı; takipçiler envanterleri dolana kadar her şeyi yağmalar.
+- **Önceliklendirme:** Takipçilerin eksik olduğu stok ürünleri (can/büyü/dayanıklılık iksirleri, yiyecek, içecek, oklar vb.) ilk sırada toplanır; ardından zırhlar, silahlar ve diğer değerli eşyalar alınır.
+- **Taşıma Kapasitesi & Bildirim:** Takipçinin taşıma kapasitesi dolduğunda bir kereye mahsus HUD bildirimi verilir:
+  `"{Takipçi Adı}: Artık daha fazla eşya taşıyamam."`
+  (Takipçi eşya satıp veya bırakıp yükü hafiflediğinde sayaç sıfırlanır).
+
+### 7. Madencilik ve Odun Kesme Kaynak Paylaşımı
+- Oyuncu kazma ile maden kazdığında (tüm cevherler, yakut/safir/elmas/ametist gibi değerli taşlar ve Stalhrim) veya odun kestiğinde, kazanılan miktar kadar kaynak aktif takipçilere de paylaştırılır.
+
+### 8. Para Kesesi ve Dünyadan Altın Toplama Paylaşımı
+- Oyuncu dünyadaki para keselerini aldığında veya serbest altınları topladığında:
+  - Oyuncunun kendi kazandığı paradan **kesinti yapılmaz** (oyuncu %100'ünü alır).
+  - Alınan miktar aktif takipçi sayısına bölünerek her birine eşit oranda bonus altın olarak çantalarına ve ekonomi profillerine eklenir.
+
+---
+
+## 🔧 Teknik İyileştirmeler & Derleme
+- CommonLibSSE-NG ve SKSE UI TaskQueue üzerinde thread-safe envanter mutasyonları korundu.
+- `PrismaUI/views/FollowerUnbound` ile `Data/PrismaUI/views/FollowerUnbound` arayüz dosyaları birebir senkronize edildi.
+- MSVC C++23 Release derlemesi sıfır hata ile tamamlandı.

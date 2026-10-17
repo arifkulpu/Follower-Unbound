@@ -78,6 +78,8 @@ namespace FollowerUnbound
         enablePetSystem      = readBool("Systems", "EnablePetSystem",      true);
         protectEquippedClothing = readBool("Systems", "ProtectEquippedClothing", true);
         promptOnBetterEquipment = readBool("Systems", "PromptOnBetterEquipment", true);
+        equipmentUpgradeChance  = static_cast<uint32_t>(std::clamp(readInt("Systems", "EquipmentUpgradeChance", 35), 1, 100));
+        enableEquipmentPurchaseOffers = readBool("Systems", "EnableEquipmentPurchaseOffers", true);
         magePreferRobes         = readBool("Systems", "MagePreferRobes",         true);
 
         // ── LOOTING ──
@@ -108,6 +110,7 @@ namespace FollowerUnbound
         transactionBatchMultiplier = static_cast<uint32_t>(std::clamp(readInt("Selling", "TransactionBatchMultiplier", 5), 1, 20));
 
         // ── NOTIFICATION TOGGLES ──
+        enableNotifications       = readBool("Notifications", "EnableNotifications",       true);
         notifyCombatHealthPotion  = readBool("Notifications", "NotifyCombatHealthPotion",  true);
         notifyCombatMagickaPotion = readBool("Notifications", "NotifyCombatMagickaPotion", true);
         notifyCombatStaminaPotion = readBool("Notifications", "NotifyCombatStaminaPotion", true);
@@ -178,6 +181,8 @@ namespace FollowerUnbound
         writeBool("Systems", "EnablePetSystem",      enablePetSystem);
         writeBool("Systems", "ProtectEquippedClothing", protectEquippedClothing);
         writeBool("Systems", "PromptOnBetterEquipment", promptOnBetterEquipment);
+        writeInt("Systems",  "EquipmentUpgradeChance",  static_cast<int>(equipmentUpgradeChance));
+        writeBool("Systems", "EnableEquipmentPurchaseOffers", enableEquipmentPurchaseOffers);
         writeBool("Systems", "MagePreferRobes",         magePreferRobes);
 
         // ── LOOTING ──
@@ -208,6 +213,7 @@ namespace FollowerUnbound
         writeInt("Selling",  "TransactionBatchMultiplier", static_cast<int>(transactionBatchMultiplier));
 
         // ── NOTIFICATION TOGGLES ──
+        writeBool("Notifications", "EnableNotifications",       enableNotifications);
         writeBool("Notifications", "NotifyCombatHealthPotion",  notifyCombatHealthPotion);
         writeBool("Notifications", "NotifyCombatMagickaPotion", notifyCombatMagickaPotion);
         writeBool("Notifications", "NotifyCombatStaminaPotion", notifyCombatStaminaPotion);

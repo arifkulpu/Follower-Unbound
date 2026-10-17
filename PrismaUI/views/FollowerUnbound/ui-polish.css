@@ -34,6 +34,22 @@
 .equip-prompt-card .equip-prompt-reason{color:#d2b575;font-size:12px}
 .equip-prompt-card .equip-prompt-copy{color:#8f9a8e;font-size:11px}
 .equip-prompt-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
+.equipment-offer-comparison{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;padding:12px;border:1px solid #414a3b;border-radius:9px;background:#111713}
+.equipment-offer-comparison[hidden]{display:none}
+.equipment-offer-comparison>div{display:grid;gap:6px;padding:8px}
+.equipment-offer-comparison span{color:#9ca493;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+.equipment-offer-comparison strong{color:#f1e6c8;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+.equipment-offer-comparison .gear-stat-name,.equipment-offer-comparison .gear-stat-details{display:flex;align-items:center;gap:7px}
+.equipment-offer-comparison .gear-stat-name{font-size:14px}
+.equipment-offer-comparison .gear-stat-details{display:block;color:#c2c9bd;font-size:12px;line-height:1.55}
+.equipment-offer-comparison.loot-upgrade{grid-template-columns:1fr;gap:8px}
+.equipment-offer-comparison.loot-upgrade>div:not(.equipment-offer-price){padding:11px 13px;border:1px solid #343d33;border-radius:7px;background:#171e19}
+.equipment-offer-comparison.loot-upgrade>div:nth-child(2){border-color:#75643f;background:#211f17}
+.equipment-offer-comparison.loot-upgrade>div>span{font-size:10px}
+.equipment-offer-comparison.loot-upgrade>div>strong{display:grid;gap:4px}
+.equipment-offer-comparison .equipment-offer-price{grid-column:1/-1;display:flex;justify-content:space-between;border-top:1px solid #343c32;padding-top:12px}
+.equipment-offer-comparison .equipment-offer-price[hidden]{display:none}
+.equipment-offer-comparison .equipment-offer-price strong{color:#e4c77f}
 @media(max-width:850px){.follower-picker-wrap,.select.follower-picker{min-width:230px}}
 
 /* Larger race/sex portraits and selection cards on the follower overview. */
@@ -211,5 +227,12 @@
 .equipment-toolbar .notice{max-width:880px;margin:0;font-size:12px;line-height:1.5;color:#b1bbae}
 .equipment-toolbar>[data-equip-selected]{align-self:start;justify-self:end;white-space:nowrap;margin:0}
 .equipment-gear-list{grid-template-columns:repeat(auto-fill,minmax(210px,240px));grid-auto-rows:min-content;align-content:start;justify-content:start;gap:13px;min-height:0;max-height:none;overflow-y:auto;overflow-x:hidden;padding:4px 10px 10px 2px}
-@media(max-width:760px){.equipment-panel>.equipment-toolbar{grid-template-columns:minmax(0,1fr);gap:12px}.equipment-toolbar>[data-equip-selected]{justify-self:start}}
 @media(max-width:640px){.equipment-gear-list{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px}}
+
+.notification-actions{display:flex;gap:8px;margin-bottom:12px}
+.mini-btn{padding:6px 12px;font-size:11px;letter-spacing:.08em}
+.equip-prompt-header-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.equip-prompt-slot-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;background:rgba(220,170,70,0.18);border:1px solid rgba(220,170,70,0.45);color:#ffd885;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase}
+.slot-tag{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);color:#e2e8f0;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;letter-spacing:0.04em}
+
+

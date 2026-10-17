@@ -14,7 +14,20 @@ namespace FollowerUnbound
             FollowerProfile* profile,
             RE::TESBoundObject* newObj,
             RE::TESBoundObject* oldObj,
-            std::string_view reason);
+            std::string_view reason,
+            std::string_view currentStats,
+            std::string_view candidateStats);
+        static bool ShowPurchasePrompt(
+            RE::Actor* follower,
+            RE::TESObjectREFR* stockContainer,
+            RE::TESBoundObject* newObj,
+            RE::TESBoundObject* oldObj,
+            uint32_t price,
+            std::string_view vendorName,
+            std::string_view currentStats,
+            std::string_view candidateStats);
+        static bool IsPurchasePending(RE::FormID followerID, RE::FormID itemID);
+        static uint32_t GetReservedGold(RE::FormID followerID);
 
         static void StartAfterLootDistribution();
         static void LootWorkStarted();

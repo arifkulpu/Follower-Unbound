@@ -45,6 +45,8 @@ namespace FollowerUnbound
         // into their personal protectedEquipment set and are NEVER sold.
         bool protectEquippedClothing{ true };
         bool promptOnBetterEquipment{ true }; // Yeni daha iyi/büyülü silah veya zırh bulunduğunda oyuncuya onay kutusu sor
+        uint32_t equipmentUpgradeChance{ 35 }; // Daha iyi ekipman algılama / sorma şansı (%) - spamı önler
+        bool enableEquipmentPurchaseOffers{ true }; // Satıcılardaki daha iyi ekipman için PrismaUI satın alma teklifi göster
         bool magePreferRobes{ true };         // Büyücü takipçiler ağır zırh yerine büyülü cübbeleri tercih etsin
 
         // ── SELLING CATEGORY FILTERS ──
@@ -55,10 +57,11 @@ namespace FollowerUnbound
         bool sellFood{ true };               // Sell excess food & drinks over personal stock limits
         bool sellGems{ true };               // Sell gems and valuables
         bool protectSoulGems{ true };        // NEVER sell soul gems (SoulKeeper compatibility)
-        uint32_t transactionBatchMultiplier{ 5 }; // Batch multiplier for buying and selling (1x, 3x, 5x, 10x)
+        uint32_t transactionBatchMultiplier{ 5 }; // Sale batch multiplier (1x, 3x, 5x, 10x); purchases fill stock deficits
 
         // ── NOTIFICATION TOGGLES ──
         // Subsystem runs normally; only the HUD notification is suppressed when false.
+        bool enableNotifications{ true };         // Master toggle for all notifications
         bool notifyCombatHealthPotion{ true };    // "X drank a Health Potion!"
         bool notifyCombatMagickaPotion{ true };   // "X drank a Magicka Potion!"
         bool notifyCombatStaminaPotion{ true };   // "X drank a Stamina Potion!"

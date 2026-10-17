@@ -39,6 +39,12 @@ namespace FollowerUnbound
             for (auto itemID : profile.protectedEquipment) {
                 a_intfc->WriteRecordData(itemID);
             }
+
+            uint32_t declinedCount = static_cast<uint32_t>(profile.declinedEquipmentPurchases.size());
+            a_intfc->WriteRecordData(declinedCount);
+            for (auto itemID : profile.declinedEquipmentPurchases) {
+                a_intfc->WriteRecordData(itemID);
+            }
         }
 
         logger::info("Saved {} follower profiles to co-save.", count);
@@ -577,6 +583,25 @@ namespace FollowerUnbound
                         }
                     }
 
+                    std::unordered_set<RE::FormID> declinedEquipmentPurchases;
+                    if (version >= 19) {
+                        uint32_t declinedCount = 0;
+                        if (!read(declinedCount) || declinedCount > 4096 || bytesRead > length ||
+                            declinedCount > (length - bytesRead) / sizeof(RE::FormID)) {
+                            logger::warn("Invalid declined equipment count for follower {:08X}.", oldFormID);
+                            recordOK = false;
+                            break;
+                        }
+                        for (uint32_t p = 0; p < declinedCount; ++p) {
+                            RE::FormID oldItemID = 0;
+                            read(oldItemID);
+                            RE::FormID newItemID = 0;
+                            if (resolved && a_intfc->ResolveFormID(oldItemID, newItemID)) {
+                                declinedEquipmentPurchases.insert(newItemID);
+                            }
+                        }
+                    }
+
                     if (!resolved) {
                         logger::warn("Failed to resolve FormID {:08X}", oldFormID);
                         continue;
@@ -589,6 +614,7 @@ namespace FollowerUnbound
                     profile.needs = needs;
                     profile.preferences = preferences;
                     profile.protectedEquipment = std::move(protectedItems);
+                    profile.declinedEquipmentPurchases = std::move(declinedEquipmentPurchases);
 
                     // Co-save callbacks run while the game is restoring its
                     // world. Defer actor lookup, follower checks, and inventory

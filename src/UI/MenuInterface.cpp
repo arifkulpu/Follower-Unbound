@@ -1291,8 +1291,8 @@ namespace FollowerUnbound
         if (IsItemHovered()) SetTooltip("When checked, followers will NEVER sell any empty or filled soul gems.");
 
         Spacing();
-        TextColored(ImVec4{ 1.0f, 0.75f, 0.2f, 1.0f }, "Transaction Batch Size (Alisveris / Satis Carpani):");
-        TextDisabled("How many items are bought or sold in a single transaction (1x = single, 3x, 5x, 10x for fast bulk trading).");
+        TextColored(ImVec4{ 1.0f, 0.75f, 0.2f, 1.0f }, "Sale Batch Size (Satis Carpani):");
+        TextDisabled("Controls how many excess items are sold per transaction. Purchases fill each enabled stock target's shortage in one transaction.");
         if (Button(" 1x ##batch1")) { settings->transactionBatchMultiplier = 1; settings->Save(); }
         SameLine();
         if (Button(" 3x ##batch3")) { settings->transactionBatchMultiplier = 3; settings->Save(); }
@@ -1332,6 +1332,7 @@ namespace FollowerUnbound
             settings->notifyShopping            = true;
             settings->notifySelling             = true;
             settings->notifyAutoEquip           = true;
+            settings->enableNotifications       = true;
         }
         SameLine();
         if (Button("Disable All Notifications")) {
@@ -1347,7 +1348,11 @@ namespace FollowerUnbound
             settings->notifyShopping            = false;
             settings->notifySelling             = false;
             settings->notifyAutoEquip           = false;
+            settings->enableNotifications       = false;
+            NotificationManager::GetSingleton()->Clear();
         }
+        Spacing();
+        Checkbox("Master: Enable All Notifications", &settings->enableNotifications);
         Spacing();
 
         // Combat
@@ -1529,6 +1534,9 @@ namespace FollowerUnbound
                 return;
             }
             if (std::chrono::duration<float>(now - lastPausedTime).count() < 3.0f) {
+                if (LootManager::GetSingleton()->HasPendingLootWork()) {
+                    LootManager::GetSingleton()->ScheduleProcessing();
+                }
                 return; // menüler kapandıktan 3 saniye sonra sisteme devam
             }
         }

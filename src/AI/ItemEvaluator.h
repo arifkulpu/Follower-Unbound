@@ -67,6 +67,54 @@ namespace FollowerUnbound
         uint32_t CountPoisons(RE::Actor* actor);
         uint32_t CountSoulGems(RE::Actor* actor);
 
+        static std::string GetWeaponTypeLabel(RE::TESObjectWEAP* weapon)
+        {
+            if (!weapon) return "Silah";
+            switch (weapon->GetWeaponType()) {
+            case RE::WEAPON_TYPE::kOneHandSword: return "Kılıç";
+            case RE::WEAPON_TYPE::kOneHandDagger: return "Hançer";
+            case RE::WEAPON_TYPE::kOneHandAxe: return "Savaş Baltası";
+            case RE::WEAPON_TYPE::kOneHandMace: return "Gürz";
+            case RE::WEAPON_TYPE::kTwoHandSword: return "Çift El Kılıç";
+            case RE::WEAPON_TYPE::kTwoHandAxe: return "Çift El Balta";
+            case RE::WEAPON_TYPE::kBow: return "Yay";
+            case RE::WEAPON_TYPE::kCrossbow: return "Arbalet";
+            case RE::WEAPON_TYPE::kStaff: return "Asa";
+            default: return "Silah";
+            }
+        }
+
+        static std::string GetArmorSlotLabel(RE::TESObjectARMO* armor)
+        {
+            if (!armor) return "Zırh";
+            using Slot = RE::BIPED_MODEL::BipedObjectSlot;
+            const auto mask = static_cast<uint32_t>(armor->GetSlotMask());
+            if (mask & static_cast<uint32_t>(Slot::kShield)) return "Kalkan";
+            if (mask & (static_cast<uint32_t>(Slot::kHead) | static_cast<uint32_t>(Slot::kHair) | static_cast<uint32_t>(Slot::kCirclet))) return "Kask";
+            if (mask & static_cast<uint32_t>(Slot::kBody)) return "Gövde";
+            if (mask & static_cast<uint32_t>(Slot::kHands)) return "Eldiven";
+            if (mask & static_cast<uint32_t>(Slot::kFeet)) return "Ayak";
+            if (mask & static_cast<uint32_t>(Slot::kAmulet)) return "Takı";
+            if (mask & static_cast<uint32_t>(Slot::kRing)) return "Takı";
+            return "Kıyafet";
+        }
+
+        static std::string GetItemCategoryLabel(RE::TESBoundObject* item)
+        {
+            if (!item) return "";
+            if (auto* w = item->As<RE::TESObjectWEAP>()) {
+                return "Silah: " + GetWeaponTypeLabel(w);
+            }
+            if (auto* a = item->As<RE::TESObjectARMO>()) {
+                const auto mask = static_cast<uint32_t>(a->GetSlotMask());
+                if (mask & static_cast<uint32_t>(RE::BIPED_MODEL::BipedObjectSlot::kShield)) {
+                    return "Kalkan";
+                }
+                return "Zırh: " + GetArmorSlotLabel(a);
+            }
+            return "";
+        }
+
     private:
         ItemEvaluator() = default;
     };

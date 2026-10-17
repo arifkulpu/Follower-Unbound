@@ -29,11 +29,21 @@
   </main>
   <div class="equip-prompt-backdrop" id="equip-prompt" hidden>
     <section class="equip-prompt-card" role="dialog" aria-modal="true" aria-labelledby="equip-prompt-title">
-      <span class="eyebrow">FOLLOWER EQUIPMENT</span>
+      <div class="equip-prompt-header-row">
+        <span class="eyebrow">FOLLOWER EQUIPMENT</span>
+        <span class="equip-prompt-slot-badge" id="equip-prompt-slot" hidden></span>
+      </div>
       <h2 id="equip-prompt-title">A better item was found</h2>
-      <p><strong id="equip-prompt-follower"></strong> found <strong id="equip-prompt-item"></strong>.</p>
+      <p id="equip-prompt-summary"></p>
+      <p id="equip-prompt-vendor" hidden></p>
       <p class="equip-prompt-reason" id="equip-prompt-reason"></p>
-      <p class="equip-prompt-copy">Equip and protect this item? The previous item may become available for sale.</p>
+      <div class="equipment-offer-comparison" id="equipment-offer-comparison" hidden>
+        <div><span>Current</span><strong id="equip-prompt-current-stats"></strong></div>
+        <div><span>Offer</span><strong id="equip-prompt-candidate-stats"></strong></div>
+        <div class="equipment-offer-price" id="equip-prompt-price-row"><span>Price</span><strong id="equip-prompt-price"></strong></div>
+        <div class="equipment-offer-price" id="equip-prompt-funds-row"><span>Follower spendable gold</span><strong id="equip-prompt-funds"></strong></div>
+      </div>
+      <p class="equip-prompt-copy" id="equip-prompt-copy">Equip and protect this item? The previous item may become available for sale.</p>
       <div class="equip-prompt-actions"><button class="button secondary" id="equip-prompt-no">KEEP CURRENT</button><button class="button" id="equip-prompt-yes">EQUIP & PROTECT</button></div>
     </section>
   </div>

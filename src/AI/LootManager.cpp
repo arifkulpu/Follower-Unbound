@@ -6,6 +6,7 @@
 #include "UI/NotificationManager.h"
 #include "UI/EquipPrompt.h"
 #include "Core/Settings.h"
+#include "Core/ClassInterface.h"
 #include "Core/TNGCompatibility.h"
 #include <random>
 
@@ -13,6 +14,109 @@ namespace FollowerUnbound
 {
     namespace
     {
+        std::string DescribeGearEnchantment(RE::TESBoundObject* item, const RE::InventoryEntryData* entry)
+        {
+            RE::EnchantmentItem* enchantment = entry ? entry->GetEnchantment() : nullptr;
+            if (!enchantment) {
+                if (auto* weapon = item ? item->As<RE::TESObjectWEAP>() : nullptr) enchantment = weapon->formEnchanting;
+                else if (auto* armor = item ? item->As<RE::TESObjectARMO>() : nullptr) enchantment = armor->formEnchanting;
+            }
+            if (!enchantment) return {};
+            std::string description;
+            if (const char* name = enchantment->GetName(); name && name[0]) description = name;
+            std::string effects;
+            uint32_t shown = 0;
+            for (auto* effect : enchantment->effects) {
+                if (!effect || !effect->baseEffect) continue;
+                const char* effectName = effect->baseEffect->GetName();
+                if (!effectName || !effectName[0]) continue;
+                if (!effects.empty()) effects += "; ";
+                effects += effectName;
+                if (effect->GetMagnitude() > 0.0f) effects += std::format(" {:.0f} pts", effect->GetMagnitude());
+                if (effect->GetDuration() > 0) effects += std::format(" / {}s", effect->GetDuration());
+                if (++shown >= 3) break;
+            }
+            if (!effects.empty()) {
+                if (!description.empty()) description += ": ";
+                description += effects;
+            }
+            return description;
+        }
+
+        std::string DescribeGearStats(RE::TESBoundObject* item, const RE::InventoryEntryData* entry)
+        {
+            if (!item) return "None";
+            const char* rawName = item->GetName();
+            const std::string_view itemName = rawName && rawName[0] ? rawName : "Unknown item";
+            std::string stats;
+            if (auto* weapon = item->As<RE::TESObjectWEAP>())
+                stats = std::format("{} · Damage {} · Value {}", itemName, weapon->GetAttackDamage(), weapon->GetGoldValue());
+            else if (auto* armor = item->As<RE::TESObjectARMO>())
+                stats = std::format("{} · Armor {} · Value {}", itemName, armor->GetArmorRating(), armor->GetGoldValue());
+            else
+                stats = std::format("{} · Value {}", itemName, item->GetGoldValue());
+            const auto enchantment = DescribeGearEnchantment(item, entry);
+            if (!enchantment.empty()) stats += std::format(" · {}", enchantment);
+            return stats;
+        }
+
+        std::string GetFollowerGearStats(RE::Actor* follower, RE::TESBoundObject* item)
+        {
+            if (!item) return "None";
+            if (follower) {
+                const auto inventory = follower->GetInventory();
+                if (const auto it = inventory.find(item); it != inventory.end())
+                    return DescribeGearStats(item, it->second.second.get());
+            }
+            return DescribeGearStats(item, nullptr);
+        }
+
+        bool IsNonPlayerOwned(RE::TESForm* owner, RE::PlayerCharacter* player)
+        {
+            if (!owner || !player || owner == player || owner == player->GetActorBase()) return false;
+            if (auto* faction = owner->As<RE::TESFaction>()) {
+                return !player->IsInFaction(faction);
+            }
+            return true;
+        }
+
+        bool IsClassBoundThief(RE::Actor* actor)
+        {
+            auto* api = ClassInterface::GetSingleton()->GetClassBoundAPI();
+            return api && actor && api->IsActorEligible(actor) &&
+                api->GetFollowerClass(actor) == KingCore::ClassID::Thief;
+        }
+
+        bool IsDeficientSupplyItem(RE::Actor* follower, FollowerProfile* profile, RE::TESBoundObject* item)
+        {
+            if (!follower || !profile || !item) return false;
+            const auto& p = profile->preferences;
+            auto* eval = ItemEvaluator::GetSingleton();
+
+            if (auto* alch = item->As<RE::AlchemyItem>()) {
+                if (alch->IsPoison()) {
+                    return p.buyPoisons && (eval->CountPoisons(follower) < p.maxPoisons);
+                }
+                if (alch->IsFood()) {
+                    if (p.buyFoodLarge && eval->CountFoodLarge(follower) < p.maxFoodLarge) return true;
+                    if (p.buyFoodMedium && eval->CountFoodMedium(follower) < p.maxFoodMedium) return true;
+                    if (p.buyFoodSmall && eval->CountFoodSmall(follower) < p.maxFoodSmall) return true;
+                    return false;
+                }
+                if (p.buyHealthPotions && eval->CountHealthPotions(follower) < p.maxHealthPotions) return true;
+                if (p.buyMagickaPotions && eval->CountMagickaPotions(follower) < p.maxMagickaPotions) return true;
+                if (p.buyStaminaPotions && eval->CountStaminaPotions(follower) < p.maxStaminaPotions) return true;
+                return false;
+            }
+            if (auto* ammo = item->As<RE::TESAmmo>()) {
+                if (ammo->IsBolt()) {
+                    return p.buyBolts && (eval->CountBolts(follower) < p.maxBolts);
+                }
+                return p.buyArrows && (eval->CountArrows(follower) < p.maxArrows);
+            }
+            return false;
+        }
+
         RE::TESObjectARMO* ChooseConfiguredUnderwear()
         {
             static const auto candidates = [] {
@@ -139,10 +243,21 @@ namespace FollowerUnbound
                 bool isUpgrade = (newDamage > currentDamage) || (newEnchanted && !curEnchanted);
 
                 if (isUpgrade) {
+                    if (settings->equipmentUpgradeChance < 100) {
+                        thread_local std::mt19937 rng{ std::random_device{}() };
+                        std::uniform_int_distribution<uint32_t> dist(1, 100);
+                        if (dist(rng) > settings->equipmentUpgradeChance) {
+                            logger::debug("AutoEquip: {} weapon upgrade chance check failed (chance: {}%).",
+                                follower->GetName(), settings->equipmentUpgradeChance);
+                            return;
+                        }
+                    }
+
                     if (settings->promptOnBetterEquipment) {
                         std::string reason = std::format("Hasar: {:.0f} (Eski: {:.0f}){}",
                             newDamage, currentDamage, newEnchanted ? ", Büyülü" : "");
-                        EquipPrompt::ShowPrompt(follower, profile, weapon, current, reason);
+                        EquipPrompt::ShowPrompt(follower, profile, weapon, current, reason,
+                            GetFollowerGearStats(follower, current), GetFollowerGearStats(follower, weapon));
                         return;
                     }
 
@@ -252,10 +367,21 @@ namespace FollowerUnbound
                 }
 
                 if (isUpgrade) {
+                    if (settings->equipmentUpgradeChance < 100) {
+                        thread_local std::mt19937 rng{ std::random_device{}() };
+                        std::uniform_int_distribution<uint32_t> dist(1, 100);
+                        if (dist(rng) > settings->equipmentUpgradeChance) {
+                            logger::debug("AutoEquip: {} armor upgrade chance check failed (chance: {}%).",
+                                follower->GetName(), settings->equipmentUpgradeChance);
+                            return;
+                        }
+                    }
+
                     if (settings->promptOnBetterEquipment) {
                         std::string reason = std::format("Zırh: {:.0f} (Eski: {:.0f}){}",
                             newRating, wornRating, newEnchanted ? ", Büyülü" : "");
-                        EquipPrompt::ShowPrompt(follower, profile, armor, wornInSlot, reason);
+                        EquipPrompt::ShowPrompt(follower, profile, armor, wornInSlot, reason,
+                            GetFollowerGearStats(follower, wornInSlot), GetFollowerGearStats(follower, armor));
                         return;
                     }
 
@@ -392,7 +518,11 @@ namespace FollowerUnbound
         {
             RE::Actor* actor;
             std::shared_ptr<FollowerProfile> profile;
+            bool classBoundThief;
+            float currentWeight;
+            float maxWeight;
         };
+        static std::unordered_set<RE::FormID> s_encumberedNotified;
         std::vector<LootRecipient> recipients;
         for (auto* follower : followers) {
             auto profile = follower ? FollowerManager::GetSingleton()->GetProfile(follower->GetFormID()) : nullptr;
@@ -400,7 +530,12 @@ namespace FollowerUnbound
                 follower->IsDead() || follower->IsInCombat()) {
                 continue;
             }
-            recipients.push_back({ follower, std::move(profile) });
+            const float curW = follower->GetWeightInContainer();
+            const float maxW = follower->GetTotalCarryWeight();
+            if (curW < maxW * 0.9f) {
+                s_encumberedNotified.erase(follower->GetFormID());
+            }
+            recipients.push_back({ follower, std::move(profile), IsClassBoundThief(follower), curW, maxW });
         }
         std::sort(recipients.begin(), recipients.end(), [](const LootRecipient& a, const LootRecipient& b) {
             return a.actor->GetFormID() < b.actor->GetFormID();
@@ -500,20 +635,78 @@ namespace FollowerUnbound
             ++queuedItems;
         };
 
+        struct LootItemEntry
+        {
+            RE::TESBoundObject* item{ nullptr };
+            int32_t count{ 0 };
+            RE::InventoryEntryData* entryData{ nullptr };
+            int priority{ 3 };
+        };
+        std::vector<LootItemEntry> entries;
+        entries.reserve(inventory.size());
+
         for (const auto& [item, data] : inventory) {
             const int32_t count = data.first;
             if (!item || count <= 0) continue;
             const bool gold = item->GetFormID() == 0x0000000F;
+            if (!gold && !IsLootableItem(item)) continue;
+
+            int priority = 3;
             if (gold) {
-                if (!settings->lootGold) continue;
-                const int32_t share = count / static_cast<int32_t>(n);
-                if (share <= 0) continue;
-                for (size_t i = 0; i < n; ++i) queueTransfer(item, share, i, true);
-                // Gold remainder stays in the container. Do not let gold change
-                // the rotating first recipient for ordinary items.
+                priority = 0;
+            } else {
+                bool isDeficient = false;
+                for (const auto& rec : recipients) {
+                    if (IsDeficientSupplyItem(rec.actor, rec.profile.get(), item)) {
+                        isDeficient = true;
+                        break;
+                    }
+                }
+                if (isDeficient) {
+                    priority = 1;
+                } else if (item->As<RE::TESObjectWEAP>() || item->As<RE::TESObjectARMO>() ||
+                           item->As<RE::TESAmmo>() || item->As<RE::AlchemyItem>() ||
+                           item->As<RE::IngredientItem>() || item->As<RE::TESSoulGem>()) {
+                    priority = 2;
+                } else {
+                    priority = 3;
+                }
+            }
+            entries.push_back({ item, count, data.second.get(), priority });
+        }
+
+        std::stable_sort(entries.begin(), entries.end(), [](const LootItemEntry& a, const LootItemEntry& b) {
+            return a.priority < b.priority;
+        });
+
+        for (const auto& entry : entries) {
+            auto* item = entry.item;
+            const int32_t count = entry.count;
+            if (!item || count <= 0) continue;
+            auto* entryData = entry.entryData;
+            const bool stolenItem = entryData && IsNonPlayerOwned(entryData->GetOwner(), player);
+            std::vector<size_t> eligibleRecipients;
+            eligibleRecipients.reserve(n);
+            for (size_t i = 0; i < n; ++i) {
+                if (!stolenItem || recipients[i].classBoundThief) eligibleRecipients.push_back(i);
+            }
+            if (eligibleRecipients.empty()) {
+                logger::info("LootShare: skipped stolen item {} [{:08X}] from container {:08X}; no ClassBound Thief follower is eligible.",
+                    item->GetName(), item->GetFormID(), corpseRef->GetFormID());
                 continue;
             }
-            if (!IsLootableItem(item)) continue;
+            const size_t recipientCount = eligibleRecipients.size();
+            const size_t recipientStart = stolenItem ? (_nextRecipientOffset % recipientCount) : (cursor % n);
+            const bool gold = item->GetFormID() == 0x0000000F;
+            if (gold) {
+                if (!settings->lootGold) continue;
+                const int32_t share = count / static_cast<int32_t>(recipientCount);
+                if (share <= 0) continue;
+                for (size_t i = 0; i < recipientCount; ++i) {
+                    queueTransfer(item, share, eligibleRecipients[(recipientStart + i) % recipientCount], true);
+                }
+                continue;
+            }
 
             bool enabled = settings->lootMisc;
             if (item->As<RE::TESObjectWEAP>()) enabled = settings->lootWeapons;
@@ -526,15 +719,46 @@ namespace FollowerUnbound
             else if (item->As<RE::TESSoulGem>()) enabled = settings->lootSoulGems;
             if (!enabled) continue;
 
-            const int32_t each = count / static_cast<int32_t>(n);
-            const int32_t remainder = count % static_cast<int32_t>(n);
-            for (size_t i = 0; i < n; ++i) {
-                int32_t assigned = each;
-                if (i < static_cast<size_t>(remainder)) ++assigned;
-                const size_t recipient = (cursor + i) % n;
-                if (assigned > 0) queueTransfer(item, assigned, recipient, false);
+            const float itemWeight = item->GetWeight();
+            int32_t remainingToDistribute = count;
+
+            for (size_t attempt = 0; attempt < recipientCount && remainingToDistribute > 0; ++attempt) {
+                const size_t recIdx = eligibleRecipients[(recipientStart + attempt) % recipientCount];
+                auto& rec = recipients[recIdx];
+
+                int32_t canTake = remainingToDistribute;
+                if (itemWeight > 0.0f) {
+                    const float availableWeight = rec.maxWeight - rec.currentWeight;
+                    if (availableWeight <= 0.0f) {
+                        if (!s_encumberedNotified.contains(rec.actor->GetFormID())) {
+                            s_encumberedNotified.insert(rec.actor->GetFormID());
+                            NotificationManager::GetSingleton()->ShowHUDMessage(
+                                std::format("{}: Artık daha fazla eşya taşıyamam.", rec.actor->GetName()));
+                        }
+                        continue;
+                    }
+                    const int32_t maxByWeight = static_cast<int32_t>(availableWeight / itemWeight);
+                    if (maxByWeight <= 0) {
+                        if (!s_encumberedNotified.contains(rec.actor->GetFormID())) {
+                            s_encumberedNotified.insert(rec.actor->GetFormID());
+                            NotificationManager::GetSingleton()->ShowHUDMessage(
+                                std::format("{}: Artık daha fazla eşya taşıyamam.", rec.actor->GetName()));
+                        }
+                        continue;
+                    }
+                    canTake = std::min(remainingToDistribute, maxByWeight);
+                }
+
+                if (canTake > 0) {
+                    queueTransfer(item, canTake, recIdx, false);
+                    rec.currentWeight += (itemWeight > 0.0f ? canTake * itemWeight : 0.0f);
+                    remainingToDistribute -= canTake;
+                }
             }
-            cursor = (cursor + static_cast<size_t>(count % static_cast<int32_t>(n))) % n;
+
+            if (!stolenItem && remainingToDistribute < count) {
+                cursor = (cursor + 1) % n;
+            }
         }
         _nextRecipientOffset = (_nextRecipientOffset + 1) % n;
         logger::info("LootShare: queued {} item transfers from container {:08X}; remainder stays behind.",
@@ -672,6 +896,9 @@ namespace FollowerUnbound
 
             _processingScheduled.store(false, std::memory_order_release);
             logger::info("LootTask: UI task finished; scheduled flag cleared.");
+            if (HasPendingLootWork()) {
+                ScheduleProcessing();
+            }
         });
         logger::debug("LootTask: UI task queued.");
     }

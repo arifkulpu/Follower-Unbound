@@ -46,7 +46,7 @@ namespace FollowerUnbound
             std::string followerName;
             std::string itemName;
         };
-        static constexpr int kMaxTransfersPerTick = 1;
+        static constexpr int kMaxTransfersPerTick = 6;
 
         LootManager() = default;
 

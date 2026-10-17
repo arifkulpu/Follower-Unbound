@@ -2,6 +2,7 @@
 #include "Economy/EconomyManager.h"
 #include "AI/ItemEvaluator.h"
 #include "UI/NotificationManager.h"
+#include "UI/EquipPrompt.h"
 #include "Core/Settings.h"
 #include "Core/TNGCompatibility.h"
 #include "Core/ClassInterface.h"
@@ -218,22 +219,10 @@ namespace FollowerUnbound
         }
     }
 
-    // Vendor types
-    enum class VendorType
-    {
-        Unknown = 0,
-        Blacksmith,      // Sells ammunition, weapons, armor
-        Apothecary,      // Sells potions, ingredients
-        Innkeeper,       // Sells food, drinks
-        GeneralMerchant, // Sells supplies, buys weapons, armor, potions, ammo, gems, etc.
-        Wizard,          // Court wizard / enchanter — sells soul gems
-        Healer           // Temple healers; only disease/poison cures are eligible
-    };
-
     struct CandidateVendor
     {
         RE::Actor* actor{ nullptr };
-        VendorType type{ VendorType::Unknown };
+        uint32_t vendorMask{ 0 };
         float distance{ 0.0f };
     };
 
@@ -249,152 +238,93 @@ namespace FollowerUnbound
         kVendHealer = 1 << 5      // Rahip/şifacı — yalnızca tedavi iksirleri
     };
 
-    static VendorType DetermineVendorType(RE::Actor* vendor)
+    static uint32_t DetermineVendorMask(RE::Actor* vendor)
     {
-        if (!vendor) return VendorType::Unknown;
+        if (!vendor) return kVendNone;
 
-        // Some vendor NPCs (especially DLC, stronghold and follower-mod
-        // merchants) do not expose the vanilla job faction consistently.
-        // Recognize the supplied vanilla merchant roster by name first; the
-        // actual inventory is still scanned before any transaction is allowed.
-        std::string vendorName = vendor->GetName();
-        std::transform(vendorName.begin(), vendorName.end(), vendorName.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        const auto nameMatches = [&vendorName](std::initializer_list<const char*> names) {
-            return std::any_of(names.begin(), names.end(), [&vendorName](const char* name) { return vendorName.find(name) != std::string::npos; });
+        std::string name = vendor->GetName();
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        const auto matches = [&name](std::initializer_list<const char*> names) {
+            return std::any_of(names.begin(), names.end(), [&name](const char* part) { return name.find(part) != std::string::npos; });
         };
-        if (nameMatches({ "arcadia", "lami", "bothela", "angeline morrard", "vivienne onis", "quintus navale", "nurelion", "elgrim", "frida", "zaria", "atub", "bolar", "murbul", "sharamph", "babette", "milore ienth", "elynea mothren", "feran sadri", "florentius baenius" })) {
-            return VendorType::Apothecary;
-        }
-        if (nameMatches({ "farengar", "sybille stentor", "wylandriah", "wuunferth", "calcelmo", "madena", "falion", "dravynea" })) {
-            return VendorType::Wizard;
-        }
-        if (nameMatches({ "adrianne avenicci", "ulfberth war-bear", "eorlund gray-mane", "beirand", "fihada", "balimund", "oengul war-anvil", "hermir strong-heart", "moth gro-bagol", "ghorza gra-bagol", "alvor", "rustleif", "seren", "lod", "dushnamub", "gharol", "shahu", "mahuwa", "yarlakh", "glover mallory", "baldor iron-shaper", "gunmar", "hestla" })) {
-            return VendorType::Blacksmith;
-        }
-        if (nameMatches({ "belethor", "sayma", "bersi honey-hand", "brand-shei", "grelka", "elrindir", "revyn sadri", "aval atheron", "niranye", "lucan valerius", "camilla valerius", "solaf", "birna", "ri'saad", "ahkari", "ma'dran", "tonilia", "mallus maccius", "endon", "fethis alor", "falas selvayn", "sorine jurard", "ronthil" })) {
-            return VendorType::GeneralMerchant;
-        }
-        if (nameMatches({ "hulda", "ysolda", "corpulus vinius", "keerava", "elda early-dawn", "ambrys rendar", "kleppr", "frabbi", "orgnar", "valga vinicia", "thoring", "jonna", "dagur", "faida", "hadring", "iddra", "voldsee", "kjeld", "gelmund", "vekel the man" })) {
-            return VendorType::Innkeeper;
-        }
-        if (nameMatches({ "heimskr", "danica pure-spring", "jensine", "ahlam", "ortus endario", "freir", "helgird", "runil", "alessandra", "maramal", "dinya balu", "hamal", "senna", "orla", "anwen", "brother verulus", "styrr", "nura snow-shod", "erandur" })) {
-            return VendorType::Healer;
-        }
 
-        // 0. Court Wizard / Enchanter — soul gem satan satıcılar
-        // (JobCourtWizardFaction 0x000513A6 + isim bazlı yedek)
-        auto courtWizardFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x000513A6);
-        if (courtWizardFaction && vendor->IsInFaction(courtWizardFaction)) return VendorType::Wizard;
+        uint32_t mask = kVendNone;
+        if (matches({ "arcadia", "lami", "bothela", "angeline morrard", "vivienne onis", "quintus navale", "nurelion", "elgrim", "frida", "zaria", "atub", "bolar", "murbul", "sharamph", "babette", "milore ienth", "elynea mothren", "feran sadri", "florentius baenius", "muiri", "hafjorg", "edla", "herluin lothaire" })) mask |= kVendApothecary;
+        if (matches({ "farengar", "sybille stentor", "wylandriah", "wuunferth", "calcelmo", "madena", "falion", "dravynea", "colette marence", "drevis neloren", "enthir", "faralda", "nelacar", "neloth", "phinis gestor", "talvas fathryon", "tolfdir", "florentius baenius" })) mask |= kVendWizard;
+        if (matches({ "adrianne avenicci", "ulfberth war-bear", "eorlund gray-mane", "beirand", "fihada", "balimund", "oengul war-anvil", "hermir strong-heart", "moth gro-bagol", "ghorza gra-bagol", "alvor", "rustleif", "seren", "lod", "dushnamub", "gharol", "shahu", "mahuwa", "yarlakh", "glover mallory", "baldor iron-shaper", "gunmar", "hestla", "filnjar", "shuftharz", "asbjorn fire-tamer" })) mask |= kVendSmith;
+        if (matches({ "belethor", "sayma", "bersi honey-hand", "brand-shei", "grelka", "elrindir", "revyn sadri", "aval atheron", "niranye", "lucan valerius", "camilla valerius", "solaf", "birna", "ri'saad", "ahkari", "ma'dran", "tonilia", "mallus maccius", "endon", "fethis alor", "falas selvayn", "sorine jurard", "ronthil", "gulum-ei", "atahbah", "ma'jhad", "zaynabi", "arnskar ember-master", "syndus", "vanryth gatharian" })) mask |= kVendGeneral;
+        if (matches({ "hulda", "ysolda", "corpulus vinius", "keerava", "elda early-dawn", "ambrys rendar", "kleppr", "frabbi", "orgnar", "valga vinicia", "thoring", "jonna", "dagur", "faida", "hadring", "iddra", "voldsee", "kjeld", "gelmund", "vekel the man", "talen-jei", "lynly star-sung", "mralki", "addvar", "anoriath", "carlotta valentia", "evette san", "garyn ienth", "hillevi cruel-sea", "hogni red-arm", "jala", "marise aravel" })) mask |= kVendInn;
+        if (matches({ "heimskr", "danica pure-spring", "jensine", "ahlam", "ortus endario", "freir", "helgird", "runil", "alessandra", "maramal", "dinya balu", "hamal", "senna", "orla", "anwen", "brother verulus", "styrr", "nura snow-shod", "erandur" })) mask |= kVendHealer;
 
-        // 1. Standart iş fraksiyonları (Job Factions)
-        auto blacksmithFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x000509FB); // JobBlacksmithFaction
-        if (blacksmithFaction && vendor->IsInFaction(blacksmithFaction)) return VendorType::Blacksmith;
+        auto addFaction = [&](uint32_t factionID, uint32_t bit) {
+            auto* faction = RE::TESForm::LookupByID<RE::TESFaction>(factionID);
+            if (faction && vendor->IsInFaction(faction)) mask |= bit;
+        };
+        addFaction(0x000513A6, kVendWizard);     // JobCourtWizardFaction
+        addFaction(0x000509FB, kVendSmith);      // JobBlacksmithFaction
+        addFaction(0x000509F9, kVendApothecary);  // JobApothecaryFaction
+        addFaction(0x000509FA, kVendInn);         // JobInnkeeperFaction
+        addFaction(0x00051596, kVendGeneral);     // JobMerchantFaction
 
-        auto apothecaryFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x000509F9); // JobApothecaryFaction
-        if (apothecaryFaction && vendor->IsInFaction(apothecaryFaction)) return VendorType::Apothecary;
-
-        auto innkeeperFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x000509FA);  // JobInnkeeperFaction
-        if (innkeeperFaction && vendor->IsInFaction(innkeeperFaction)) return VendorType::Innkeeper;
-
-        // 2. Aktör taban fraksiyonları kontrolü
-        auto base = vendor->GetActorBase();
-        if (base) {
-            bool factionWizard = false;
-            bool factionApothecary = false;
-            bool factionBlacksmith = false;
-            bool factionInnkeeper = false;
-            bool factionGeneral = false;
+        if (auto* base = vendor->GetActorBase()) {
             for (auto& fInfo : base->factions) {
                 if (!fInfo.faction) continue;
-                const auto factionID = fInfo.faction->GetFormID();
-                factionWizard |= factionID == 0x000513A6;
-                factionBlacksmith |= factionID == 0x000509FB;
-                factionApothecary |= factionID == 0x000509F9;
-                factionInnkeeper |= factionID == 0x000509FA;
-                factionGeneral |= factionID == 0x00051596;
+                const uint32_t id = fInfo.faction->GetFormID();
+                if (id == 0x000513A6) mask |= kVendWizard;
+                if (id == 0x000509FB) mask |= kVendSmith;
+                if (id == 0x000509F9) mask |= kVendApothecary;
+                if (id == 0x000509FA) mask |= kVendInn;
+                if (id == 0x00051596) mask |= kVendGeneral;
 
-                const char* rawFactionName = fInfo.faction->GetName();
-                if (!rawFactionName) continue;
-                std::string fName(rawFactionName);
-                std::transform(fName.begin(), fName.end(), fName.begin(), ::tolower);
-                factionWizard |= fName.find("court wizard") != std::string::npos || fName.find("courtwizard") != std::string::npos;
-                factionApothecary |= fName.find("apothecary") != std::string::npos || fName.find("alchem") != std::string::npos;
-                factionBlacksmith |= fName.find("blacksmith") != std::string::npos || fName.find("fletcher") != std::string::npos ||
-                    fName.find("weapon") != std::string::npos || fName.find("armor") != std::string::npos;
-                factionInnkeeper |= fName.find("innkeeper") != std::string::npos || fName.find("food") != std::string::npos ||
-                    fName.find("tavern") != std::string::npos || fName.find("wench") != std::string::npos;
-                factionGeneral |= fName.find("merchant") != std::string::npos || fName.find("trader") != std::string::npos ||
-                    fName.find("general") != std::string::npos || fName.find("goods") != std::string::npos ||
-                    fName.find("fence") != std::string::npos || fName.find("caravan") != std::string::npos ||
-                    fName.find("pawn") != std::string::npos;
+                const char* raw = fInfo.faction->GetName();
+                if (!raw) continue;
+                std::string factionName(raw);
+                std::transform(factionName.begin(), factionName.end(), factionName.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                if (factionName.find("court wizard") != std::string::npos || factionName.find("courtwizard") != std::string::npos) mask |= kVendWizard;
+                if (factionName.find("apothecary") != std::string::npos || factionName.find("alchem") != std::string::npos) mask |= kVendApothecary;
+                if (factionName.find("blacksmith") != std::string::npos || factionName.find("fletcher") != std::string::npos || factionName.find("weapon") != std::string::npos || factionName.find("armor") != std::string::npos) mask |= kVendSmith;
+                if (factionName.find("innkeeper") != std::string::npos || factionName.find("food") != std::string::npos || factionName.find("tavern") != std::string::npos || factionName.find("wench") != std::string::npos) mask |= kVendInn;
+                if (factionName.find("merchant") != std::string::npos || factionName.find("trader") != std::string::npos || factionName.find("general") != std::string::npos || factionName.find("goods") != std::string::npos || factionName.find("fence") != std::string::npos || factionName.find("caravan") != std::string::npos || factionName.find("pawn") != std::string::npos) mask |= kVendGeneral;
             }
-
-            // Base factions are not guaranteed to be stored in role order.
-            // Resolve specialist jobs before the generic merchant faction so
-            // apothecaries such as Arcadia do not get treated as food shops.
-            if (factionWizard) return VendorType::Wizard;
-            if (factionApothecary) return VendorType::Apothecary;
-            if (factionBlacksmith) return VendorType::Blacksmith;
-            if (factionInnkeeper) return VendorType::Innkeeper;
-            if (factionGeneral) return VendorType::GeneralMerchant;
         }
 
-        // 3. Genel Tüccar Fraksiyonu (JobMerchantFaction — Belethor, Lucan Valerius, Sadri vb.)
-        auto merchantFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x00051596); // JobMerchantFaction
-        if (merchantFaction && vendor->IsInFaction(merchantFaction)) {
-            std::string name = vendor->GetName();
-            std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-            if (name.find("blacksmith") != std::string::npos || name.find("fletcher") != std::string::npos) return VendorType::Blacksmith;
-            if (name.find("alchem") != std::string::npos || name.find("apothecary") != std::string::npos) return VendorType::Apothecary;
-            if (name.find("inn") != std::string::npos || name.find("tavern") != std::string::npos) return VendorType::Innkeeper;
-            return VendorType::GeneralMerchant;
-        }
-
-        // 4. İsim bazlı son kontrol
-        std::string vName = vendor->GetName();
-        std::transform(vName.begin(), vName.end(), vName.begin(), ::tolower);
-        if (vName.find("wench") != std::string::npos || vName.find("maid") != std::string::npos ||
-            vName.find("server") != std::string::npos) {
-            return VendorType::Innkeeper;
-        }
-        if (vName.find("blacksmith") != std::string::npos || vName.find("fletcher") != std::string::npos ||
-            vName.find("forge") != std::string::npos || vName.find("armorer") != std::string::npos) {
-            return VendorType::Blacksmith;
-        }
-        if (vName.find("alchem") != std::string::npos || vName.find("apothecary") != std::string::npos) {
-            return VendorType::Apothecary;
-        }
-        if (vName.find("trader") != std::string::npos || vName.find("merchant") != std::string::npos ||
-            vName.find("general") != std::string::npos || vName.find("goods") != std::string::npos ||
-            vName.find("pawn") != std::string::npos || vName.find("caravan") != std::string::npos) {
-            return VendorType::GeneralMerchant;
-        }
-        if (vName.find("wizard") != std::string::npos || vName.find("enchanter") != std::string::npos ||
-            vName.find("büyücü") != std::string::npos || vName.find("buyucu") != std::string::npos) {
-            return VendorType::Wizard;
-        }
-
-        return VendorType::Unknown;
+        // Name fallback for modded vendors, layered on top of faction/name roster roles.
+        if (name.find("wench") != std::string::npos || name.find("maid") != std::string::npos || name.find("server") != std::string::npos) mask |= kVendInn;
+        if (name.find("blacksmith") != std::string::npos || name.find("fletcher") != std::string::npos || name.find("forge") != std::string::npos || name.find("armorer") != std::string::npos) mask |= kVendSmith;
+        if (name.find("alchem") != std::string::npos || name.find("apothecary") != std::string::npos) mask |= kVendApothecary;
+        if (name.find("trader") != std::string::npos || name.find("merchant") != std::string::npos || name.find("general") != std::string::npos || name.find("goods") != std::string::npos || name.find("pawn") != std::string::npos || name.find("caravan") != std::string::npos) mask |= kVendGeneral;
+        if (name.find("wizard") != std::string::npos || name.find("enchanter") != std::string::npos || name.find("büyücü") != std::string::npos || name.find("buyucu") != std::string::npos) mask |= kVendWizard;
+        return mask;
     }
-
     static std::vector<CandidateVendor> FindNearbyVendors(RE::Actor* follower, RE::ProcessLists* processLists, float maxDistance)
     {
         std::vector<CandidateVendor> vendors;
         if (!follower || !processLists) return vendors;
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* playerCell = player ? player->GetParentCell() : nullptr;
+        auto* followerCell = follower->GetParentCell();
+        // Interior cell coordinates are local to each cell and can overlap.
+        // Distance alone can therefore mistake a merchant in another shop
+        // for a nearby vendor. Prefer the player's current interior (the place
+        // where the follower is shopping); fall back to the follower's cell.
+        auto* shoppingInterior = playerCell && playerCell->IsInteriorCell() ? playerCell :
+                                 (followerCell && followerCell->IsInteriorCell() ? followerCell : nullptr);
 
         auto collect = [&](auto& handles) {
             for (auto& handle : handles) {
                 auto actorPtr = handle.get();
                 auto* candidate = actorPtr ? actorPtr.get() : nullptr;
                 if (!candidate || candidate->IsDead() || candidate == follower || candidate->IsPlayerRef()) continue;
+                if (shoppingInterior && candidate->GetParentCell() != shoppingInterior) continue;
                 const float distance = follower->GetPosition().GetDistance(candidate->GetPosition());
                 if (distance > maxDistance) continue;
                 if (std::any_of(vendors.begin(), vendors.end(), [candidate](const CandidateVendor& existing) {
                     return existing.actor == candidate;
                 })) continue;
 
-                const auto type = DetermineVendorType(candidate);
-                if (type != VendorType::Unknown) vendors.push_back({ candidate, type, distance });
+                const auto vendorMask = DetermineVendorMask(candidate);
+                if (vendorMask != kVendNone) vendors.push_back({ candidate, vendorMask, distance });
             }
         };
 
@@ -628,24 +558,164 @@ namespace FollowerUnbound
         int32_t stock{ 0 };
         const char* vendorName{ nullptr };
         uint32_t vendorMask{ kVendNone };
+        RE::FormID stockContainerID{ 0 };
+        std::string enchantmentDescription;
     };
 
     struct VendorStock
     {
         std::vector<StockEntry> buckets[64]; // SupplyCat-1 indexli (SOther excluded)
+        std::vector<StockEntry> equipment;
     };
+
+    static std::string DescribeItemEnchantment(RE::TESBoundObject* item, const RE::InventoryEntryData* entry = nullptr)
+    {
+        RE::EnchantmentItem* enchantment = entry ? entry->GetEnchantment() : nullptr;
+        if (!enchantment) {
+            if (auto* weapon = item ? item->As<RE::TESObjectWEAP>() : nullptr) enchantment = weapon->formEnchanting;
+            else if (auto* armor = item ? item->As<RE::TESObjectARMO>() : nullptr) enchantment = armor->formEnchanting;
+        }
+        if (!enchantment) return {};
+
+        std::string description;
+        const char* enchantName = enchantment->GetName();
+        if (enchantName && enchantName[0]) description = enchantName;
+        std::string effects;
+        uint32_t shown = 0;
+        for (auto* effect : enchantment->effects) {
+            if (!effect || !effect->baseEffect) continue;
+            const char* rawEffectName = effect->baseEffect->GetName();
+            if (!rawEffectName || !rawEffectName[0]) continue;
+            if (!effects.empty()) effects += "; ";
+            effects += rawEffectName;
+            if (effect->GetMagnitude() > 0.0f) effects += std::format(" {:.0f} pts", effect->GetMagnitude());
+            if (effect->GetDuration() > 0) effects += std::format(" / {}s", effect->GetDuration());
+            if (++shown >= 3) break;
+        }
+        if (!effects.empty()) {
+            if (!description.empty()) description += ": ";
+            description += effects;
+        }
+        return description;
+    }
 
     static void ScanVendorStock(RE::Actor* vendor, ItemEvaluator* ev, const char* vendorName, uint32_t vendorMask, VendorStock& out)
     {
         if (!vendor) return;
-        auto inventory = vendor->GetInventory();
-        for (const auto& [obj, invData] : inventory) {
-            if (!obj || invData.first <= 0) continue;
-            if (obj->GetFormID() == 0x0000000F) continue; // gold
-            SupplyCat cat = ClassifySupply(ev, obj);
-            if (cat == SOther) continue;
-            out.buckets[static_cast<int>(cat) - 1].push_back({ obj, invData.first, vendorName, vendorMask });
+        std::unordered_set<RE::TESObjectREFR*> scannedContainers;
+        auto scanContainer = [&](RE::TESObjectREFR* container) {
+            if (!container || !scannedContainers.insert(container).second) return;
+            for (const auto& [obj, invData] : container->GetInventory()) {
+                if (!obj || invData.first <= 0 || obj->GetFormID() == 0x0000000F) continue;
+                SupplyCat cat = ClassifySupply(ev, obj);
+                if (cat != SOther) {
+                    out.buckets[static_cast<int>(cat) - 1].push_back({ obj, invData.first, vendorName, vendorMask, container->GetFormID(), {} });
+                } else if (obj->As<RE::TESObjectWEAP>() || obj->As<RE::TESObjectARMO>()) {
+                    out.equipment.push_back({ obj, invData.first, vendorName, vendorMask, container->GetFormID(),
+                        DescribeItemEnchantment(obj, invData.second.get()) });
+                }
+            }
+        };
+
+        // Some stock is directly carried by the actor (modded vendors), but
+        // vanilla merchant stock normally lives in the vendor faction's
+        // merchant container. Scan both paths and deduplicate shared chests.
+        scanContainer(vendor);
+        if (auto* faction = vendor->GetVendorFaction()) {
+            scanContainer(faction->vendorData.merchantContainer);
         }
+        if (auto* base = vendor->GetActorBase()) {
+            for (const auto& factionInfo : base->factions) {
+                if (factionInfo.faction && factionInfo.faction->vendorData.merchantContainer) {
+                    scanContainer(factionInfo.faction->vendorData.merchantContainer);
+                }
+            }
+        }
+    }
+
+    struct UpgradeComparison
+    {
+        RE::TESBoundObject* current{ nullptr };
+        int64_t improvement{ 0 };
+        std::string currentStats;
+        std::string candidateStats;
+    };
+
+    static bool IsWornInventoryItem(const RE::InventoryEntryData* entry)
+    {
+        if (!entry || !entry->extraLists) return false;
+        for (auto* list : *entry->extraLists) {
+            if (list && (list->HasType(RE::ExtraDataType::kWorn) || list->HasType(RE::ExtraDataType::kWornLeft))) return true;
+        }
+        return false;
+    }
+
+    static std::optional<UpgradeComparison> CompareEquipment(RE::Actor* follower, const FollowerProfile& profile,
+        RE::TESBoundObject* candidate, std::string_view candidateEnchant)
+    {
+        if (!follower || !candidate || !ItemEvaluator::GetSingleton()->IsItemUsableByRole(profile.role, candidate)) return std::nullopt;
+        const int32_t candidateValue = std::max(0, candidate->GetGoldValue());
+        if (auto* weapon = candidate->As<RE::TESObjectWEAP>()) {
+            if ((weapon->GetFormFlags() & RE::TESObjectWEAP::RecordFlags::kNonPlayable) != 0) return std::nullopt;
+            RE::TESObjectWEAP* current = nullptr;
+            for (bool leftHand : { false, true }) {
+                auto* equipped = follower->GetEquippedObject(leftHand);
+                auto* currentWeapon = equipped ? equipped->As<RE::TESObjectWEAP>() : nullptr;
+                if (!currentWeapon || currentWeapon->GetWeaponType() != weapon->GetWeaponType()) continue;
+                if (!current || currentWeapon->GetAttackDamage() > current->GetAttackDamage()) current = currentWeapon;
+            }
+            if (!current) return std::nullopt;
+            std::string currentEnchant;
+            auto inventory = follower->GetInventory();
+            if (auto it = inventory.find(current); it != inventory.end()) currentEnchant = DescribeItemEnchantment(current, it->second.second.get());
+            const bool candidateEnchanted = !candidateEnchant.empty();
+            const bool currentEnchanted = !currentEnchant.empty();
+            const int64_t newScore = static_cast<int64_t>(weapon->GetAttackDamage()) * 100000 + (candidateEnchanted ? 10000 : 0) + candidateValue;
+            const int64_t oldScore = static_cast<int64_t>(current->GetAttackDamage()) * 100000 + (currentEnchanted ? 10000 : 0) + std::max(0, current->GetGoldValue());
+            if (newScore <= oldScore) return std::nullopt;
+            return UpgradeComparison{ current, newScore - oldScore,
+                std::format("{} · Damage {} · Value {}{}", current->GetName(), current->GetAttackDamage(), current->GetGoldValue(), currentEnchanted ? std::format(" · {}", currentEnchant) : ""),
+                std::format("{} · Damage {} · Value {}{}", weapon->GetName(), weapon->GetAttackDamage(), candidateValue, candidateEnchanted ? std::format(" · {}", candidateEnchant) : "") };
+        }
+
+        auto* armor = candidate->As<RE::TESObjectARMO>();
+        if (!armor || IsTngHiddenBodyItem(armor) || static_cast<uint32_t>(armor->GetSlotMask()) == 0 ||
+            (armor->GetFormFlags() & RE::TESObjectARMO::RecordFlags::kNonPlayable) != 0) return std::nullopt;
+
+        const auto candidateMask = static_cast<uint32_t>(armor->GetSlotMask());
+        RE::TESObjectARMO* current = nullptr;
+        int64_t oldScore = -1;
+        for (const auto& [form, entry] : follower->GetInventory()) {
+            auto* worn = form ? form->As<RE::TESObjectARMO>() : nullptr;
+            if (!worn || entry.first <= 0 || !IsWornInventoryItem(entry.second.get()) || IsTngHiddenBodyItem(worn)) continue;
+            if ((static_cast<uint32_t>(worn->GetSlotMask()) & candidateMask) == 0) continue;
+            const auto enchant = DescribeItemEnchantment(worn, entry.second.get());
+            const int64_t score = static_cast<int64_t>(worn->GetArmorRating()) * 100000 +
+                (!enchant.empty() ? 10000 : 0) + std::max(0, worn->GetGoldValue());
+            if (!current || score > oldScore) { current = worn; oldScore = score; }
+        }
+        if (!current) return std::nullopt;
+        const bool candidateEnchanted = !candidateEnchant.empty();
+        const int64_t newScore = static_cast<int64_t>(armor->GetArmorRating()) * 100000 +
+            (candidateEnchanted ? 10000 : 0) + candidateValue;
+        if (newScore <= oldScore) return std::nullopt;
+        std::string currentEnchant;
+        for (const auto& [form, entry] : follower->GetInventory()) {
+            if (form == current && entry.first > 0) { currentEnchant = DescribeItemEnchantment(current, entry.second.get()); break; }
+        }
+        return UpgradeComparison{ current, newScore - oldScore,
+            std::format("{} · Armor {} · Value {}{}", current->GetName(), current->GetArmorRating(), current->GetGoldValue(), currentEnchant.empty() ? "" : std::format(" · {}", currentEnchant)),
+            std::format("{} · Armor {} · Value {}{}", armor->GetName(), armor->GetArmorRating(), candidateValue, candidateEnchanted ? std::format(" · {}", candidateEnchant) : "") };
+    }
+
+    static uint32_t CalculateFollowerPurchasePrice(RE::Actor* follower, RE::TESBoundObject* item)
+    {
+        if (!follower || !item) return 0;
+        const int32_t value = item->GetGoldValue();
+        float speech = 15.0f;
+        if (auto* owner = follower->AsActorValueOwner()) speech = owner->GetActorValue(RE::ActorValue::kSpeech);
+        const float discount = std::clamp(speech * 0.002f, 0.0f, 0.25f);
+        return value > 0 ? std::max(1u, static_cast<uint32_t>(static_cast<float>(value) * (1.0f - discount))) : 5u;
     }
 
     // Ok/arbalet oku: takipçinin halihazırda kullandığı ok tipini tercih et
@@ -829,7 +899,9 @@ namespace FollowerUnbound
                 break;
             }
         }
-        if (!anyNeeded) return; // hiçbir ihtiyaç yoksa satıcı bile aranmaz (perf + döngü yok)
+        const bool equipmentOffersEnabled = pref.allowBuyEquipment && settings->enableEquipmentPurchaseOffers;
+        const uint32_t pendingEquipmentGold = EquipPrompt::GetReservedGold(formID);
+        if (!anyNeeded && !equipmentOffersEnabled) return;
 
         // ── ADIM 2: YAKIN SATICILARI TOPLA (1500 birim, en fazla 6 aday) ──
         auto processLists = RE::ProcessLists::GetSingleton();
@@ -839,27 +911,15 @@ namespace FollowerUnbound
         if (nearbyVendors.empty()) return;
 
         // ── ADIM 3: UYUMLU SATICILARIN STOĞUNU TARA (en fazla 6 yakındaki aday) ──
-        auto vendMaskFor = [](VendorType vt) -> uint32_t {
-            switch (vt) {
-            case VendorType::Blacksmith:     return kVendSmith;
-            case VendorType::Apothecary:     return kVendApothecary;
-            case VendorType::Innkeeper:      return kVendInn;
-            case VendorType::GeneralMerchant: return kVendGeneral;
-            case VendorType::Wizard:         return kVendWizard;
-            case VendorType::Healer:         return kVendHealer;
-            default: return kVendNone;
-            }
-        };
-
         VendorStock stock;
         int stockScans = 0;
         for (const auto& cand : nearbyVendors) {
             if (stockScans >= 6) break;
-            uint32_t vMask = vendMaskFor(cand.type);
+            uint32_t vMask = cand.vendorMask;
 
-            bool useful = false;
+            bool useful = equipmentOffersEnabled && (vMask & (kVendSmith | kVendGeneral)) != 0;
             for (const auto& n : needs) {
-                if (isNeeded(n) && (n.vendMask & vMask)) {
+                if (!useful && isNeeded(n) && (n.vendMask & vMask)) {
                     useful = true;
                     break;
                 }
@@ -870,27 +930,81 @@ namespace FollowerUnbound
             stockScans++;
         }
 
+        // Offer only the strongest affordable compatible upgrade per follower
+        // and shopping pass, avoiding repeated prompts for inventory items.
+        if (equipmentOffersEnabled && pendingEquipmentGold == 0) {
+            const uint32_t balance = std::min(profile.gold, static_cast<uint32_t>(std::max(0, invGold)));
+            const uint32_t reserve = pref.savingsEnabled ? std::min(pref.savedGold, balance) : 0;
+            const uint32_t spendable = balance - reserve;
+            const StockEntry* bestEntry = nullptr;
+            std::optional<UpgradeComparison> bestComparison;
+            uint32_t bestPrice = 0;
+            int64_t bestImprovement = 0;
+            for (const auto& entry : stock.equipment) {
+                if (!entry.obj || entry.stock <= 0 ||
+                    (entry.vendorMask & (kVendSmith | kVendGeneral)) == 0 ||
+                    profile.declinedEquipmentPurchases.contains(entry.obj->GetFormID()) ||
+                    EquipPrompt::IsPurchasePending(formID, entry.obj->GetFormID()) ||
+                    ItemEvaluator::GetItemCount(follower, entry.obj) > 0) continue;
+
+                const uint32_t price = CalculateFollowerPurchasePrice(follower, entry.obj);
+                if (price == 0 || price > spendable) continue;
+                auto comparison = CompareEquipment(follower, profile, entry.obj, entry.enchantmentDescription);
+                if (!comparison || comparison->improvement <= bestImprovement) continue;
+                bestEntry = &entry;
+                bestPrice = price;
+                bestImprovement = comparison->improvement;
+                bestComparison = std::move(comparison);
+            }
+
+            if (bestEntry && bestComparison) {
+                if (settings->equipmentUpgradeChance < 100) {
+                    thread_local std::mt19937 rng{ std::random_device{}() };
+                    std::uniform_int_distribution<uint32_t> dist(1, 100);
+                    if (dist(rng) > settings->equipmentUpgradeChance) {
+                        bestEntry = nullptr;
+                    }
+                }
+            }
+
+            if (bestEntry && bestComparison) {
+                auto* stockContainer = RE::TESForm::LookupByID<RE::TESObjectREFR>(bestEntry->stockContainerID);
+                if (EquipPrompt::ShowPurchasePrompt(follower, stockContainer, bestEntry->obj,
+                    bestComparison->current, bestPrice, bestEntry->vendorName ? bestEntry->vendorName : "Nearby seller",
+                    bestComparison->currentStats, bestComparison->candidateStats)) {
+                    _lastShopTime[formID] = now;
+                    EquipPrompt::StartAfterLootDistribution();
+                    logger::info("EquipmentPurchase: presenting {} offer to {} ({} gold, improvement {}).",
+                        bestEntry->obj->GetName(), follower->GetName(), bestPrice, bestImprovement);
+                    return;
+                }
+            }
+        }
+
         // Explain why a nearby merchant did or did not satisfy each enabled
         // purchase target. This is rate-limited and makes seller classification
         // and stock matching observable in the user's SKSE log.
         static std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> lastSupplyCheckLog;
         auto lastSupplyLog = lastSupplyCheckLog.find(formID);
         if (lastSupplyLog == lastSupplyCheckLog.end() || std::chrono::duration<float>(now - lastSupplyLog->second).count() >= 30.0f) {
-            auto vendorLabel = [](VendorType type) -> const char* {
-                switch (type) {
-                case VendorType::Blacksmith: return "smith";
-                case VendorType::Apothecary: return "apothecary";
-                case VendorType::Innkeeper: return "inn";
-                case VendorType::GeneralMerchant: return "general";
-                case VendorType::Wizard: return "wizard";
-                case VendorType::Healer: return "healer";
-                default: return "unknown";
-                }
+            auto vendorLabel = [](uint32_t mask) {
+                std::string label;
+                const auto append = [&label](const char* value) {
+                    if (!label.empty()) label += "+";
+                    label += value;
+                };
+                if (mask & kVendSmith) append("smith");
+                if (mask & kVendApothecary) append("apothecary");
+                if (mask & kVendInn) append("inn");
+                if (mask & kVendGeneral) append("general");
+                if (mask & kVendWizard) append("wizard");
+                if (mask & kVendHealer) append("healer");
+                return label.empty() ? std::string("unknown") : label;
             };
             std::string vendorSummary;
             for (const auto& vendor : nearbyVendors) {
                 if (!vendorSummary.empty()) vendorSummary += ", ";
-                vendorSummary += std::format("{}({})", vendor.actor->GetName(), vendorLabel(vendor.type));
+                vendorSummary += std::format("{}({})", vendor.actor->GetName(), vendorLabel(vendor.vendorMask));
             }
             std::string demandSummary;
             for (const auto& need : needs) {
@@ -953,12 +1067,29 @@ namespace FollowerUnbound
         // ── ADIM 4: ÖNCELİK SIRASIYLA SATIN AL (tur başına en fazla 3 işlem) ──
         auto econ = EconomyManager::GetSingleton();
         auto notifier = NotificationManager::GetSingleton();
-        uint32_t batchMult = settings->transactionBatchMultiplier;
         int purchasesThisRound = 0;
         constexpr int kMaxPurchasesPerRound = 3;
+        std::unordered_set<SupplyCat> attemptedCategories;
+        struct StockShortageNotice
+        {
+            SupplyCat category;
+            std::string message;
+        };
+        std::vector<StockShortageNotice> stockShortageNotices;
+        std::unordered_map<SupplyCat, uint32_t> purchasedByCategory;
+        std::unordered_map<SupplyCat, int32_t> stockAtVisit;
+        std::unordered_map<SupplyCat, std::unordered_set<std::string>> sellersAtVisit;
+        for (const auto& need : needs) {
+            if (!isNeeded(need)) continue;
+            for (const auto& entry : stock.buckets[static_cast<int>(need.cat) - 1]) {
+                if ((entry.vendorMask & need.vendMask) == 0 || entry.stock <= 0) continue;
+                stockAtVisit[need.cat] += entry.stock;
+                if (entry.vendorName) sellersAtVisit[need.cat].insert(entry.vendorName);
+            }
+        }
 
-        auto purchase = [&](RE::TESBoundObject* obj, uint32_t desiredQty, const char* vendorName) -> bool {
-            if (!obj || desiredQty == 0) return false;
+        auto purchase = [&](RE::TESBoundObject* obj, uint32_t desiredQty, const char* vendorName) -> uint32_t {
+            if (!obj || desiredQty == 0) return 0;
 
             uint32_t unitPrice = 5;
             int32_t objVal = obj->GetGoldValue();
@@ -973,20 +1104,21 @@ namespace FollowerUnbound
 
             const uint32_t balance = std::min(profile.gold, static_cast<uint32_t>(std::max(0, invGold)));
             const uint32_t reserve = pref.savingsEnabled ? std::min(pref.savedGold, balance) : 0;
-            const uint32_t spendable = balance - reserve;
+            const uint32_t afterSavings = balance - reserve;
+            const uint32_t reservedForEquipment = std::min(afterSavings, EquipPrompt::GetReservedGold(formID));
+            const uint32_t spendable = afterSavings - reservedForEquipment;
             uint32_t maxAffordable = (unitPrice > 0) ? (spendable / unitPrice) : desiredQty;
             uint32_t finalQty = std::min(desiredQty, maxAffordable);
-            if (finalQty == 0) return false;
+            if (finalQty == 0) return 0;
 
             uint32_t totalCost = unitPrice * finalQty;
             if (spendable < totalCost || invGold < static_cast<int32_t>(totalCost)) {
-                return false;
+                return 0;
             }
 
             // Deduct physical gold from inventory
             follower->RemoveItem(goldItem, static_cast<int32_t>(totalCost), RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
             econ->RemoveGold(formID, static_cast<int32_t>(totalCost));
-            profile.gold = (profile.gold >= totalCost) ? (profile.gold - totalCost) : 0;
 
             // Add purchased item
             follower->AddObjectToContainer(obj, nullptr, static_cast<int32_t>(finalQty), nullptr);
@@ -997,18 +1129,12 @@ namespace FollowerUnbound
             _lastPurchaseTime[formID][obj->GetFormID()] = now;
 
             if (settings->notifyShopping) {
-                std::string msg;
-                if (finalQty > 1) {
-                    msg = std::format("{} purchased {}x {} from {}. (-{} Gold)",
-                                      follower->GetName(), finalQty, obj->GetName(), vendorName ? vendorName : "?", totalCost);
-                } else {
-                    msg = std::format("{} purchased {} from {}. (-{} Gold)",
-                                      follower->GetName(), obj->GetName(), vendorName ? vendorName : "?", totalCost);
-                }
+                std::string msg = std::format("{} purchased {}x {} from {}. (-{} Gold)",
+                    follower->GetName(), finalQty, obj->GetName(), vendorName ? vendorName : "?", totalCost);
                 notifier->ShowHUDMessage(msg);
             }
             logger::info("Shopping: {} purchased {}x {} from {} for {} gold.", follower->GetName(), finalQty, obj->GetName(), vendorName ? vendorName : "?", totalCost);
-            return true;
+            return finalQty;
         };
 
         auto tryBuyStock = [&](SupplyCat cat, uint32_t desiredQty, bool isAmmo, uint32_t requiredMask, const char* label) -> bool {
@@ -1028,8 +1154,10 @@ namespace FollowerUnbound
             if (!entry || entry->stock <= 0) return false;
 
             uint32_t qty = std::min<uint32_t>(desiredQty, static_cast<uint32_t>(entry->stock));
-            if (purchase(entry->obj, qty, entry->vendorName)) {
-                entry->stock -= static_cast<int32_t>(qty);
+            const uint32_t purchasedQty = purchase(entry->obj, qty, entry->vendorName);
+            if (purchasedQty > 0) {
+                entry->stock -= static_cast<int32_t>(purchasedQty);
+                purchasedByCategory[cat] += purchasedQty;
                 return true;
             }
             return false;
@@ -1045,9 +1173,10 @@ namespace FollowerUnbound
             const auto& n = needs[index];
             if (!isNeeded(n)) continue;
             const uint32_t outstanding = n.limit - static_cast<uint32_t>(n.current);
-            const uint32_t purchaseTarget = (n.cat == STreatment) ? outstanding
-                : (n.isAmmo ? std::min<uint32_t>(outstanding, 15u * batchMult)
-                             : std::min<uint32_t>(outstanding, batchMult));
+            // Fill the configured deficit in one transaction, bounded by the
+            // seller's available stock and the follower's spendable gold.
+            const uint32_t purchaseTarget = outstanding;
+            attemptedCategories.insert(n.cat);
             if (tryBuyStock(n.cat, purchaseTarget,
                              n.isAmmo, n.vendMask, n.label)) {
                 purchasesThisRound++;
@@ -1057,9 +1186,39 @@ namespace FollowerUnbound
 
         if (!needs.empty()) _purchaseCursor[formID] = nextCursor;
 
+        // If the sellers' available stock cannot satisfy this follower's full
+        // configured target, tell the user once per follower/item window.
+        // Report the stock observed at the start of this visit (not the
+        // remaining local batch counter), and avoid repeating every poll.
+        static std::unordered_map<uint64_t, std::chrono::steady_clock::time_point> lastStockShortageNotice;
+        if (settings->notifyShopping) {
+            for (const auto& need : needs) {
+                if (!attemptedCategories.contains(need.cat) || purchasedByCategory[need.cat] == 0 || !isNeeded(need)) continue;
+                const int32_t availableStock = stockAtVisit[need.cat];
+                const int32_t outstanding = static_cast<int32_t>(need.limit) - need.current;
+                const auto& sources = sellersAtVisit[need.cat];
+                if (sources.empty() || availableStock <= 0 || availableStock >= outstanding) continue;
+
+                const uint64_t noticeKey = (static_cast<uint64_t>(formID) << 32) | static_cast<uint32_t>(need.cat);
+                auto previous = lastStockShortageNotice.find(noticeKey);
+                if (previous != lastStockShortageNotice.end() &&
+                    std::chrono::duration<float>(now - previous->second).count() < 300.0f) continue;
+
+                const std::string seller = sources.size() == 1 ? *sources.begin() : "Nearby sellers";
+                const std::string stockMessage = std::format("{} had only {}x {} in stock; {}'s target is {}.",
+                    seller, availableStock, need.label, follower->GetName(), need.limit);
+                stockShortageNotices.push_back({ need.cat, stockMessage });
+                lastStockShortageNotice[noticeKey] = now;
+            }
+        }
+
         if (purchasesThisRound > 0) {
             _lastShopTime[formID] = now;
             MaybePlayShoppingSound(follower);
+        }
+        for (const auto& notice : stockShortageNotices) {
+            notifier->ShowHUDMessage(notice.message);
+            logger::info("Shopping stock shortage: follower={} category={} message={}", follower->GetName(), static_cast<int>(notice.category), notice.message);
         }
     }
 
@@ -1408,12 +1567,7 @@ namespace FollowerUnbound
             else if (isBook || isScroll || isSoulGem) requiredMask = kVendWizard | kVendGeneral;
 
             for (const auto& cand : nearbyVendors) {
-                VendorType vt = cand.type;
-                if (vt == VendorType::Healer) continue; // Clergy only supplies cure potions.
-                uint32_t vmask = (vt == VendorType::Blacksmith) ? kVendSmith :
-                                 (vt == VendorType::Apothecary) ? kVendApothecary :
-                                 (vt == VendorType::Innkeeper) ? kVendInn :
-                                 (vt == VendorType::Wizard) ? kVendWizard : kVendGeneral;
+                uint32_t vmask = cand.vendorMask & ~kVendHealer; // Clergy only supplies cure potions.
                 if (requiredMask & vmask) {
                     chosenVendor = &cand;
                     break;

@@ -1,4 +1,5 @@
 #include "UI/PrismaUIManager.h"
+#include "UI/NotificationManager.h"
 #include "UI/EquipPrompt.h"
 #include "PrismaUI_API.h"
 #include "UI/SKSEMenuFramework.h"
@@ -242,11 +243,63 @@ namespace FollowerUnbound
             });
         }
         _api->Hide(_view);
+
+        // Keep a transparent, non-interactive overlay alive independently from
+        // the management menu so game notifications can be rendered by PrismaUI.
+        _notificationView = _api->CreateView("FollowerUnbound/notifications.html", [](PrismaView view) {
+            if (auto* tasks = SKSE::GetTaskInterface()) tasks->AddTask([view]() {
+                auto* self = GetSingleton();
+                if (!self->_api || self->_notificationView != view || !self->_api->IsValid(view)) return;
+                self->_notificationViewReady = true;
+                self->_api->SetOrder(view, 1000);
+                self->_api->Show(view);
+            });
+        });
+        if (_notificationView == 0 || !_api->IsValid(_notificationView)) {
+            logger::error("Could not create PrismaUI notification overlay; mod notifications will be unavailable.");
+            _notificationView = 0;
+        } else if (auto* apiV2 = PRISMA_UI_API::RequestPluginAPI<PRISMA_UI_API::IVPrismaUI2>()) {
+            apiV2->RegisterConsoleCallback(_notificationView, [](PrismaView view, PRISMA_UI_API::ConsoleMessageLevel level, const char* msg) {
+                if (level == PRISMA_UI_API::ConsoleMessageLevel::Error) logger::error("PrismaUI Notifications {}: {}", view, msg ? msg : "(null)");
+                else if (level == PRISMA_UI_API::ConsoleMessageLevel::Warning) logger::warn("PrismaUI Notifications {}: {}", view, msg ? msg : "(null)");
+            });
+        }
         if (SKSEMenuFramework::IsInstalled()) {
             _hotkeyListener = SKSEMenuFramework::AddInputEvent(OnFrameworkInput);
         }
         logger::info("Registered Follower Unbound PrismaUI; shortcut is Shift+I.");
         return true;
+    }
+
+    bool PrismaUIManager::ShowNotification(std::string_view message)
+    {
+        if (!Settings::GetSingleton()->enableNotifications) return false;
+        if (!_api || !_notificationView || !_notificationViewReady || !_api->IsValid(_notificationView)) return false;
+        const auto argument = nlohmann::json(std::string(message)).dump();
+        const auto script = "window.fuNotify && window.fuNotify(" + argument + ");";
+        const auto notificationView = _notificationView;
+        if (auto* tasks = SKSE::GetTaskInterface()) {
+            tasks->AddTask([this, notificationView, script]() {
+                if (_api && _notificationViewReady && _api->IsValid(notificationView)) {
+                    _api->Invoke(notificationView, script.c_str());
+                }
+            });
+            return true;
+        }
+        return false;
+    }
+
+    void PrismaUIManager::ClearNotifications()
+    {
+        if (!_api || !_notificationView || !_notificationViewReady || !_api->IsValid(_notificationView)) return;
+        const auto notificationView = _notificationView;
+        if (auto* tasks = SKSE::GetTaskInterface()) {
+            tasks->AddTask([this, notificationView]() {
+                if (_api && _notificationViewReady && _api->IsValid(notificationView)) {
+                    _api->Invoke(notificationView, "window.fuClearNotifications && window.fuClearNotifications();");
+                }
+            });
+        }
     }
 
     bool __stdcall PrismaUIManager::OnFrameworkInput(RE::InputEvent* event)
@@ -322,7 +375,7 @@ namespace FollowerUnbound
         tasks->AddTask([remaining]() {
             if (SKSEMenuFramework::IsInstalled() && SKSEMenuFramework::IsAnyBlockingWindowOpened()) {
                 if (remaining == 0) {
-                    RE::DebugNotification("Close the SKSE menu before opening Follower Unbound.");
+                    GetSingleton()->ShowNotification("Close the SKSE menu before opening Follower Unbound.");
                     return;
                 }
                 if (remaining % 20 == 0 && !SKSEMenuFramework::GetMainWindow()) PressEscapeForFramework();
@@ -348,12 +401,14 @@ namespace FollowerUnbound
         // Closing the overlay while an equipment decision is active dismisses
         // that decision as declined. Never trap the player behind a modal.
         if (EquipPrompt::HasActivePrompt()) EquipPrompt::Resolve(false);
+        if (self->_viewReady) self->_api->Invoke(self->_view, "window.fuHideEquipPrompt && window.fuHideEquipPrompt();");
         self->_api->Unfocus(self->_view);
         self->_api->Hide(self->_view);
     }
 
     void PrismaUIManager::ShowEquipPrompt(RE::FormID followerID, RE::FormID itemID, RE::FormID oldItemID,
-        std::string_view followerName, std::string_view itemName, std::string_view reason)
+        std::string_view followerName, std::string_view itemName, std::string_view slotLabel,
+        std::string_view reason, std::string_view currentStats, std::string_view candidateStats)
     {
         if (!IsAvailable() || !_viewReady) {
             logger::warn("EquipPrompt: PrismaUI is unavailable; skipped prompt for {} / {}.", followerName, itemName);
@@ -365,11 +420,38 @@ namespace FollowerUnbound
         nlohmann::json prompt = {
             {"follower", followerID}, {"item", itemID}, {"oldItem", oldItemID},
             {"followerName", std::string(followerName)}, {"itemName", std::string(itemName)},
-            {"reason", std::string(reason)}
+            {"slotLabel", std::string(slotLabel)},
+            {"reason", std::string(reason)}, {"currentStats", std::string(currentStats)},
+            {"candidateStats", std::string(candidateStats)}, {"mode", "loot"}
         };
         const auto script = "window.fuShowEquipPrompt && window.fuShowEquipPrompt(" + prompt.dump() + ");";
         _api->Invoke(_view, script.c_str());
-        logger::info("EquipPrompt: opened PrismaUI decision for {} / {}.", followerName, itemName);
+        logger::info("EquipPrompt: opened PrismaUI decision for {} / {} ({}).", followerName, itemName, slotLabel);
+    }
+
+    void PrismaUIManager::ShowEquipmentPurchasePrompt(RE::FormID followerID, RE::FormID itemID, RE::FormID oldItemID,
+        std::string_view followerName, std::string_view itemName, std::string_view slotLabel,
+        std::string_view vendorName, uint32_t price, uint32_t spendableGold,
+        std::string_view currentStats, std::string_view candidateStats)
+    {
+        if (!IsAvailable() || !_viewReady) {
+            logger::warn("EquipmentPurchase: PrismaUI is unavailable; skipped offer for {} / {}.", followerName, itemName);
+            EquipPrompt::Resolve(false);
+            return;
+        }
+        ShowView();
+        nlohmann::json prompt = {
+            {"follower", followerID}, {"item", itemID}, {"oldItem", oldItemID},
+            {"followerName", std::string(followerName)}, {"itemName", std::string(itemName)},
+            {"slotLabel", std::string(slotLabel)},
+            {"vendorName", std::string(vendorName)}, {"price", price},
+            {"spendableGold", spendableGold},
+            {"currentStats", std::string(currentStats)}, {"candidateStats", std::string(candidateStats)},
+            {"mode", "purchase"}
+        };
+        const auto script = "window.fuShowEquipPrompt && window.fuShowEquipPrompt(" + prompt.dump() + ");";
+        _api->Invoke(_view, script.c_str());
+        logger::info("EquipmentPurchase: opened PrismaUI offer for {} / {} ({}) at {} gold.", followerName, itemName, slotLabel, price);
     }
 
     void PrismaUIManager::OnAction(const char* data)
@@ -393,24 +475,76 @@ namespace FollowerUnbound
         const auto kind = a.value("kind", std::string{});
         auto* manager = FollowerManager::GetSingleton();
         if (kind == "refresh") { manager->ScanForActiveFollowers(); return; }
+        if (kind == "notificationsBulk") {
+            auto* s = Settings::GetSingleton();
+            const bool enable = a.value("enable", false);
+            s->enableNotifications = enable;
+            s->notifyLoot = enable;
+            s->notifyShopping = enable;
+            s->notifySelling = enable;
+            s->notifyNeedsFood = enable;
+            s->notifyNeedsDrink = enable;
+            s->notifyNeedsHungryWarning = enable;
+            s->notifyNeedsThirstyWarning = enable;
+            s->notifyCombatHealthPotion = enable;
+            s->notifyCombatMagickaPotion = enable;
+            s->notifyCombatStaminaPotion = enable;
+            s->notifyPoisonApplied = enable;
+            s->notifyAutoEquip = enable;
+            if (!enable) {
+                NotificationManager::GetSingleton()->Clear();
+                ClearNotifications();
+            }
+            s->Save();
+            SendState();
+            return;
+        }
         if (kind == "setting") {
             auto* s = Settings::GetSingleton();
             const auto key = a.value("key", std::string{});
             const auto& v = a.at("value");
+            if (key == "notifications") {
+                const bool val = v.get<bool>();
+                s->enableNotifications = val;
+                if (!val) {
+                    NotificationManager::GetSingleton()->Clear();
+                    ClearNotifications();
+                }
+            } else
+            if (key == "notifyNeeds") {
+                const bool val = v.get<bool>();
+                s->notifyNeedsFood = val;
+                s->notifyNeedsDrink = val;
+                s->notifyNeedsHungryWarning = val;
+                s->notifyNeedsThirstyWarning = val;
+            } else
+            if (key == "notifyCombatPotions") {
+                const bool val = v.get<bool>();
+                s->notifyCombatHealthPotion = val;
+                s->notifyCombatMagickaPotion = val;
+                s->notifyCombatStaminaPotion = val;
+                s->notifyPoisonApplied = val;
+            } else
 #define FU_SET_BOOL(name, field) if (key == name) s->field = v.get<bool>(); else
             FU_SET_BOOL("autoLoot", autoLootCorpses) FU_SET_BOOL("autoEquip", enableAutoEquip)
             FU_SET_BOOL("selling", enableSellingSystem) FU_SET_BOOL("shopping", enableShoppingSystem)
             FU_SET_BOOL("combatPotions", enableCombatPotions) FU_SET_BOOL("needs", enableNeedsSystem)
             FU_SET_BOOL("poison", enablePoisonSystem) FU_SET_BOOL("protectOutfit", protectEquippedClothing)
             FU_SET_BOOL("promptBetterGear", promptOnBetterEquipment) FU_SET_BOOL("mageRobes", magePreferRobes)
+            FU_SET_BOOL("equipmentPurchaseOffers", enableEquipmentPurchaseOffers)
+            FU_SET_BOOL("notifyLoot", notifyLoot)
+            FU_SET_BOOL("notifyShopping", notifyShopping)
+            FU_SET_BOOL("notifySelling", notifySelling)
+            FU_SET_BOOL("notifyAutoEquip", notifyAutoEquip)
             FU_SET_BOOL("lootHostilesOnly", lootHostilesOnly) FU_SET_BOOL("lootGold", lootGold)
             FU_SET_BOOL("lootWeapons", lootWeapons) FU_SET_BOOL("lootArmor", lootArmor)
             FU_SET_BOOL("lootArrows", lootArrows) FU_SET_BOOL("lootPotions", lootPotions)
             FU_SET_BOOL("lootFood", lootFood) FU_SET_BOOL("lootIngredients", lootIngredients)
             FU_SET_BOOL("lootSoulGems", lootSoulGems) FU_SET_BOOL("lootMisc", lootMisc)
-            { logger::debug("Unknown PrismaUI setting key: {}", key); }
+            {}
 #undef FU_SET_BOOL
             if (key == "lootDelay") s->lootDelaySeconds = std::clamp(v.get<float>(), 0.0f, 60.0f);
+            if (key == "equipmentUpgradeChance") s->equipmentUpgradeChance = std::clamp<uint32_t>(v.get<uint32_t>(), 1, 100);
             s->Save();
             return;
         }
@@ -493,12 +627,20 @@ namespace FollowerUnbound
             {"combatPotions",settings->enableCombatPotions},{"needs",settings->enableNeedsSystem},
             {"poison",settings->enablePoisonSystem},{"protectOutfit",settings->protectEquippedClothing},
             {"promptBetterGear",settings->promptOnBetterEquipment},{"mageRobes",settings->magePreferRobes},
+            {"equipmentPurchaseOffers",settings->enableEquipmentPurchaseOffers},
+            {"notifications",settings->enableNotifications},
+            {"notifyLoot",settings->notifyLoot},
+            {"notifyShopping",settings->notifyShopping},
+            {"notifySelling",settings->notifySelling},
+            {"notifyNeeds",settings->notifyNeedsFood},
+            {"notifyCombatPotions",settings->notifyCombatHealthPotion},
+            {"notifyAutoEquip",settings->notifyAutoEquip},
             {"lootHostilesOnly",settings->lootHostilesOnly},{"lootGold",settings->lootGold},
             {"lootWeapons",settings->lootWeapons},{"lootArmor",settings->lootArmor},
             {"lootArrows",settings->lootArrows},{"lootPotions",settings->lootPotions},
             {"lootFood",settings->lootFood},{"lootIngredients",settings->lootIngredients},
             {"lootSoulGems",settings->lootSoulGems},{"lootMisc",settings->lootMisc},
-            {"lootDelay",settings->lootDelaySeconds}
+            {"lootDelay",settings->lootDelaySeconds},{"equipmentUpgradeChance",settings->equipmentUpgradeChance}
         };
         state["followers"] = nlohmann::json::array();
         auto gold = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0000000F);
@@ -546,6 +688,7 @@ namespace FollowerUnbound
                     if (auto* right = actor->GetEquippedObject(false); right && right->GetFormID() == weapon->GetFormID()) worn = true;
                     if (auto* left = actor->GetEquippedObject(true); left && left->GetFormID() == weapon->GetFormID()) worn = true;
                     f["weapons"].push_back({{"id",weapon->GetFormID()},{"name",weapon->GetName() ? weapon->GetName() : "Weapon"},
+                        {"slot",ItemEvaluator::GetWeaponTypeLabel(weapon)},
                         {"damage",weapon->GetAttackDamage()},{"count",inv.first},{"worn",worn},{"protected",p.IsProtected(weapon->GetFormID())}});
                 } else if (auto* armor = item->As<RE::TESObjectARMO>(); armor && !IsTngHiddenBodyItem(armor) &&
                     (armor->GetFormFlags() & RE::TESObjectARMO::RecordFlags::kNonPlayable) == 0) {
@@ -554,6 +697,7 @@ namespace FollowerUnbound
                         if (list && (list->HasType(RE::ExtraDataType::kWorn) || list->HasType(RE::ExtraDataType::kWornLeft))) { worn = true; break; }
                     }
                     f["apparel"].push_back({{"id",armor->GetFormID()},{"name",armor->GetName() ? armor->GetName() : "Apparel"},
+                        {"slot",ItemEvaluator::GetArmorSlotLabel(armor)},
                         {"armor",armor->GetArmorRating()},{"count",inv.first},{"worn",worn},{"protected",p.IsProtected(armor->GetFormID())}});
                 }
             }

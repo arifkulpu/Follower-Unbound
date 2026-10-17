@@ -17,6 +17,58 @@
   const follower = () => state.followers.find((f) => Number(f.id) === Number(selectedFollower)) || state.followers[0] || null;
   const money = (n) => Number(n || 0).toLocaleString();
   const notify = (message) => { const t = document.createElement('div'); t.className = 'toast'; t.textContent = message; document.body.append(t); setTimeout(() => t.remove(), 2450); };
+  window.fuShowEquipPrompt = (prompt) => {
+    const purchase = prompt?.mode === 'purchase';
+    const lootUpgrade = prompt?.mode === 'loot' && Boolean(prompt?.currentStats || prompt?.candidateStats);
+    if ($('equip-prompt-slot')) {
+      const slot = prompt?.slotLabel;
+      $('equip-prompt-slot').textContent = slot ? slot.toUpperCase() : '';
+      $('equip-prompt-slot').hidden = !slot;
+    }
+    $('equip-prompt-title').textContent = purchase ? 'Equipment upgrade available' : (lootUpgrade ? 'Corpse loot equipment offer' : 'A better item was found');
+    $('equip-prompt-summary').textContent = purchase
+      ? `${prompt?.followerName || 'Your follower'} can buy ${prompt?.itemName || 'this item'} from a nearby seller.`
+      : (lootUpgrade
+        ? `${prompt?.followerName || 'Your follower'} will receive ${prompt?.itemName || 'this item'} from the loot.`
+        : `${prompt?.followerName || 'Your follower'} found ${prompt?.itemName || 'a better item'}.`);
+    $('equip-prompt-reason').textContent = purchase
+      ? 'This compatible upgrade is available from a nearby seller.'
+      : (lootUpgrade ? 'Compare the follower’s current gear with the item recovered from the corpse.' : (prompt?.reason || ''));
+    $('equip-prompt-vendor').hidden = !purchase;
+    $('equip-prompt-vendor').textContent = purchase ? `Seller: ${prompt.vendorName || 'Nearby merchant'}` : '';
+    $('equipment-offer-comparison').hidden = !(purchase || lootUpgrade);
+    $('equipment-offer-comparison').classList.toggle('loot-upgrade', lootUpgrade);
+    $('equip-prompt-price-row').hidden = !purchase;
+    $('equip-prompt-funds-row').hidden = !purchase;
+    $('equipment-offer-comparison').querySelector('div:first-child span').textContent = lootUpgrade ? 'Currently equipped' : 'Current equipment';
+    $('equipment-offer-comparison').querySelector('div:nth-child(2) span').textContent = purchase ? 'Purchase offer' : (lootUpgrade ? 'Recovered from corpse' : 'Loot item');
+    const renderGearStats = (id, value) => {
+      const parts = String(value || 'None').split(' · ');
+      const name = parts.shift() || 'Unknown item';
+      $(id).innerHTML = `<span class="gear-stat-name">${iconImg(iconFor(name), 'inline-icon')} ${esc(name)}</span>${parts.length ? `<span class="gear-stat-details">${esc(parts.join(' · '))}</span>` : ''}`;
+    };
+    renderGearStats('equip-prompt-current-stats', prompt?.currentStats);
+    renderGearStats('equip-prompt-candidate-stats', prompt?.candidateStats);
+    $('equip-prompt-price').textContent = purchase ? `${money(prompt.price)} gold` : '';
+    $('equip-prompt-funds').textContent = purchase
+      ? `${prompt?.followerName || 'Follower'}: ${money(prompt.spendableGold)} gold available${Number(prompt.spendableGold || 0) < Number(prompt.price || 0) ? ' — not enough' : ''}`
+      : '';
+    $('equip-prompt-copy').textContent = purchase
+      ? 'Buy using this follower’s own spendable gold? The new item will be equipped and protected. Their current item will be unequipped, unprotected and available for sale.'
+      : (lootUpgrade
+        ? 'Give this item to the named follower, equip it and protect it? Their previous item will be unprotected and can be sold.'
+        : 'Equip and protect this item? The previous item may become available for sale.');
+    $('equip-prompt-no').textContent = purchase ? 'NO — NEVER ASK FOR THIS ITEM AGAIN' : 'KEEP CURRENT';
+    $('equip-prompt-yes').textContent = purchase ? 'BUY, EQUIP & PROTECT' : 'EQUIP & PROTECT';
+    $('equip-prompt').hidden = false;
+  };
+  window.fuHideEquipPrompt = () => { $('equip-prompt').hidden = true; };
+  const resolveEquipPrompt = (accept) => {
+    window.fuHideEquipPrompt();
+    send({kind:'equipPromptDecision',accept});
+  };
+  $('equip-prompt-yes').addEventListener('click', () => resolveEquipPrompt(true));
+  $('equip-prompt-no').addEventListener('click', () => resolveEquipPrompt(false));
   const iconFor = (value='') => {
     const s=String(value).toLowerCase();
     if(/poison/.test(s))return 'icon-poison';
@@ -33,7 +85,7 @@
     if(/soap/.test(s))return 'icon-soap';
     if(/lantern/.test(s))return 'icon-lantern';
     if(/upgrade|better gear/.test(s))return 'icon-upgrade';
-    if(/weapon|sword|combat/.test(s))return 'icon-combat';
+    if(/weapon|sword|dagger|axe|mace|warhammer|combat/.test(s))return 'icon-combat';
     if(/bow|bolt|arrow|ammo/.test(s))return 'icon-arrows';
     if(/armor|armour|clothing|robe|apparel|shield|outfit/.test(s))return /shield/.test(s)?'icon-shield':'icon-armor';
     if(/gold|coin|saving/.test(s))return 'icon-coin';
@@ -49,6 +101,7 @@
     if(/loot|corpse/.test(s))return 'icon-skull';
     if(/shop|trade|buy|sell|merchant/.test(s))return /sell/.test(s)?'icon-sell':'icon-cart';
     if(/bag|supply|utility|container/.test(s))return 'icon-sack';
+    if(/notification|notify|alert|bell|message/.test(s))return 'icon-info';
     if(/follower|companion|party/.test(s))return 'icon-followers';
     if(/settings|system|gear/.test(s))return 'icon-settings';
     return 'icon-person';
@@ -62,9 +115,10 @@
   const check = (title, key, obj, copy='') => { const values=obj==='settings'?state.settings:(follower()?.prefs||{}); return `<label class="toggle-row"><span class="toggle-copy-wrap"><span class="toggle-title">${itemLabel(title,key)}</span>${copy ? `<span class="toggle-copy">${copy}</span>` : ''}</span><span class="toggle"><input type="checkbox" data-${obj === 'settings' ? 'setting' : 'pref'}="${key}" ${values?.[key] ? 'checked' : ''}></span></label>`; };
   const globalCheck = (title,key,copy='') => `<label class="toggle-row"><span class="toggle-copy-wrap"><span class="toggle-title">${itemLabel(title,key)}</span>${copy?`<span class="toggle-copy">${copy}</span>`:''}</span><span class="toggle"><input type="checkbox" data-setting="${key}" ${state.settings?.[key]?'checked':''}></span></label>`;
   const renderOverview = () => {
-    const humanoids=state.followers.filter(f=>!f.animal), avg=humanoids.length?Math.round(humanoids.reduce((n,f)=>n+Number(f.hunger||0),0)/humanoids.length):0;
+    const humanoids=state.followers.filter(f=>!f.animal), avgNeeds=(key)=>state.followers.length?Math.round(state.followers.reduce((n,f)=>n+Number(f[key]||0),0)/state.followers.length):0;
+    const avgHunger=avgNeeds('hunger'), avgThirst=avgNeeds('thirst'), avgFatigue=avgNeeds('fatigue');
     $('content').innerHTML=`<div class="hero"><div><span class="eyebrow">THE PEOPLE AT YOUR SIDE</span><h1>Companions, in one place.</h1><p>Review their condition, equipment and daily routines.</p></div><button class="button secondary" data-refresh>SCAN PARTY</button></div>
-      <div class="stats">${stat('Active companions',state.followers.length,'Followers and animal allies')}${stat('Party gold',money(humanoids.reduce((n,f)=>n+Number(f.gold||0),0)),'Carried by companions')}${stat('Average hunger',`${avg}%`,'Across humanoid followers')}${stat('Loot distribution',state.settings.autoLoot?'ACTIVE':'PAUSED','After closing a container')}</div>
+      <div class="stats">${stat('Active companions',state.followers.length,'Followers and animal allies')}${stat('Party gold',money(humanoids.reduce((n,f)=>n+Number(f.gold||0),0)),'Carried by companions')}${stat('Average hunger',`${avgHunger}%`,'Across tracked companions')}${stat('Average thirst',`${avgThirst}%`,'Across tracked companions')}${stat('Average fatigue',`${avgFatigue}%`,'Across tracked companions')}${stat('Loot distribution',state.settings.autoLoot?'ACTIVE':'PAUSED','After closing a container')}</div>
       <div class="section-title">Your followers</div><div class="follower-grid">${state.followers.length?state.followers.map(f=>{const race=f.portraitRace||'nord';const portrait=!f.animal?`<img class="follower-portrait" src="assets/portraits/${race}_${f.portraitFemale?'female':'male'}.jpg" alt="${esc(race)} portrait" onerror="this.classList.add('portrait-missing');this.removeAttribute('src')">`:'';return `<article class="follower-card ${Number(f.id)===Number(selectedFollower)?'selected':''}" data-select-follower="${f.id}">${portrait}<div class="follower-card-body"><div class="follower-top"><div><div class="follower-name">${esc(f.name)}</div><div class="follower-sub">${esc(f.role|| (f.animal?'Animal companion':'Companion'))}${f.portraitRace?` · ${esc(f.portraitRace.replace('_',' '))} · ${f.portraitFemale?'Female':'Male'}`:''}</div></div><span class="role-pill">${f.animal?'ANIMAL':'FOLLOWER'}</span></div><div class="bars">${bar('Hunger',f.hunger)}${bar('Thirst',f.thirst,'thirst')}${bar('Fatigue',f.fatigue,'fatigue')}</div><div class="card-foot"><span>${iconImg(iconFor('gold'),'inline-icon')} ${money(f.gold)} gold</span><span>Carry ${Math.round(f.carry||0)} / ${Math.round(f.capacity||0)}</span><span class="gold-actions"><button data-gold="100" data-follower="${f.id}">+100</button><button data-gold="500" data-follower="${f.id}">+500</button></span></div></div></article>`}).join(''):`<div class="empty">No active followers found. Press Scan Party to refresh.</div>`}</div>`;
   };
   const renderEquipment = () => {
@@ -73,7 +127,7 @@
     $('content').innerHTML=`<div class="hero"><div><span class="eyebrow">LOADOUT CONTROL</span><h1>Equipment</h1><p>Protection and equipped status are separate. Protect items without selecting them to wear.</p></div>${followerPicker(f.id)}</div>
       <div class="panel equipment-panel"><div class="toolbar equipment-toolbar"><div><div class="section-title">${esc(f.name)}’s inventory</div><div class="notice">The EQUIPPED badge shows what they currently wear or wield. Protection keeps an item from sale; card selection plus the button equips it.</div></div><button class="button" data-equip-selected>WEAR & PROTECT SELECTED <span>(${selectedGear.size})</span></button></div>
       <div class="tabs"><button class="tab ${gearTab==='apparel'?'active':''}" data-gear-tab="apparel">APPAREL & ARMOR (${(f.apparel||[]).length})</button><button class="tab ${gearTab==='weapons'?'active':''}" data-gear-tab="weapons">WEAPONS (${(f.weapons||[]).length})</button></div>
-      <div class="gear-list equipment-gear-list">${rows.length?rows.map(item=>`<div class="gear-card ${selectedGear.has(Number(item.id))?'chosen':''}" data-gear-card="${item.id}" role="button" tabindex="0" aria-pressed="${selectedGear.has(Number(item.id))}"><span class="gear-check" aria-hidden="true">${selectedGear.has(Number(item.id))?'✓':''}</span><span class="gear-name">${itemLabel(esc(item.name),gearTab==='weapons'?'weapon':'armor')}</span><span class="gear-meta">${gearTab==='weapons'?`DMG ${item.damage}`:`ARMOR ${item.armor}`}${item.count>1?` · ×${item.count}`:''}</span>${item.worn?'<span class="tag equipped-tag">EQUIPPED</span>':''}<label class="gear-state" data-protect-wrap><input type="checkbox" data-protect="${item.id}" ${item.protected?'checked':''}> PROTECTED</label></div>`).join(''):'<div class="empty">No items in this category.</div>'}</div></div>`;
+      <div class="gear-list equipment-gear-list">${rows.length?rows.map(item=>`<div class="gear-card ${selectedGear.has(Number(item.id))?'chosen':''}" data-gear-card="${item.id}" role="button" tabindex="0" aria-pressed="${selectedGear.has(Number(item.id))}"><span class="gear-check" aria-hidden="true">${selectedGear.has(Number(item.id))?'✓':''}</span><span class="gear-name">${itemLabel(esc(item.name),gearTab==='weapons'?'weapon':'armor')}</span><span class="gear-meta">${gearTab==='weapons'?`DMG ${item.damage}`:`ARMOR ${item.armor}`}${item.count>1?` · ×${item.count}`:''}</span>${item.slot?`<span class="tag slot-tag">${esc(item.slot)}</span>`:''}${item.worn?'<span class="tag equipped-tag">EQUIPPED</span>':''}<label class="gear-state" data-protect-wrap><input type="checkbox" data-protect="${item.id}" ${item.protected?'checked':''}> PROTECTED</label></div>`).join(''):'<div class="empty">No items in this category.</div>'}</div></div>`;
   };
   const prefGroup = (title, keys, f) => `<div class="group-label">${title}</div><div class="toggle-grid">${keys.map(([key,label])=>check(label,key,f.prefs?'prefs':'prefs')).join('')}</div>`;
   const prefDefs = {
@@ -173,8 +227,43 @@
   };
   const renderSettings = () => {
     const f=follower();
-    const groups=[['CORE SYSTEMS',[['autoLoot','Automatic loot','Share eligible leftovers after you close a container.'],['autoEquip','Automatic equipment upgrades','Automatically equip eligible gear received through Follower Unbound.'],['protectOutfit','Protect starting outfit','Capture equipped clothing when a follower is first registered.'],['combatPotions','Combat potions','Use potions when combat health or magicka is low.'],['needs','Needs system','Track hunger, thirst and fatigue.'],['poison','Poison system','Apply poison to compatible weapons.'],['shopping','Shopping','Buy supplies from nearby merchants.'],['selling','Selling','Sell excess items to nearby merchants.'],['promptBetterGear','Ask before equipment upgrades','Show a prompt before equipping better gear.'],['mageRobes','Mage robe preference','Prefer robes for mage-class followers.']]],['GLOBAL LOOT CATEGORIES',[['lootHostilesOnly','Hostile corpses only','Ignore neutral and friendly actors.'],['lootGold','Gold'],['lootWeapons','Weapons'],['lootArmor','Armor'],['lootArrows','Arrows & bolts'],['lootPotions','Potions'],['lootFood','Food'],['lootIngredients','Ingredients'],['lootSoulGems','Soul gems'],['lootMisc','Other valuables']]]];
-    $('content').innerHTML=`<div class="hero"><div><span class="eyebrow">GLOBAL BEHAVIOR</span><h1>Systems</h1><p>Control companion automation and global loot behavior.</p></div><div class="settings-actions">${followerPicker(f?.id)}<button class="button secondary" data-refresh>REFRESH STATE</button></div></div><div class="settings-columns">${groups.map(([title,items])=>`<section class="panel"><div class="group-label">${title}</div><div class="toggle-grid">${items.map(([key,label,copy])=>globalCheck(label,key,copy)).join('')}</div></section>`).join('')}<section class="panel"><div class="group-label">FOLLOWER GOLD SAVINGS</div>${f?`<div class="savings-setting"><div><strong>${esc(f.name)}</strong><span>Saved ${money(f.prefs.savedGold||0)} of ${money(f.prefs.savingsTarget||1000)} gold</span></div><label><span>Target gold (1–10,000)</span><input class="number-input savings-target-input" type="number" min="1" max="10000" step="1" data-pref="savingsTarget" value="${Math.max(1,Math.min(10000,Number(f.prefs.savingsTarget??1000)))}"></label></div>`:'<div class="empty">No follower selected.</div>'}</section><section class="panel"><div class="group-label">LOOT TIMING</div><label class="toggle-row"><span><span class="toggle-title">Post-combat loot delay</span><span class="toggle-copy">Seconds before followers begin looting.</span></span><input class="number-input" type="number" min="0" max="60" step="1" data-setting="lootDelay" value="${state.settings.lootDelay||0}"></label></section></div>`;
+    const groups=[
+      ['CORE SYSTEMS',[
+        ['autoLoot','Automatic loot','Share eligible leftovers after you close a container.'],
+        ['autoEquip','Automatic equipment upgrades','Automatically equip eligible gear received through Follower Unbound.'],
+        ['protectOutfit','Protect starting outfit','Capture equipped clothing when a follower is first registered.'],
+        ['combatPotions','Combat potions','Use potions when combat health or magicka is low.'],
+        ['needs','Needs system','Track hunger, thirst and fatigue.'],
+        ['poison','Poison system','Apply poison to compatible weapons.'],
+        ['shopping','Shopping','Buy supplies from nearby merchants.'],
+        ['selling','Selling','Sell excess items to nearby merchants.'],
+        ['promptBetterGear','Ask before equipping looted gear','Show a prompt before equipping a better item found in loot.'],
+        ['equipmentPurchaseOffers','Offer better gear from merchants','Ask before a follower buys a better weapon or armor from a merchant.'],
+        ['mageRobes','Mage robe preference','Prefer robes for mage-class followers.']
+      ]],
+      ['NOTIFICATIONS & ALERTS',[
+        ['notifications','Enable all notifications','Master switch for all on-screen companion messages and alerts.'],
+        ['notifyLoot','Looting alerts','Show messages when companions collect items or gold.'],
+        ['notifyShopping','Shopping & stock alerts','Show messages for merchant purchases and low stock warnings.'],
+        ['notifySelling','Trade & sales alerts','Show messages when excess items are sold to merchants.'],
+        ['notifyNeeds','Needs alerts','Show messages when companions eat, drink or become starved.'],
+        ['notifyCombatPotions','Combat potion & poison alerts','Show messages when potions or weapon poisons are used.'],
+        ['notifyAutoEquip','Equipment upgrade alerts','Show messages when companions equip upgraded weapons or armor.']
+      ]],
+      ['GLOBAL LOOT CATEGORIES',[
+        ['lootHostilesOnly','Hostile corpses only','Ignore neutral and friendly actors.'],
+        ['lootGold','Gold'],
+        ['lootWeapons','Weapons'],
+        ['lootArmor','Armor'],
+        ['lootArrows','Arrows & bolts'],
+        ['lootPotions','Potions'],
+        ['lootFood','Food'],
+        ['lootIngredients','Ingredients'],
+        ['lootSoulGems','Soul gems'],
+        ['lootMisc','Other valuables']
+      ]]
+    ];
+    $('content').innerHTML=`<div class="hero"><div><span class="eyebrow">GLOBAL BEHAVIOR</span><h1>Systems</h1><p>Control companion automation, notifications and global loot behavior.</p></div><div class="settings-actions">${followerPicker(f?.id)}<button class="button secondary" data-refresh>REFRESH STATE</button></div></div><div class="settings-columns">${groups.map(([title,items])=>`<section class="panel"><div class="group-label">${title}</div>${title.includes('NOTIFICATIONS')?`<div class="notification-actions"><button type="button" class="button secondary mini-btn" data-notif-bulk="true">ENABLE ALL</button><button type="button" class="button secondary mini-btn" data-notif-bulk="false">DISABLE ALL</button></div>`:''}<div class="toggle-grid">${items.map(([key,label,copy])=>globalCheck(label,key,copy)).join('')}</div></section>`).join('')}<section class="panel"><div class="group-label">EQUIPMENT UPGRADES</div><label class="toggle-row"><span><span class="toggle-title">Gear upgrade check chance (%)</span><span class="toggle-copy">Chance (1–100%) that followers look for or offer better weapons and armor.</span></span><input class="number-input" type="number" min="1" max="100" step="1" data-setting="equipmentUpgradeChance" value="${state.settings.equipmentUpgradeChance||35}"></label></section><section class="panel"><div class="group-label">FOLLOWER GOLD SAVINGS</div>${f?`<div class="savings-setting"><div><strong>${esc(f.name)}</strong><span>Saved ${money(f.prefs.savedGold||0)} of ${money(f.prefs.savingsTarget||1000)} gold</span></div><label><span>Target gold (1–10,000)</span><input class="number-input savings-target-input" type="number" min="1" max="10000" step="1" data-pref="savingsTarget" value="${Math.max(1,Math.min(10000,Number(f.prefs.savingsTarget??1000)))}"></label></div>`:'<div class="empty">No follower selected.</div>'}</section><section class="panel"><div class="group-label">LOOT TIMING</div><label class="toggle-row"><span><span class="toggle-title">Post-combat loot delay</span><span class="toggle-copy">Seconds before followers begin looting.</span></span><input class="number-input" type="number" min="0" max="60" step="1" data-setting="lootDelay" value="${state.settings.lootDelay||0}"></label></section></div>`;
   };
   const render = () => {
     if(!state.followers.some(f=>Number(f.id)===Number(selectedFollower))) selectedFollower=state.followers[0]?.id||0;
@@ -192,6 +281,7 @@
     const protect=e.target.closest('[data-protect]');if(protect){send({kind:'protect',follower:Number(follower()?.id),item:Number(protect.dataset.protect),value:protect.checked});return;}
   });
   $('content').addEventListener('click',e=>{
+    const notifBulk=e.target.closest('[data-notif-bulk]');if(notifBulk){const enable=notifBulk.dataset.notifBulk==='true';send({kind:'notificationsBulk',enable});notify(enable?'All notifications enabled.':'All notifications disabled.');return;}
     const pickerToggle=e.target.closest('[data-picker-toggle]');if(pickerToggle){pickerOpen=!pickerOpen;render();return;}
     const pickerOption=e.target.closest('[data-picker-option]');if(pickerOption){selectedFollower=Number(pickerOption.dataset.pickerOption);selectedGear.clear();pickerOpen=false;render();return;}
     const gear=e.target.closest('[data-gear-card]');if(gear){if(e.target.closest('[data-protect-wrap]'))return;toggleGearCard(gear);return;}
