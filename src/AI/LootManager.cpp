@@ -532,8 +532,15 @@ namespace FollowerUnbound
 
     bool LootManager::ProcessContainerLoot(RE::TESObjectREFR* corpseRef)
     {
-        if (!corpseRef || !Settings::GetSingleton()->autoLootCorpses) return true;
-        if (IsQuestItem(corpseRef)) return true;
+        if (!corpseRef) return true;
+        if (!Settings::GetSingleton()->autoLootCorpses) {
+            logger::info("LootShare: skipped container {:08X} because autoLootCorpses setting is false.", corpseRef->GetFormID());
+            return true;
+        }
+        if (IsQuestItem(corpseRef)) {
+            logger::info("LootShare: skipped container {:08X} because it is a quest item / alias.", corpseRef->GetFormID());
+            return true;
+        }
         auto* player = RE::PlayerCharacter::GetSingleton();
         auto isPlayerOwner = [player](RE::TESForm* owner) {
             if (!player || !owner) return false;
@@ -558,6 +565,7 @@ namespace FollowerUnbound
         }
 
         auto followers = FollowerManager::GetSingleton()->GetActiveFollowers();
+        logger::info("LootShare: active followers retrieved: {} follower(s).", followers.size());
         struct LootRecipient
         {
             RE::Actor* actor;
@@ -569,13 +577,28 @@ namespace FollowerUnbound
         static std::unordered_set<RE::FormID> s_encumberedNotified;
         std::vector<LootRecipient> recipients;
         for (auto* follower : followers) {
-            auto profile = follower ? FollowerManager::GetSingleton()->GetProfile(follower->GetFormID()) : nullptr;
-            if (!follower || !profile || profile->isAnimal || !profile->preferences.allowLoot || follower->IsDead()) {
+            if (!follower) continue;
+            auto profile = FollowerManager::GetSingleton()->GetProfile(follower->GetFormID());
+            if (!profile) {
+                logger::info("LootShare: follower {:08X} ({}) has no profile.", follower->GetFormID(), follower->GetName());
+                continue;
+            }
+            if (profile->isAnimal) {
+                logger::info("LootShare: follower {} is an animal, skipping.", follower->GetName());
+                continue;
+            }
+            if (!profile->preferences.allowLoot) {
+                logger::info("LootShare: follower {} has allowLoot=false in preferences.", follower->GetName());
+                continue;
+            }
+            if (follower->IsDead()) {
+                logger::info("LootShare: follower {} is dead, skipping.", follower->GetName());
                 continue;
             }
             // If follower is in combat, only skip if the player is also actively in combat.
             // If the player has safely opened and looted the corpse, combat is effectively done.
             if (follower->IsInCombat() && player && player->IsInCombat()) {
+                logger::info("LootShare: follower {} and player are both in combat, skipping for now.", follower->GetName());
                 continue;
             }
             const float curW = follower->GetWeightInContainer();
