@@ -57,6 +57,8 @@ v0.2.1 güncellemesi; Prisma UI bildirim yönetimi, yağma hızlandırması ve d
 - **2 Saniye Gecikme:** Oyuncu bir cesedi kapattıktan tam 2 saniye sonra takipçiler o cesedi yağmalamaya başlar.
 - **Tek Tek Eşya Alma (Pacing):** Eşyalar toplu şekilde birden aktarılmak yerine 500ms aralıklarla tek tek toplanır (`kMaxTransfersPerTick = 1`).
 - **Kesintisiz Yağma Animasyonu:** Takipçiler eşya alırken cesedin başında diz çökerek arama animasyonu (`IdleSearchBody` / `IdleActivatePickLow`) yaparlar; o cesedin tüm eşyaları bitene kadar animasyon devam eder ve işlem tamamlandığında ayağa kalkarlar.
+- **Savaş Sonrası Otomatik Düşman Yağmalama (Auto-Loot Casualties):** Oyuncu savaştan sonra cesetleri tek tek açmasa bile, çatışma sırasında ölen ve oyuncuya/takipçilere düşman olan tüm düşman cesetleri (`CombatTracker` kayıtları) savaş bittiğinde otomatik olarak takipçilerin yağma sırasına eklenir.
+- **QuickLoot & Envanter Sayım Hatası Çözüldü:** Oyuncu cesetten 1 ok veya altın aldığında transferin "stale/bayat" sayılarak iptal edilmesi sorunu giderildi; transferler anlık kalan eşya sayısını (`ItemEvaluator::GetItemCount`) doğrudan kontrol edip transfer miktarını dinamik sınırlar (`std::min`). Ayrıca QuickLoot ile menü açılmadan alınan eşyalar da tetikleyici olarak algılanıp kalan eşyalar takipçilere devredilir.
 - **Düşman Hücre & Savaş Durumu Koruması:** Savaş bitimindeki gecikmeler veya hücre sahipliği kontrolleri sebebiyle düşman cesetlerinin atlanması/unutulması engellendi. Takipçiler o an meşgulse cesetler asla kuyruktan düşürülmez, uygun oldukları ilk anda yağmalanır.
 
 ### 11. Akıllı Toplu Özet Bildirim Sistemi (Batched / Digest Notifications)

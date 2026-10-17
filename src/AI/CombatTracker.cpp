@@ -76,7 +76,9 @@ namespace FollowerUnbound
 
         std::lock_guard lock(_mutex);
         _lastCombatActivity = std::chrono::steady_clock::now();
-        if (_hostileParticipants.contains(formID)) {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        const bool isHostile = _hostileParticipants.contains(formID) || (player && deadActor->IsHostileToActor(player));
+        if (isHostile) {
             _casualties.insert(formID);
         }
         if (_casualties.size() > kMaxCasualties) {
@@ -118,5 +120,13 @@ namespace FollowerUnbound
         }
         std::lock_guard lock(_mutex);
         return std::chrono::steady_clock::now() - _lastCombatActivity >= std::chrono::seconds(8);
+    }
+
+    std::vector<RE::FormID> CombatTracker::GetAndClearCasualties()
+    {
+        std::lock_guard lock(_mutex);
+        std::vector<RE::FormID> result(_casualties.begin(), _casualties.end());
+        _casualties.clear();
+        return result;
     }
 }

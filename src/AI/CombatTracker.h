@@ -43,6 +43,9 @@ namespace FollowerUnbound
         bool ShouldAutoLoot(RE::Actor* deadActor) const;
         bool IsLootSafe() const;
 
+        // Returns and clears the current list of dead hostile casualties ready for looting
+        std::vector<RE::FormID> GetAndClearCasualties();
+
     private:
         CombatTracker() = default;
 

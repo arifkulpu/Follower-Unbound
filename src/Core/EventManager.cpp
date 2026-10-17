@@ -205,6 +205,34 @@ namespace FollowerUnbound
             tracker->NotifyCombatEnd(actor);
         }
 
+        // Savaş tamamen bittiyse (oyuncu ve takipçiler savaşta değilse) savaş sırasında ölen düşmanları otomatik yağma kuyruğuna al
+        if (a_event->newState == RE::ACTOR_COMBAT_STATE::kNone && Settings::GetSingleton()->autoLootCorpses) {
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            if (player && !player->IsInCombat()) {
+                bool anyFollowerInCombat = false;
+                for (auto* f : manager->GetActiveFollowers()) {
+                    if (f && f->IsInCombat()) {
+                        anyFollowerInCombat = true;
+                        break;
+                    }
+                }
+                if (!anyFollowerInCombat) {
+                    auto casualties = tracker->GetAndClearCasualties();
+                    for (auto corpseID : casualties) {
+                        auto* corpseRef = RE::TESForm::LookupByID<RE::TESObjectREFR>(corpseID);
+                        if (!corpseRef) continue;
+                        if (player->GetPosition().GetDistance(corpseRef->GetPosition()) <= 3000.0f) {
+                            logger::info("EventManager: Post-combat casualty {:08X} queued for automatic follower looting.", corpseID);
+                            LootManager::GetSingleton()->QueuePlayerLootDistribution(corpseID);
+                        }
+                    }
+                    if (!casualties.empty()) {
+                        LootManager::GetSingleton()->ScheduleProcessing();
+                    }
+                }
+            }
+        }
+
         return RE::BSEventNotifyControl::kContinue;
     }
 
@@ -343,6 +371,19 @@ namespace FollowerUnbound
                     });
                 } else {
                     logger::warn("HarvestShare: SKSE task interface unavailable for {}.", ingredient->GetName());
+                }
+            }
+
+            // QuickLoot / Direct Loot detection:
+            // When the player loots an item directly from a dead NPC (or container)
+            // without necessarily opening the full ContainerMenu, queue the dead NPC/container
+            // for followers to inspect and share the remainder.
+            if (a_event->oldContainer != 0 && a_event->oldContainer != playerID && Settings::GetSingleton()->autoLootCorpses) {
+                auto* sourceRef = RE::TESForm::LookupByID<RE::TESObjectREFR>(a_event->oldContainer);
+                auto* sourceActor = sourceRef ? sourceRef->As<RE::Actor>() : nullptr;
+                if (sourceActor && sourceActor->IsDead()) {
+                    LootManager::GetSingleton()->QueuePlayerLootDistribution(sourceActor->GetFormID());
+                    LootManager::GetSingleton()->ScheduleProcessing();
                 }
             }
         }

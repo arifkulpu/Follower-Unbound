@@ -859,28 +859,23 @@ namespace FollowerUnbound
             // Play / sustain the body search loot animation on the follower
             AnimationManager::GetSingleton()->PlayLootAnimation(actor, source);
 
-            // Re-read only the requested stack immediately before moving it.
-            // The player may have reopened the source or another system may
-            // have changed its inventory since the distribution was queued.
-            logger::info("LootTransfer #{}: source count check started item={:08X} source={:08X} expected={}",
-                pt.transferID, pt.itemFormID, pt.sourceFormID, pt.count);
-            const auto currentStack = source->GetInventoryCounts(
-                [itemID = pt.itemFormID](RE::TESBoundObject& candidate) {
-                    return candidate.GetFormID() == itemID;
-                }, true);
-            const auto currentItem = currentStack.find(item);
-            logger::info("LootTransfer #{}: source count check finished; matching={} count={}",
-                pt.transferID, currentItem != currentStack.end(),
-                currentItem != currentStack.end() ? currentItem->second : 0);
-            if (currentItem == currentStack.end() || currentItem->second < pt.count) {
-                logger::info("LootTransfer #{}: skipped stale transfer for {} x{} from {:08X} (stack changed).",
-                    pt.transferID, item->GetName(), pt.count, pt.sourceFormID);
+            // Re-read available item count immediately before moving it.
+            // The player may have taken items or stack counts may have shifted.
+            const int32_t availableCount = ItemEvaluator::GetItemCount(source, item);
+            logger::info("LootTransfer #{}: source count check item={:08X} ({}) available={} requested={}",
+                pt.transferID, pt.itemFormID, item->GetName(), availableCount, pt.count);
+
+            if (availableCount <= 0) {
+                logger::info("LootTransfer #{}: skipped transfer for {} from {:08X} (item no longer present).",
+                    pt.transferID, item->GetName(), pt.sourceFormID);
                 continue;
             }
 
+            const int32_t transferCount = std::min(pt.count, availableCount);
+
             logger::info("LootTransfer #{}: RemoveItem started item={} x{} source={:08X} recipient={:08X}.",
-                pt.transferID, item->GetName(), pt.count, pt.sourceFormID, pt.actorFormID);
-            source->RemoveItem(item, pt.count, RE::ITEM_REMOVE_REASON::kRemove, nullptr, actor);
+                pt.transferID, item->GetName(), transferCount, pt.sourceFormID, pt.actorFormID);
+            source->RemoveItem(item, transferCount, RE::ITEM_REMOVE_REASON::kRemove, nullptr, actor);
             logger::info("LootTransfer #{}: RemoveItem returned.", pt.transferID);
 
             // Underwear.dll intentionally excludes followers from its own
