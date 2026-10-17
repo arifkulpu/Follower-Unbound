@@ -62,6 +62,7 @@ namespace FollowerUnbound
         // ── NOTIFICATION TOGGLES ──
         // Subsystem runs normally; only the HUD notification is suppressed when false.
         bool enableNotifications{ true };         // Master toggle for all notifications
+        uint32_t notificationMode{ 0 };           // 0: Batched / Digest (Toplu Özet), 1: Detailed (Ayrıntılı), 2: Critical Only (Sadece Kritik)
         bool notifyCombatHealthPotion{ true };    // "X drank a Health Potion!"
         bool notifyCombatMagickaPotion{ true };   // "X drank a Magicka Potion!"
         bool notifyCombatStaminaPotion{ true };   // "X drank a Stamina Potion!"

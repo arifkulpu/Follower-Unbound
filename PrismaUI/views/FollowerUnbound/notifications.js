@@ -1,6 +1,6 @@
 (() => {
   const host = document.getElementById('fu-notifications');
-  const maxVisible = 3;
+  const maxVisible = 2;
 
   const removeToast = (el) => {
     if (!el) return;

@@ -541,8 +541,7 @@ namespace FollowerUnbound
             FU_SET_BOOL("lootArrows", lootArrows) FU_SET_BOOL("lootPotions", lootPotions)
             FU_SET_BOOL("lootFood", lootFood) FU_SET_BOOL("lootIngredients", lootIngredients)
             FU_SET_BOOL("lootSoulGems", lootSoulGems) FU_SET_BOOL("lootMisc", lootMisc)
-            {}
-#undef FU_SET_BOOL
+            if (key == "notificationMode") s->notificationMode = std::clamp<uint32_t>(v.get<uint32_t>(), 0, 2);
             if (key == "lootDelay") s->lootDelaySeconds = std::clamp(v.get<float>(), 0.0f, 60.0f);
             if (key == "equipmentUpgradeChance") s->equipmentUpgradeChance = std::clamp<uint32_t>(v.get<uint32_t>(), 1, 100);
             s->Save();
@@ -640,6 +639,7 @@ namespace FollowerUnbound
             {"lootArrows",settings->lootArrows},{"lootPotions",settings->lootPotions},
             {"lootFood",settings->lootFood},{"lootIngredients",settings->lootIngredients},
             {"lootSoulGems",settings->lootSoulGems},{"lootMisc",settings->lootMisc},
+            {"notificationMode",settings->notificationMode},
             {"lootDelay",settings->lootDelaySeconds},{"equipmentUpgradeChance",settings->equipmentUpgradeChance}
         };
         state["followers"] = nlohmann::json::array();

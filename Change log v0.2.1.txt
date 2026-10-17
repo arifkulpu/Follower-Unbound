@@ -59,6 +59,19 @@ v0.2.1 güncellemesi; Prisma UI bildirim yönetimi, yağma hızlandırması ve d
 - **Kesintisiz Yağma Animasyonu:** Takipçiler eşya alırken cesedin başında diz çökerek arama animasyonu (`IdleSearchBody` / `IdleActivatePickLow`) yaparlar; o cesedin tüm eşyaları bitene kadar animasyon devam eder ve işlem tamamlandığında ayağa kalkarlar.
 - **Düşman Hücre & Savaş Durumu Koruması:** Savaş bitimindeki gecikmeler veya hücre sahipliği kontrolleri sebebiyle düşman cesetlerinin atlanması/unutulması engellendi. Takipçiler o an meşgulse cesetler asla kuyruktan düşürülmez, uygun oldukları ilk anda yağmalanır.
 
+### 11. Akıllı Toplu Özet Bildirim Sistemi (Batched / Digest Notifications)
+- **Toplu Özetleme (Batch Aggregator):** Hızlı ve art arda gerçekleşen eylemler (yağma, yemek/içecek tüketimi, madencilik/odun paylaşımı, ticaret) ekranı ve arayüz kuyruğunu meşgul etmeden 2.2 saniyelik zaman pencerelerinde birleştirilir:
+  - **Yağma:** Onlarca ayrı mesaj yerine tek satırlık takım özeti: `"Party Loot: 6 items & 120 gold collected (Lydia, Inigo)."`
+  - **İhtiyaçlar:** Her lokma ve yudum için ayrı bildirim yerine: `"Companions rested and replenished supplies."`
+  - **Ticaret:** Her parça satış için ayrı mesaj yerine: `"Lydia finished trading: sold 4 item(s), bought 2 item(s)."`
+  - **Kaynak Paylaşımı:** Maden veya odun vuruşları için tek bildirim: `"Ore mined & shared with companions."`
+- **Kritik Olay Koruması:** Savaş içi can iksiri kullanımı, taşıma kapasitesi dolma uyarısı ve ekipman yükseltme bildirimleri asla geciktirilmez; anında ekrana iletilir.
+- **Bildirim Modu Seçimi (Prisma UI & Settings):**
+  - **Batched (Toplu Özet - Varsayılan):** Tüm rutin olayları özetler, çökme ve ekran kalabalığını tamamen önler.
+  - **Detailed (Ayrıntılı):** Her eylemi tek tek listeler.
+  - **Critical Only (Sadece Kritik):** Rutin bildirimleri kapatır, sadece can iksiri ve acil durum uyarılarını gösterir.
+- **Arayüz Koruması:** Ekranda aynı anda en fazla 2 bildirim gösterilecek şekilde sınırlandırıldı (`maxVisible = 2`).
+
 ---
 
 ## 🔧 Teknik İyileştirmeler & Derleme

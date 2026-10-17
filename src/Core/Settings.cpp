@@ -111,6 +111,7 @@ namespace FollowerUnbound
 
         // ── NOTIFICATION TOGGLES ──
         enableNotifications       = readBool("Notifications", "EnableNotifications",       true);
+        notificationMode          = static_cast<uint32_t>(std::clamp(readInt("Notifications", "NotificationMode", 0), 0, 2));
         notifyCombatHealthPotion  = readBool("Notifications", "NotifyCombatHealthPotion",  true);
         notifyCombatMagickaPotion = readBool("Notifications", "NotifyCombatMagickaPotion", true);
         notifyCombatStaminaPotion = readBool("Notifications", "NotifyCombatStaminaPotion", true);
@@ -214,6 +215,7 @@ namespace FollowerUnbound
 
         // ── NOTIFICATION TOGGLES ──
         writeBool("Notifications", "EnableNotifications",       enableNotifications);
+        writeInt( "Notifications", "NotificationMode",          static_cast<int>(notificationMode));
         writeBool("Notifications", "NotifyCombatHealthPotion",  notifyCombatHealthPotion);
         writeBool("Notifications", "NotifyCombatMagickaPotion", notifyCombatMagickaPotion);
         writeBool("Notifications", "NotifyCombatStaminaPotion", notifyCombatStaminaPotion);
