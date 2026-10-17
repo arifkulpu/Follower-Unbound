@@ -647,12 +647,18 @@ namespace FollowerUnbound
         for (const auto& [id, p] : FollowerManager::GetSingleton()->GetProfilesSnapshot()) {
             auto* actor = RE::TESForm::LookupByID<RE::Actor>(id);
             if (!actor) continue;
+            const auto invGold = gold ? ItemEvaluator::GetItemCount(actor, gold) : 0;
+            const uint32_t totalGold = static_cast<uint32_t>(std::max(0, invGold));
+            const uint32_t savedGold = p.preferences.savingsEnabled ? std::min(p.preferences.savedGold, totalGold) : 0;
+            const uint32_t spendableGold = totalGold >= savedGold ? (totalGold - savedGold) : 0;
             nlohmann::json f = {
                 {"id",id},{"name",p.name},{"animal",p.isAnimal},{"role",p.classBoundDisplayName},
                 {"portraitRace",GetPortraitRaceKey(actor)},
                 {"portraitFemale",actor->GetActorBase() && actor->GetActorBase()->GetSex() == RE::SEX::kFemale},
                 {"hunger",p.needs.hunger},{"thirst",p.needs.thirst},{"fatigue",p.needs.fatigue},
-                {"gold",gold ? ItemEvaluator::GetItemCount(actor, gold) : 0},
+                {"gold",totalGold},
+                {"savedGold",savedGold},
+                {"spendableGold",spendableGold},
                 {"carry",actor->GetWeightInContainer()},{"capacity",actor->GetTotalCarryWeight()}
             };
             AddPreferences(f["prefs"], p.preferences);

@@ -47,6 +47,11 @@ v0.2.1 güncellemesi; Prisma UI bildirim yönetimi, yağma hızlandırması ve d
   - Oyuncunun kendi kazandığı paradan **kesinti yapılmaz** (oyuncu %100'ünü alır).
   - Alınan miktar aktif takipçi sayısına bölünerek her birine eşit oranda bonus altın olarak çantalarına ve ekonomi profillerine eklenir.
 
+### 9. Prisma UI Genel Bakış (Overview): Harcanabilir & Saklanan Altın Gösterimi
+- Takipçilerin birikim hedefi (`savingsTarget`) ve sakladığı para (`savedGold`) ile harcayabileceği serbest bütçe (`spendableGold`) Prisma UI'da net bir şekilde ayrıştırıldı:
+  - **Genel İstatistikler Bölümü:** Parti toplam altını kartında harcanabilir ve saklanan para alt başlık olarak gösterildi; ayrıca genel bakışa doğrudan **"Spendable gold" (Harcanabilir Altın)** istatistik kartı eklendi.
+  - **Takipçi Kartları:** Her takipçinin kartının altında harcanabilir bütçesi (`X gold spendable`), birikimi varsa toplam altını (`(Y total)`) ve fare üzerine getirildiğinde detaylı ipucu (`Spendable: X | Saved: Z | Total: Y`) gösterildi.
+
 ---
 
 ## 🔧 Teknik İyileştirmeler & Derleme
