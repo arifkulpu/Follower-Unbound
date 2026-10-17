@@ -453,8 +453,20 @@ namespace FollowerUnbound
         if (containerID == 0 || !Settings::GetSingleton()->autoLootCorpses) return;
         EquipPrompt::LootWorkStarted();
         std::lock_guard lock(_lootMutex);
+        // Avoid duplicate if the same corpse is already at the end of the queue
+        if (!_playerLootRequests.empty() && _playerLootRequests.back().formID == containerID) return;
+
+        auto now = std::chrono::steady_clock::now();
+        // 2-second initial delay after inspecting/closing a corpse before followers start looting it
+        auto startAt = now + std::chrono::milliseconds(2000);
+        // If there are previous corpses queued, chain them sequentially so they are looted in order
+        if (!_playerLootRequests.empty() && _playerLootRequests.back().availableAt > now) {
+            startAt = std::max(startAt, _playerLootRequests.back().availableAt + std::chrono::milliseconds(1500));
+        }
+
         if (_playerLootRequests.size() >= 32) _playerLootRequests.pop_front();
-        _playerLootRequests.push_back(containerID);
+        _playerLootRequests.push_back({ containerID, startAt });
+        logger::info("LootShare: queued container {:08X} (queue size={}).", containerID, _playerLootRequests.size());
     }
 
     bool LootManager::HasPendingLootWork()
@@ -484,19 +496,44 @@ namespace FollowerUnbound
         {
             std::lock_guard lock(_lootMutex);
             if (_playerLootRequests.empty()) return;
-            containerID = _playerLootRequests.front();
-            _playerLootRequests.pop_front();
+            const auto now = std::chrono::steady_clock::now();
+            if (now < _playerLootRequests.front().availableAt) {
+                return; // Wait for the 2-second delay before followers begin looting
+            }
+            containerID = _playerLootRequests.front().formID;
         }
+
         logger::info("LootShare: processing closed container {:08X}.", containerID);
         auto* container = RE::TESForm::LookupByID<RE::TESObjectREFR>(containerID);
         logger::info("LootShare: container lookup {:08X} {}.", containerID, container ? "succeeded" : "failed");
-        if (container) ProcessContainerLoot(container);
+        if (!container) {
+            // Container invalid or despawned, pop it
+            std::lock_guard lock(_lootMutex);
+            if (!_playerLootRequests.empty() && _playerLootRequests.front().formID == containerID) {
+                _playerLootRequests.pop_front();
+            }
+            return;
+        }
+
+        const bool processed = ProcessContainerLoot(container);
+        if (processed) {
+            std::lock_guard lock(_lootMutex);
+            if (!_playerLootRequests.empty() && _playerLootRequests.front().formID == containerID) {
+                _playerLootRequests.pop_front();
+            }
+        } else {
+            // Followers were temporarily ineligible (e.g. still concluding combat); do not drop!
+            std::lock_guard lock(_lootMutex);
+            if (!_playerLootRequests.empty() && _playerLootRequests.front().formID == containerID) {
+                _playerLootRequests.front().availableAt = std::chrono::steady_clock::now() + std::chrono::milliseconds(1000);
+            }
+        }
     }
 
-    void LootManager::ProcessContainerLoot(RE::TESObjectREFR* corpseRef)
+    bool LootManager::ProcessContainerLoot(RE::TESObjectREFR* corpseRef)
     {
-        if (!corpseRef || !Settings::GetSingleton()->autoLootCorpses) return;
-        if (IsQuestItem(corpseRef)) return;
+        if (!corpseRef || !Settings::GetSingleton()->autoLootCorpses) return true;
+        if (IsQuestItem(corpseRef)) return true;
         auto* player = RE::PlayerCharacter::GetSingleton();
         auto isPlayerOwner = [player](RE::TESForm* owner) {
             if (!player || !owner) return false;
@@ -504,15 +541,22 @@ namespace FollowerUnbound
             auto* faction = owner->As<RE::TESFaction>();
             return faction && player->IsInFaction(faction);
         };
-        if (isPlayerOwner(corpseRef->GetOwner()) || isPlayerOwner(corpseRef->GetFactionOwner())) {
-            logger::info("LootShare: skipped explicitly player-owned container {:08X}.", corpseRef->GetFormID());
-            return;
-        }
+
         auto* cell = corpseRef->GetParentCell();
-        if (cell && (isPlayerOwner(cell->GetOwner()) || isPlayerOwner(cell->GetFactionOwner()))) {
-            logger::info("LootShare: skipped container {:08X} in a player-owned cell.", corpseRef->GetFormID());
-            return;
+
+        // For dead actors/NPCs, NEVER skip based on cell ownership! They are dead enemies in the world.
+        auto* corpseActor = corpseRef->As<RE::Actor>();
+        if (!corpseActor) {
+            if (isPlayerOwner(corpseRef->GetOwner()) || isPlayerOwner(corpseRef->GetFactionOwner())) {
+                logger::info("LootShare: skipped explicitly player-owned container {:08X}.", corpseRef->GetFormID());
+                return true;
+            }
+            if (cell && (isPlayerOwner(cell->GetOwner()) || isPlayerOwner(cell->GetFactionOwner()))) {
+                logger::info("LootShare: skipped container {:08X} in a player-owned cell.", corpseRef->GetFormID());
+                return true;
+            }
         }
+
         auto followers = FollowerManager::GetSingleton()->GetActiveFollowers();
         struct LootRecipient
         {
@@ -526,8 +570,12 @@ namespace FollowerUnbound
         std::vector<LootRecipient> recipients;
         for (auto* follower : followers) {
             auto profile = follower ? FollowerManager::GetSingleton()->GetProfile(follower->GetFormID()) : nullptr;
-            if (!follower || !profile || profile->isAnimal || !profile->preferences.allowLoot ||
-                follower->IsDead() || follower->IsInCombat()) {
+            if (!follower || !profile || profile->isAnimal || !profile->preferences.allowLoot || follower->IsDead()) {
+                continue;
+            }
+            // If follower is in combat, only skip if the player is also actively in combat.
+            // If the player has safely opened and looted the corpse, combat is effectively done.
+            if (follower->IsInCombat() && player && player->IsInCombat()) {
                 continue;
             }
             const float curW = follower->GetWeightInContainer();
@@ -541,8 +589,8 @@ namespace FollowerUnbound
             return a.actor->GetFormID() < b.actor->GetFormID();
         });
         if (recipients.empty()) {
-            logger::info("LootShare: no eligible active followers for container {:08X}.", corpseRef->GetFormID());
-            return;
+            logger::info("LootShare: no eligible active followers currently for container {:08X}; will retry.", corpseRef->GetFormID());
+            return false;
         }
 
         logger::info("LootShare: reading inventory for container {:08X}.", corpseRef->GetFormID());
@@ -621,6 +669,7 @@ namespace FollowerUnbound
             transfer.sourceFormID = corpseRef->GetFormID();
             transfer.count = count;
             transfer.isGold = gold;
+            transfer.readyAt = std::chrono::steady_clock::now() + (std::chrono::milliseconds(500) * queuedItems);
             // Auto-equip decisions are queued by EquipPrompt and displayed in
             // PrismaUI after the complete container distribution finishes.
             transfer.autoEquip = !gold && (item->As<RE::TESObjectWEAP>() || item->As<RE::TESObjectARMO>());
@@ -763,6 +812,7 @@ namespace FollowerUnbound
         _nextRecipientOffset = (_nextRecipientOffset + 1) % n;
         logger::info("LootShare: queued {} item transfers from container {:08X}; remainder stays behind.",
             queuedItems, corpseRef->GetFormID());
+        return true;
     }
     void LootManager::FlushPendingTransfers()
     {
@@ -805,6 +855,9 @@ namespace FollowerUnbound
                 logger::warn("LootTransfer #{}: skipped because a form lookup failed.", pt.transferID);
                 continue;
             }
+
+            // Play / sustain the body search loot animation on the follower
+            AnimationManager::GetSingleton()->PlayLootAnimation(actor, source);
 
             // Re-read only the requested stack immediately before moving it.
             // The player may have reopened the source or another system may
@@ -859,10 +912,17 @@ namespace FollowerUnbound
         {
             std::lock_guard lock(_transferMutex);
             logger::info("LootTransfer: transfer queue check; pending={}.", _pendingTransfers.size());
-            if (_pendingTransfers.empty() && settings->notifyLoot) {
-                logger::info("LootTransfer: loot notification flush started.");
-                notifier->FlushLootNotifications();
-                logger::info("LootTransfer: loot notification flush returned.");
+            if (_pendingTransfers.empty()) {
+                if (settings->notifyLoot) {
+                    logger::info("LootTransfer: loot notification flush started.");
+                    notifier->FlushLootNotifications();
+                    logger::info("LootTransfer: loot notification flush returned.");
+                }
+                for (auto* f : FollowerManager::GetSingleton()->GetActiveFollowers()) {
+                    if (f) {
+                        AnimationManager::GetSingleton()->SheatheWeapon(f);
+                    }
+                }
             }
         }
         logger::info("LootTransfer: isolated task finished.");

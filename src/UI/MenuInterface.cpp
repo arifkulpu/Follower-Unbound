@@ -1544,6 +1544,10 @@ namespace FollowerUnbound
         // Bildirim kuyruğunu işle: en fazla 1 mesaj / 2 saniye (yığılma önlenir)
         NotificationManager::GetSingleton()->Update();
 
+        if (LootManager::GetSingleton()->HasPendingLootWork()) {
+            LootManager::GetSingleton()->ScheduleProcessing();
+        }
+
         // 1. Her saniye: İhtiyaç seansındaki veya aç/susuz takipçilerin tüketimlerini dene
         //    + savaş bitmiş ölüleri otomatik yağlama kuyruğunu işle
         if (std::chrono::duration<float>(now - lastConsumptionTime).count() >= 1.0f) {

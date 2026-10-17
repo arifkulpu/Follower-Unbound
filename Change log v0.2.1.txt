@@ -52,6 +52,13 @@ v0.2.1 güncellemesi; Prisma UI bildirim yönetimi, yağma hızlandırması ve d
   - **Genel İstatistikler Bölümü:** Parti toplam altını kartında harcanabilir ve saklanan para alt başlık olarak gösterildi; ayrıca genel bakışa doğrudan **"Spendable gold" (Harcanabilir Altın)** istatistik kartı eklendi.
   - **Takipçi Kartları:** Her takipçinin kartının altında harcanabilir bütçesi (`X gold spendable`), birikimi varsa toplam altını (`(Y total)`) ve fare üzerine getirildiğinde detaylı ipucu (`Spendable: X | Saved: Z | Total: Y`) gösterildi.
 
+### 10. Sıralı Ceset Yağmalama Kuyruğu, Doğal Zamanlama & Yağma Animasyonu
+- **Sıralı Kuyruk & Hafıza (Sequential Queue):** Oyuncu arka arkaya birden çok cesedi (örneğin 5 farklı ölü NPC) hızlıca inceleyip kapatsa dahi, tüm cesetler sırayla hafızaya alınır ve takipçiler bunları sırayla (sıra sıra) yağmalar.
+- **2 Saniye Gecikme:** Oyuncu bir cesedi kapattıktan tam 2 saniye sonra takipçiler o cesedi yağmalamaya başlar.
+- **Tek Tek Eşya Alma (Pacing):** Eşyalar toplu şekilde birden aktarılmak yerine 500ms aralıklarla tek tek toplanır (`kMaxTransfersPerTick = 1`).
+- **Kesintisiz Yağma Animasyonu:** Takipçiler eşya alırken cesedin başında diz çökerek arama animasyonu (`IdleSearchBody` / `IdleActivatePickLow`) yaparlar; o cesedin tüm eşyaları bitene kadar animasyon devam eder ve işlem tamamlandığında ayağa kalkarlar.
+- **Düşman Hücre & Savaş Durumu Koruması:** Savaş bitimindeki gecikmeler veya hücre sahipliği kontrolleri sebebiyle düşman cesetlerinin atlanması/unutulması engellendi. Takipçiler o an meşgulse cesetler asla kuyruktan düşürülmez, uygun oldukları ilk anda yağmalanır.
+
 ---
 
 ## 🔧 Teknik İyileştirmeler & Derleme

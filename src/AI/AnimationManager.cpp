@@ -127,6 +127,10 @@ namespace FollowerUnbound
             return false;
         }
 
+        if (auto* actorState = actor->AsActorState(); actorState && actorState->IsWeaponDrawn()) {
+            SheatheWeapon(actor);
+        }
+
         // Immersive Interactions uses the vanilla IdleSearchBody idle directly
         // (its Papyrus script calls PlayerRef.PlayIdle(idleSearchBody)). Sending
         // generic pickup graph events can be accepted without showing an animation.

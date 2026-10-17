@@ -14,7 +14,8 @@ namespace FollowerUnbound
         }
 
         // Reads a container's remaining inventory and queues balanced transfers.
-        void ProcessContainerLoot(RE::TESObjectREFR* containerRef);
+        // Returns true if processed/looted (or skipped/empty), false if followers are not currently eligible (retry later).
+        bool ProcessContainerLoot(RE::TESObjectREFR* containerRef);
 
         // Called only after the player closes a corpse's container menu.
         void QueuePlayerLootDistribution(RE::FormID corpseID);
@@ -46,14 +47,19 @@ namespace FollowerUnbound
             std::string followerName;
             std::string itemName;
         };
-        static constexpr int kMaxTransfersPerTick = 6;
+        static constexpr int kMaxTransfersPerTick = 1;
 
         LootManager() = default;
 
         static bool IsLootableItem(RE::TESBoundObject* item);
         static bool IsQuestItem(RE::TESObjectREFR* ref);
 
-        std::deque<RE::FormID> _playerLootRequests;
+        struct QueuedCorpse
+        {
+            RE::FormID formID{ 0 };
+            std::chrono::steady_clock::time_point availableAt{};
+        };
+        std::deque<QueuedCorpse> _playerLootRequests;
         size_t _nextRecipientOffset{ 0 };
         std::mutex _lootMutex;
 
