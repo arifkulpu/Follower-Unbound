@@ -448,7 +448,7 @@ namespace FollowerUnbound
         return false;
     }
 
-    void LootManager::QueuePlayerLootDistribution(RE::FormID containerID)
+    void LootManager::QueuePlayerLootDistribution(RE::FormID containerID, uint32_t delayMs)
     {
         if (containerID == 0 || !Settings::GetSingleton()->autoLootCorpses) return;
         EquipPrompt::LootWorkStarted();
@@ -457,8 +457,8 @@ namespace FollowerUnbound
         if (!_playerLootRequests.empty() && _playerLootRequests.back().formID == containerID) return;
 
         auto now = std::chrono::steady_clock::now();
-        // 2-second initial delay after inspecting/closing a corpse before followers start looting it
-        auto startAt = now + std::chrono::milliseconds(2000);
+        // Initial delay before followers start looting it
+        auto startAt = now + std::chrono::milliseconds(delayMs);
         // If there are previous corpses queued, chain them sequentially so they are looted in order
         if (!_playerLootRequests.empty() && _playerLootRequests.back().availableAt > now) {
             startAt = std::max(startAt, _playerLootRequests.back().availableAt + std::chrono::milliseconds(1500));
@@ -466,7 +466,8 @@ namespace FollowerUnbound
 
         if (_playerLootRequests.size() >= 32) _playerLootRequests.pop_front();
         _playerLootRequests.push_back({ containerID, startAt });
-        logger::info("LootShare: queued container {:08X} (queue size={}).", containerID, _playerLootRequests.size());
+        logger::info("LootShare: queued container {:08X} (queue size={}, delay={}ms).",
+            containerID, _playerLootRequests.size(), delayMs);
     }
 
     bool LootManager::HasPendingLootWork()
@@ -694,7 +695,8 @@ namespace FollowerUnbound
             transfer.sourceFormID = corpseRef->GetFormID();
             transfer.count = count;
             transfer.isGold = gold;
-            transfer.readyAt = std::chrono::steady_clock::now() + (std::chrono::milliseconds(500) * queuedItems);
+            // 1-second interval between items so each follower has time to kneel and play the search animation
+            transfer.readyAt = std::chrono::steady_clock::now() + (std::chrono::milliseconds(1000) * queuedItems);
             // Auto-equip decisions are queued by EquipPrompt and displayed in
             // PrismaUI after the complete container distribution finishes.
             transfer.autoEquip = !gold && (item->As<RE::TESObjectWEAP>() || item->As<RE::TESObjectARMO>());

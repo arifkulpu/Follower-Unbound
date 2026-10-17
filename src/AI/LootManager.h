@@ -17,8 +17,8 @@ namespace FollowerUnbound
         // Returns true if processed/looted (or skipped/empty), false if followers are not currently eligible (retry later).
         bool ProcessContainerLoot(RE::TESObjectREFR* containerRef);
 
-        // Called only after the player closes a corpse's container menu.
-        void QueuePlayerLootDistribution(RE::FormID corpseID);
+        // Called after the player closes a corpse's container menu or post-combat auto loot.
+        void QueuePlayerLootDistribution(RE::FormID corpseID, uint32_t delayMs = 2000);
         void ProcessPlayerLootDistributions();
 
         // True while a player-requested distribution or item transfer remains.

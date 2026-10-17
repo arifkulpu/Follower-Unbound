@@ -212,12 +212,14 @@ namespace FollowerUnbound
                 }
                 if (!anyFollowerInCombat) {
                     auto casualties = tracker->GetAndClearCasualties();
+                    // Savaş sonrası oyuncunun cesetleri önce kendisinin incelemesi için 8 saniyelik doğal bekleme süresi
+                    const uint32_t postCombatDelayMs = 8000;
                     for (auto corpseID : casualties) {
                         auto* corpseRef = RE::TESForm::LookupByID<RE::TESObjectREFR>(corpseID);
                         if (!corpseRef) continue;
                         if (player->GetPosition().GetDistance(corpseRef->GetPosition()) <= 3000.0f) {
-                            logger::info("EventManager: Post-combat casualty {:08X} queued for automatic follower looting.", corpseID);
-                            LootManager::GetSingleton()->QueuePlayerLootDistribution(corpseID);
+                            logger::info("EventManager: Post-combat casualty {:08X} queued for follower looting (delayed {}ms).", corpseID, postCombatDelayMs);
+                            LootManager::GetSingleton()->QueuePlayerLootDistribution(corpseID, postCombatDelayMs);
                         }
                     }
                     if (!casualties.empty()) {
