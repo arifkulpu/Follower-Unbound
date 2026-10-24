@@ -98,10 +98,7 @@ namespace FollowerUnbound
             logger::info("Registered TESDeathEvent sink.");
         }
 
-        if (auto* inputMgr = RE::BSInputDeviceManager::GetSingleton()) {
-            inputMgr->AddEventSink(this);
-            logger::info("Registered direct BSInputDeviceManager InputEvent sink.");
-        }
+        // InputEvent is handled exclusively via SKSEMenuFramework in PrismaUIManager (matching ClassBound)
     }
 
     RE::BSEventNotifyControl EventManager::ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*)
@@ -518,10 +515,4 @@ namespace FollowerUnbound
         return RE::BSEventNotifyControl::kContinue;
     }
 
-    RE::BSEventNotifyControl EventManager::ProcessEvent(RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>*)
-    {
-        if (!a_event || !*a_event) return RE::BSEventNotifyControl::kContinue;
-        PrismaUIManager::GetSingleton()->HandleInputEvent(*a_event);
-        return RE::BSEventNotifyControl::kContinue;
-    }
 }

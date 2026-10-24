@@ -113,14 +113,12 @@ namespace FollowerUnbound
             // Eğer aktör bleedout'a düştüyse animasyonu derhal sonlandır, bleedout davranışına izin ver!
             if (inBleedout || since >= 1.5f) {
                 if (!inBleedout) {
-                    follower->NotifyAnimationGraph("IdleForceDefaultState");
-                    if (!state || !state->IsWeaponDrawn()) {
+                                        if (!state || !state->IsWeaponDrawn()) {
                         follower->DrawWeaponMagicHands(true);
                     }
                     follower->EvaluatePackage();
                 } else {
-                    follower->NotifyAnimationGraph("IdleForceDefaultState");
-                    follower->NotifyAnimationGraph("BleedOutStart");
+                                        follower->NotifyAnimationGraph("BleedOutStart");
                 }
                 _combatDrinkAnimTime.erase(it);
                 if (inBleedout) return;

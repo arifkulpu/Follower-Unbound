@@ -324,85 +324,79 @@ namespace FollowerUnbound
 
     bool __stdcall PrismaUIManager::OnFrameworkInput(RE::InputEvent* event)
     {
-        static std::chrono::steady_clock::time_point s_lastMenuToggleTime{};
-        auto now = std::chrono::steady_clock::now();
-
-        bool requested = false;
+        bool openRequested = false;
+        bool closeRequested = false;
         for (auto* current = event; current; current = current->next) {
             if (current->GetDevice() != RE::INPUT_DEVICE::kKeyboard) continue;
             auto* button = current->AsButtonEvent();
             if (!button) continue;
+
             const auto key = button->GetIDCode();
             auto* self = GetSingleton();
-            if (key == RE::BSKeyboardDevice::Keys::kEscape && (button->IsPressed() || button->IsDown()) &&
+            if (key == RE::BSKeyboardDevice::Keys::kEscape && button->IsDown() &&
                 self->IsAvailable() && !self->_api->IsHidden(self->_view)) {
-                // PrismaUI may not deliver keyboard events to its JS document
-                // while another SKSE menu owns focus. Handle Escape natively so
-                // the overlay can always be dismissed without trapping input.
-                if (auto* tasks = SKSE::GetTaskInterface()) {
-                    tasks->AddTask([]() { OnClose(nullptr); });
-                    return true;
-                }
-            } else if (key == RE::BSKeyboardDevice::Keys::kLeftShift) {
+                closeRequested = true;
+                continue;
+            }
+            if (key == RE::BSKeyboardDevice::Keys::kLeftShift) {
                 if (button->IsUp()) g_leftShiftDown.store(false, std::memory_order_relaxed);
-                else if (button->IsDown() || button->IsPressed()) g_leftShiftDown.store(true, std::memory_order_relaxed);
-            } else if (key == RE::BSKeyboardDevice::Keys::kRightShift) {
+                else if (button->IsPressed()) g_leftShiftDown.store(true, std::memory_order_relaxed);
+                continue;
+            }
+            if (key == RE::BSKeyboardDevice::Keys::kRightShift) {
                 if (button->IsUp()) g_rightShiftDown.store(false, std::memory_order_relaxed);
-                else if (button->IsDown() || button->IsPressed()) g_rightShiftDown.store(true, std::memory_order_relaxed);
-            } else if (key == RE::BSKeyboardDevice::Keys::kLeftControl) {
+                else if (button->IsPressed()) g_rightShiftDown.store(true, std::memory_order_relaxed);
+                continue;
+            }
+            if (key == RE::BSKeyboardDevice::Keys::kLeftControl) {
                 if (button->IsUp()) g_leftCtrlDown.store(false, std::memory_order_relaxed);
-                else if (button->IsDown() || button->IsPressed()) g_leftCtrlDown.store(true, std::memory_order_relaxed);
-            } else if (key == RE::BSKeyboardDevice::Keys::kRightControl) {
+                else if (button->IsPressed()) g_leftCtrlDown.store(true, std::memory_order_relaxed);
+                continue;
+            }
+            if (key == RE::BSKeyboardDevice::Keys::kRightControl) {
                 if (button->IsUp()) g_rightCtrlDown.store(false, std::memory_order_relaxed);
-                else if (button->IsDown() || button->IsPressed()) g_rightCtrlDown.store(true, std::memory_order_relaxed);
-            } else if (key == RE::BSKeyboardDevice::Keys::kLeftAlt) {
+                else if (button->IsPressed()) g_rightCtrlDown.store(true, std::memory_order_relaxed);
+                continue;
+            }
+            if (key == RE::BSKeyboardDevice::Keys::kLeftAlt) {
                 if (button->IsUp()) g_leftAltDown.store(false, std::memory_order_relaxed);
-                else if (button->IsDown() || button->IsPressed()) g_leftAltDown.store(true, std::memory_order_relaxed);
-            } else if (key == RE::BSKeyboardDevice::Keys::kRightAlt) {
+                else if (button->IsPressed()) g_leftAltDown.store(true, std::memory_order_relaxed);
+                continue;
+            }
+            if (key == RE::BSKeyboardDevice::Keys::kRightAlt) {
                 if (button->IsUp()) g_rightAltDown.store(false, std::memory_order_relaxed);
-                else if (button->IsDown() || button->IsPressed()) g_rightAltDown.store(true, std::memory_order_relaxed);
-            } else if (button->IsDown() || button->IsPressed()) {
-                // Hızlı çift basma (debounce) koruması: 350 milisaniye
-                if (std::chrono::duration<float>(now - s_lastMenuToggleTime).count() < 0.35f) {
-                    continue;
-                }
+                else if (button->IsPressed()) g_rightAltDown.store(true, std::memory_order_relaxed);
+                continue;
+            }
 
-                auto* settings = Settings::GetSingleton();
-                const uint32_t hotkey   = settings->menuHotkey;
-                const uint32_t modifier = settings->menuHotkeyModifier;
+            auto* settings = Settings::GetSingleton();
+            const uint32_t targetKey = settings->menuHotkey;
+            const uint32_t targetMod = settings->menuHotkeyModifier; // 0=None, 1=Shift, 2=Ctrl, 3=Alt
 
-                // Donanım düzeyinde (GetAsyncKeyState) ve SKSE olay düzeyinde hibrit modifier kontrolü
-                const bool shiftPressed = g_leftShiftDown.load(std::memory_order_relaxed) ||
-                                          g_rightShiftDown.load(std::memory_order_relaxed) ||
-                                          ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0);
+            bool modSatisfied = false;
+            if (targetMod == 0) {
+                modSatisfied = true;
+            } else if (targetMod == 1) {
+                modSatisfied = (g_leftShiftDown.load(std::memory_order_relaxed) || g_rightShiftDown.load(std::memory_order_relaxed));
+            } else if (targetMod == 2) {
+                modSatisfied = (g_leftCtrlDown.load(std::memory_order_relaxed) || g_rightCtrlDown.load(std::memory_order_relaxed));
+            } else if (targetMod == 3) {
+                modSatisfied = (g_leftAltDown.load(std::memory_order_relaxed) || g_rightAltDown.load(std::memory_order_relaxed));
+            }
 
-                const bool ctrlPressed  = g_leftCtrlDown.load(std::memory_order_relaxed) ||
-                                          g_rightCtrlDown.load(std::memory_order_relaxed) ||
-                                          ((GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0);
-
-                const bool altPressed   = g_leftAltDown.load(std::memory_order_relaxed) ||
-                                          g_rightAltDown.load(std::memory_order_relaxed) ||
-                                          ((GetAsyncKeyState(VK_MENU) & 0x8000) != 0);
-
-                const bool wantShift = (modifier & 1) != 0;
-                const bool wantCtrl  = (modifier & 2) != 0;
-                const bool wantAlt   = (modifier & 4) != 0;
-
-                // 1. Ayarlanan kısayol kontrolü
-                if (key == hotkey && shiftPressed == wantShift && ctrlPressed == wantCtrl && altPressed == wantAlt) {
-                    s_lastMenuToggleTime = now;
-                    requested = true;
-                    logger::info("PrismaUI shortcut triggered: key=0x{:X}, mod={}", key, modifier);
-                }
-                // 2. Daima çalışan acil durum yedeği (Shift + I)
-                else if (key == RE::BSKeyboardDevice::Keys::kI && shiftPressed && !ctrlPressed && !altPressed) {
-                    s_lastMenuToggleTime = now;
-                    requested = true;
-                    logger::info("PrismaUI fallback shortcut triggered: Shift + I");
-                }
+            if (key == targetKey && button->IsDown() && modSatisfied) {
+                openRequested = true;
             }
         }
-        if (!requested) return false;
+
+        if (closeRequested) {
+            if (auto* tasks = SKSE::GetTaskInterface()) {
+                tasks->AddTask([]() { OnClose(nullptr); });
+                return true;
+            }
+            return false;
+        }
+        if (!openRequested) return false;
         if (auto* tasks = SKSE::GetTaskInterface()) {
             tasks->AddTask([]() { GetSingleton()->Open(); });
             return true;

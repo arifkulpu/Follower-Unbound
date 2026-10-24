@@ -12,8 +12,7 @@ namespace FollowerUnbound
         public RE::BSTEventSink<RE::TESSleepStopEvent>,
         public RE::BSTEventSink<RE::TESFastTravelEndEvent>,
         public RE::BSTEventSink<RE::TESCellFullyLoadedEvent>,
-        public RE::BSTEventSink<RE::TESDeathEvent>,
-        public RE::BSTEventSink<RE::InputEvent*>
+        public RE::BSTEventSink<RE::TESDeathEvent>
     {
     public:
         static EventManager* GetSingleton()
@@ -34,7 +33,7 @@ namespace FollowerUnbound
         virtual RE::BSEventNotifyControl ProcessEvent(const RE::TESFastTravelEndEvent* a_event, RE::BSTEventSource<RE::TESFastTravelEndEvent>* a_eventSource) override;
         virtual RE::BSEventNotifyControl ProcessEvent(const RE::TESCellFullyLoadedEvent* a_event, RE::BSTEventSource<RE::TESCellFullyLoadedEvent>* a_eventSource) override;
         virtual RE::BSEventNotifyControl ProcessEvent(const RE::TESDeathEvent* a_event, RE::BSTEventSource<RE::TESDeathEvent>* a_eventSource) override;
-        virtual RE::BSEventNotifyControl ProcessEvent(RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>* a_eventSource) override;
+        // virtual RE::BSEventNotifyControl ProcessEvent(RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>* a_eventSource) override;
 
     private:
         EventManager() = default;

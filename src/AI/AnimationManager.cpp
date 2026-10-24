@@ -30,18 +30,23 @@ namespace FollowerUnbound
             }
         }
 
-        // Graph reset + tek tekrar
+        // Savas sirasinda actor stagger/hasar anindayken IdleForceDefaultState cagirmak Havok grafigini kilitler!
+        if (actor->IsInCombat()) {
+            return false;
+        }
+
+        // Savas disinda graph reset + tek tekrar
         if (AnimationManager::SendAnimEvent(actor, "IdleForceDefaultState")) {
             for (const char* eventName : events) {
                 if (AnimationManager::SendAnimEvent(actor, eventName)) {
-                    logger::info("AnimationManager: '{}' animasyonu graph reset sonrası oynatıldı ({}).",
+                    logger::info("AnimationManager: '{}' animasyonu graph reset sonrasi oynatildi ({}).",
                                  context, actor->GetName());
                     return true;
                 }
             }
         }
 
-        logger::warn("AnimationManager: '{}' animasyonu hiçbir fallback ile oynatılamadı ({}).",
+        logger::warn("AnimationManager: '{}' animasyonu hicbir fallback ile oynatilamadi ({}).",
             context, actor->GetName());
         return false;
     }
