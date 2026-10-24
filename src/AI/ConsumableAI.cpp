@@ -62,8 +62,12 @@ namespace FollowerUnbound
 
     void ConsumableAI::UpdateCombatConsumables(RE::Actor* follower, FollowerProfile& profile)
     {
-        // Yalnızca savaş sırasında ve hayattayken iksir kullanılır; at sırtındayken animasyon oynatılmaz
+        // Yalnızca savaş sırasında ve hayattayken iksir kullanılır; at sırtındayken veya bleedout durumundayken oynatılmaz
         if (!follower || follower->IsDead() || !follower->IsInCombat() || follower->IsOnMount()) return;
+        if (auto* state = follower->AsActorState()) {
+            auto life = state->GetLifeState();
+            if (life == RE::ACTOR_LIFE_STATE::kBleedout || life == RE::ACTOR_LIFE_STATE::kDead || life == RE::ACTOR_LIFE_STATE::kDying) return;
+        }
 
         // Dinamik savaş silahı geçişi (hedef mesafesine göre yay <-> kılıç/asa geçişi)
         FollowerManager::GetSingleton()->UpdateCombatWeaponSwitching(follower, profile);
@@ -103,15 +107,27 @@ namespace FollowerUnbound
         // ── ACİL DURUM (KRİTİK) ──
         // İçme animasyonu sürerken yeni içme başlatma (acil durumda bile)
         if (auto it = _combatDrinkAnimTime.find(actorID); it != _combatDrinkAnimTime.end()) {
+            auto* state = follower->AsActorState();
+            const bool inBleedout = state && (state->GetLifeState() == RE::ACTOR_LIFE_STATE::kBleedout);
             float since = std::chrono::duration<float>(now - it->second).count();
-            if (since < 1.5f) return;          // animasyon hâlâ oynuyor
-            // Animasyon bitti: grafiği savaş durumuna geri döndür
-            follower->NotifyAnimationGraph("IdleForceDefaultState");
-            if (auto* state = follower->AsActorState(); !state || !state->IsWeaponDrawn()) {
-                follower->DrawWeaponMagicHands(true);
+
+            // Eğer aktör bleedout'a düştüyse animasyonu derhal sonlandır, bleedout davranışına izin ver!
+            if (inBleedout || since >= 1.5f) {
+                if (!inBleedout) {
+                    follower->NotifyAnimationGraph("IdleForceDefaultState");
+                    if (!state || !state->IsWeaponDrawn()) {
+                        follower->DrawWeaponMagicHands(true);
+                    }
+                    follower->EvaluatePackage();
+                } else {
+                    follower->NotifyAnimationGraph("IdleForceDefaultState");
+                    follower->NotifyAnimationGraph("BleedOutStart");
+                }
+                _combatDrinkAnimTime.erase(it);
+                if (inBleedout) return;
+            } else {
+                return; // animasyon hâlâ oynuyor
             }
-            follower->EvaluatePackage();
-            _combatDrinkAnimTime.erase(it);
         }
 
         // Can %15, mana %5 veya dayanıklılık %5 altına düştüyse: cooldown YOK,

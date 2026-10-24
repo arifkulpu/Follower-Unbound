@@ -102,6 +102,16 @@ namespace FollowerUnbound
     {
         if (!actor || actor->IsDead()) return;
 
+        // Bleedout (yere diz çökme / can çekişme) durumunda asla ayakta iksir animasyonu başlatma!
+        if (auto* state = actor->AsActorState()) {
+            auto life = state->GetLifeState();
+            if (life == RE::ACTOR_LIFE_STATE::kBleedout ||
+                life == RE::ACTOR_LIFE_STATE::kDead ||
+                life == RE::ACTOR_LIFE_STATE::kDying) {
+                return;
+            }
+        }
+
         // Savaş ve tedavi iksirleri için:
         // Ultimate Animated Potions NG (SKSE_UAPNG / mod 97674) - "DrinkPotionStart", "DrinkPotion_Slow", "DrinkPotion_NoMove"
         // Potion Drinking Animation SE / EAS / Vanilla - "drinkPotion", "IdleDrink"
