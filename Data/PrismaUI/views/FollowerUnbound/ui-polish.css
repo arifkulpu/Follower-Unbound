@@ -226,7 +226,7 @@
 .equipment-toolbar .section-title{margin-bottom:7px}
 .equipment-toolbar .notice{max-width:880px;margin:0;font-size:12px;line-height:1.5;color:#b1bbae}
 .equipment-toolbar>[data-equip-selected]{align-self:start;justify-self:end;white-space:nowrap;margin:0}
-.equipment-gear-list{grid-template-columns:repeat(auto-fill,minmax(210px,240px));grid-auto-rows:min-content;align-content:start;justify-content:start;gap:13px;min-height:0;max-height:none;overflow-y:auto;overflow-x:hidden;padding:4px 10px 10px 2px}
+.equipment-gear-list{grid-template-columns:repeat(auto-fill,minmax(330px,1fr));grid-auto-rows:min-content;align-content:start;justify-content:start;gap:13px;min-height:0;max-height:none;overflow-y:auto;overflow-x:hidden;padding:4px 10px 10px 2px}
 @media(max-width:640px){.equipment-gear-list{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px}}
 
 .notification-actions{display:flex;gap:8px;margin-bottom:12px}

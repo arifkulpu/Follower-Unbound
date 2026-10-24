@@ -261,17 +261,19 @@
             <span class="gear-meta">DMG ${w.damage}${w.count>1?` · ×${w.count}`:''}</span>
             ${w.slot?`<span class="tag slot-tag">${esc(w.slot)}</span>`:''}
             ${w.worn?'<span class="tag equipped-tag">EQUIPPED</span>':''}
-            <div style="display:flex;gap:6px;align-items:center;margin-top:4px">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px">
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
               ${w.isTwoHanded?`
-                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="right" data-secondary="false" style="font-size:11px;padding:3px 10px;background:${f.assignedPrimaryRight===w.id?'#b7791f':''}">Asli İki El</button>
-                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="right" data-secondary="true" style="font-size:11px;padding:3px 10px;background:${f.assignedSecondaryRight===w.id?'#2c7a7b':''}">Yardımcı İki El</button>
+                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="right" data-secondary="false" style="font-size:11px;padding:3px 8px;background:${f.assignedPrimaryRight===w.id?'#b7791f':''}">Asli İki El</button>
+                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="right" data-secondary="true" style="font-size:11px;padding:3px 8px;background:${f.assignedSecondaryRight===w.id?'#2c7a7b':''}">Yardımcı İki El</button>
               `:`
-                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="right" data-secondary="false" style="font-size:11px;padding:3px 8px;background:${f.assignedPrimaryRight===w.id?'#b7791f':''}">Asli Sağ</button>
-                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="left" data-secondary="false" style="font-size:11px;padding:3px 8px;background:${f.assignedPrimaryLeft===w.id?'#b7791f':''}">Asli Sol</button>
-                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="right" data-secondary="true" style="font-size:11px;padding:3px 8px;background:${f.assignedSecondaryRight===w.id?'#2c7a7b':''}">Yardımcı Sağ</button>
-                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="left" data-secondary="true" style="font-size:11px;padding:3px 8px;background:${f.assignedSecondaryLeft===w.id?'#2c7a7b':''}">Yardımcı Sol</button>
+                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="right" data-secondary="false" style="font-size:11px;padding:3px 6px;background:${f.assignedPrimaryRight===w.id?'#b7791f':''}">Asli Sağ</button>
+                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="left" data-secondary="false" style="font-size:11px;padding:3px 6px;background:${f.assignedPrimaryLeft===w.id?'#b7791f':''}">Asli Sol</button>
+                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="right" data-secondary="true" style="font-size:11px;padding:3px 6px;background:${f.assignedSecondaryRight===w.id?'#2c7a7b':''}">Yardımcı Sağ</button>
+                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="left" data-secondary="true" style="font-size:11px;padding:3px 6px;background:${f.assignedSecondaryLeft===w.id?'#2c7a7b':''}">Yardımcı Sol</button>
               `}
-              <label class="gear-state" data-protect-wrap style="margin-left:auto"><input type="checkbox" data-protect="${w.id}" ${w.protected?'checked':''}> PROTECTED</label>
+              </div>
+              <label class="gear-state" data-protect-wrap style="margin-left:auto;white-space:nowrap;font-size:11px"><input type="checkbox" data-protect="${w.id}" ${w.protected?'checked':''}> PROTECTED</label>
             </div>
           </div>`).join(''):'<div class="empty">Takipçinin envanterinde silah bulunmuyor.</div>'}
         </div>`;

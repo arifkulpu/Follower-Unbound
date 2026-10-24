@@ -482,6 +482,19 @@ namespace FollowerUnbound
 
         // Refresh roles for all remaining tracked followers
         RefreshFollowerRoles();
+
+        // Takipçilerin oyuncunun atadığı asli loadout'u taşıdığını doğrula
+        {
+            std::shared_lock lock(_mutex);
+            for (const auto& [fid, prof] : _profiles) {
+                if (!prof || prof->isAnimal) continue;
+                if (auto* fActor = RE::TESForm::LookupByID<RE::Actor>(fid)) {
+                    if (fActor->Is3DLoaded() && !fActor->IsDead()) {
+                        EnforceAssignedLoadout(fActor, *prof);
+                    }
+                }
+            }
+        }
     }
 
     void FollowerManager::Update(float deltaGameHours)
