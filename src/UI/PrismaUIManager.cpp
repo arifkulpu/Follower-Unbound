@@ -324,6 +324,9 @@ namespace FollowerUnbound
 
     bool __stdcall PrismaUIManager::OnFrameworkInput(RE::InputEvent* event)
     {
+        static std::chrono::steady_clock::time_point s_lastMenuToggleTime{};
+        auto now = std::chrono::steady_clock::now();
+
         bool requested = false;
         for (auto* current = event; current; current = current->next) {
             if (current->GetDevice() != RE::INPUT_DEVICE::kKeyboard) continue;
@@ -331,7 +334,7 @@ namespace FollowerUnbound
             if (!button) continue;
             const auto key = button->GetIDCode();
             auto* self = GetSingleton();
-            if (key == RE::BSKeyboardDevice::Keys::kEscape && button->IsPressed() &&
+            if (key == RE::BSKeyboardDevice::Keys::kEscape && (button->IsPressed() || button->IsDown()) &&
                 self->IsAvailable() && !self->_api->IsHidden(self->_view)) {
                 // PrismaUI may not deliver keyboard events to its JS document
                 // while another SKSE menu owns focus. Handle Escape natively so
@@ -342,39 +345,60 @@ namespace FollowerUnbound
                 }
             } else if (key == RE::BSKeyboardDevice::Keys::kLeftShift) {
                 if (button->IsUp()) g_leftShiftDown.store(false, std::memory_order_relaxed);
-                else if (button->IsPressed()) g_leftShiftDown.store(true, std::memory_order_relaxed);
+                else if (button->IsDown() || button->IsPressed()) g_leftShiftDown.store(true, std::memory_order_relaxed);
             } else if (key == RE::BSKeyboardDevice::Keys::kRightShift) {
                 if (button->IsUp()) g_rightShiftDown.store(false, std::memory_order_relaxed);
-                else if (button->IsPressed()) g_rightShiftDown.store(true, std::memory_order_relaxed);
+                else if (button->IsDown() || button->IsPressed()) g_rightShiftDown.store(true, std::memory_order_relaxed);
             } else if (key == RE::BSKeyboardDevice::Keys::kLeftControl) {
                 if (button->IsUp()) g_leftCtrlDown.store(false, std::memory_order_relaxed);
-                else if (button->IsPressed()) g_leftCtrlDown.store(true, std::memory_order_relaxed);
+                else if (button->IsDown() || button->IsPressed()) g_leftCtrlDown.store(true, std::memory_order_relaxed);
             } else if (key == RE::BSKeyboardDevice::Keys::kRightControl) {
                 if (button->IsUp()) g_rightCtrlDown.store(false, std::memory_order_relaxed);
-                else if (button->IsPressed()) g_rightCtrlDown.store(true, std::memory_order_relaxed);
+                else if (button->IsDown() || button->IsPressed()) g_rightCtrlDown.store(true, std::memory_order_relaxed);
             } else if (key == RE::BSKeyboardDevice::Keys::kLeftAlt) {
                 if (button->IsUp()) g_leftAltDown.store(false, std::memory_order_relaxed);
-                else if (button->IsPressed()) g_leftAltDown.store(true, std::memory_order_relaxed);
+                else if (button->IsDown() || button->IsPressed()) g_leftAltDown.store(true, std::memory_order_relaxed);
             } else if (key == RE::BSKeyboardDevice::Keys::kRightAlt) {
                 if (button->IsUp()) g_rightAltDown.store(false, std::memory_order_relaxed);
-                else if (button->IsPressed()) g_rightAltDown.store(true, std::memory_order_relaxed);
-            } else if (button->IsPressed()) {
-                // Dinamik kısayol: ayarlardan alınan tuş ve modifier kombinasyonu
+                else if (button->IsDown() || button->IsPressed()) g_rightAltDown.store(true, std::memory_order_relaxed);
+            } else if (button->IsDown() || button->IsPressed()) {
+                // Hızlı çift basma (debounce) koruması: 350 milisaniye
+                if (std::chrono::duration<float>(now - s_lastMenuToggleTime).count() < 0.35f) {
+                    continue;
+                }
+
                 auto* settings = Settings::GetSingleton();
                 const uint32_t hotkey   = settings->menuHotkey;
                 const uint32_t modifier = settings->menuHotkeyModifier;
-                if (key == hotkey) {
-                    const bool shiftPressed = g_leftShiftDown.load(std::memory_order_relaxed) || g_rightShiftDown.load(std::memory_order_relaxed);
-                    const bool ctrlPressed  = g_leftCtrlDown.load(std::memory_order_relaxed)  || g_rightCtrlDown.load(std::memory_order_relaxed);
-                    const bool altPressed   = g_leftAltDown.load(std::memory_order_relaxed)   || g_rightAltDown.load(std::memory_order_relaxed);
 
-                    const bool wantShift = (modifier & 1) != 0;
-                    const bool wantCtrl  = (modifier & 2) != 0;
-                    const bool wantAlt   = (modifier & 4) != 0;
+                // Donanım düzeyinde (GetAsyncKeyState) ve SKSE olay düzeyinde hibrit modifier kontrolü
+                const bool shiftPressed = g_leftShiftDown.load(std::memory_order_relaxed) ||
+                                          g_rightShiftDown.load(std::memory_order_relaxed) ||
+                                          ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0);
 
-                    if (shiftPressed == wantShift && ctrlPressed == wantCtrl && altPressed == wantAlt) {
-                        requested = true;
-                    }
+                const bool ctrlPressed  = g_leftCtrlDown.load(std::memory_order_relaxed) ||
+                                          g_rightCtrlDown.load(std::memory_order_relaxed) ||
+                                          ((GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0);
+
+                const bool altPressed   = g_leftAltDown.load(std::memory_order_relaxed) ||
+                                          g_rightAltDown.load(std::memory_order_relaxed) ||
+                                          ((GetAsyncKeyState(VK_MENU) & 0x8000) != 0);
+
+                const bool wantShift = (modifier & 1) != 0;
+                const bool wantCtrl  = (modifier & 2) != 0;
+                const bool wantAlt   = (modifier & 4) != 0;
+
+                // 1. Ayarlanan kısayol kontrolü
+                if (key == hotkey && shiftPressed == wantShift && ctrlPressed == wantCtrl && altPressed == wantAlt) {
+                    s_lastMenuToggleTime = now;
+                    requested = true;
+                    logger::info("PrismaUI shortcut triggered: key=0x{:X}, mod={}", key, modifier);
+                }
+                // 2. Daima çalışan acil durum yedeği (Shift + I)
+                else if (key == RE::BSKeyboardDevice::Keys::kI && shiftPressed && !ctrlPressed && !altPressed) {
+                    s_lastMenuToggleTime = now;
+                    requested = true;
+                    logger::info("PrismaUI fallback shortcut triggered: Shift + I");
                 }
             }
         }
@@ -614,13 +638,20 @@ namespace FollowerUnbound
             return;
         }
         if (kind == "setHotkey") {
-            // JS'den gelen: { kind: "setHotkey", hotkey: 0x17, modifier: 1, text: "Shift + I" }
             auto* s = Settings::GetSingleton();
-            s->menuHotkey         = a.value("hotkey",   uint32_t{ 0x17 });
-            s->menuHotkeyModifier = a.value("modifier", uint32_t{ 1 });
-            s->menuHotkeyText     = a.value("text",     std::string{ "Shift + I" });
+            if (a.contains("hotkey")) {
+                if (a["hotkey"].is_number()) s->menuHotkey = a["hotkey"].get<uint32_t>();
+                else if (a["hotkey"].is_string()) s->menuHotkey = static_cast<uint32_t>(std::stoul(a["hotkey"].get<std::string>(), nullptr, 0));
+            }
+            if (a.contains("modifier")) {
+                if (a["modifier"].is_number()) s->menuHotkeyModifier = a["modifier"].get<uint32_t>();
+                else if (a["modifier"].is_string()) s->menuHotkeyModifier = static_cast<uint32_t>(std::stoul(a["modifier"].get<std::string>(), nullptr, 0));
+            }
+            if (a.contains("text") && a["text"].is_string()) {
+                s->menuHotkeyText = a["text"].get<std::string>();
+            }
             s->Save();
-            logger::info("Hotkey updated to {} (modifier={}, text={})", s->menuHotkey, s->menuHotkeyModifier, s->menuHotkeyText);
+            logger::info("Hotkey updated to 0x{:X} (modifier={}, text={})", s->menuHotkey, s->menuHotkeyModifier, s->menuHotkeyText);
             return;
         }
         const auto followerID = a.value("follower", uint32_t{ 0 });

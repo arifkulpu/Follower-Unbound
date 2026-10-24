@@ -1,4 +1,5 @@
 #include "Core/EventManager.h"
+#include "UI/PrismaUIManager.h"
 #include "AI/LootManager.h"
 #include "AI/CombatTracker.h"
 #include "AI/ConsumableAI.h"
@@ -97,6 +98,10 @@ namespace FollowerUnbound
             logger::info("Registered TESDeathEvent sink.");
         }
 
+        if (auto* inputMgr = RE::BSInputDeviceManager::GetSingleton()) {
+            inputMgr->AddEventSink(this);
+            logger::info("Registered direct BSInputDeviceManager InputEvent sink.");
+        }
     }
 
     RE::BSEventNotifyControl EventManager::ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*)
@@ -508,6 +513,13 @@ namespace FollowerUnbound
             manager->UnregisterFollower(formID);
         }
 
+        return RE::BSEventNotifyControl::kContinue;
+    }
+
+    RE::BSEventNotifyControl EventManager::ProcessEvent(RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>*)
+    {
+        if (!a_event || !*a_event) return RE::BSEventNotifyControl::kContinue;
+        PrismaUIManager::GetSingleton()->HandleInputEvent(*a_event);
         return RE::BSEventNotifyControl::kContinue;
     }
 }

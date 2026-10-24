@@ -22,6 +22,7 @@ namespace FollowerUnbound
         void ClearNotifications();
         void Open();
         void SendState();
+        bool HandleInputEvent(RE::InputEvent* event) { return OnFrameworkInput(event); }
         void ShowEquipPrompt(RE::FormID followerID, RE::FormID itemID, RE::FormID oldItemID,
             std::string_view followerName, std::string_view itemName, std::string_view slotLabel,
             std::string_view reason, std::string_view currentStats, std::string_view candidateStats);
