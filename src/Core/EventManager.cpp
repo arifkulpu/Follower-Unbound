@@ -199,13 +199,11 @@ namespace FollowerUnbound
             if (profile) {
                 if (a_event->newState == RE::ACTOR_COMBAT_STATE::kCombat) {
                     profile->currentState = FollowerState::Combat;
-                    // Savaş başlangıcında mesafeye göre uygun silahı (Asli / Yardımcı) kuşan
-                    manager->EnforceAssignedLoadout(actor, *profile, false);
                     ConsumableAI::GetSingleton()->UpdateCombatConsumables(actor, *profile);
                 } else if (a_event->newState == RE::ACTOR_COMBAT_STATE::kNone) {
                     profile->currentState = FollowerState::PostCombat;
-                    // Savaş bittiğinde her zaman oyuncunun tercih ettiği Asli (Primary) silaha dön
-                    manager->EnforceAssignedLoadout(actor, *profile, true);
+                    // Savaş bittiğinde oyuncunun atadığı Asli silaha dönmesini sağla
+                    manager->EnforceAssignedLoadout(actor, *profile);
                     // Savaş bitti: yeme/içme birkaç saniye geciktirilir
                     ConsumableAI::GetSingleton()->NotifyCombatEnded(actor->GetFormID());
                     tracker->NotifyCombatEnd(actor);

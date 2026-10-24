@@ -219,97 +219,14 @@ namespace FollowerUnbound
         return true;
     }
 
-    static bool IsRangedWeapon(RE::TESBoundObject* bound)
-    {
-        if (!bound) return false;
-        if (auto* weapon = bound->As<RE::TESObjectWEAP>()) {
-            auto type = weapon->GetWeaponType();
-            return (type == RE::WEAPON_TYPE::kBow || type == RE::WEAPON_TYPE::kCrossbow || type == RE::WEAPON_TYPE::kStaff);
-        }
-        return false;
-    }
-
-    void FollowerManager::UpdateCombatWeaponSwitching(RE::Actor* actor, FollowerProfile& profile)
-    {
-        if (!actor || actor->IsDead() || profile.isAnimal || !actor->IsInCombat()) return;
-
-        // Yardımcı silah tanımlanmamışsa sadece asli loadout güvenceye alınır
-        if (profile.assignedSecondaryRight == 0 && profile.assignedSecondaryLeft == 0) {
-            EnforceAssignedLoadout(actor, profile, true);
-            return;
-        }
-
-        // Hedef aktörü bul
-        auto* target = actor->GetActorRuntimeData().currentCombatTarget.get().get();
-        if (!target) {
-            auto* player = RE::PlayerCharacter::GetSingleton();
-            if (player && player->IsInCombat()) {
-                target = player->GetActorRuntimeData().currentCombatTarget.get().get();
-            }
-        }
-        if (!target || target->IsDead()) return;
-
-        const float distance = actor->GetPosition().GetDistance(target->GetPosition());
-
-        auto* primRight = RE::TESForm::LookupByID<RE::TESBoundObject>(profile.assignedPrimaryRight);
-        auto* primLeft  = RE::TESForm::LookupByID<RE::TESBoundObject>(profile.assignedPrimaryLeft);
-        auto* secRight  = RE::TESForm::LookupByID<RE::TESBoundObject>(profile.assignedSecondaryRight);
-        auto* secLeft   = RE::TESForm::LookupByID<RE::TESBoundObject>(profile.assignedSecondaryLeft);
-
-        const bool primHasRanged = IsRangedWeapon(primRight) || IsRangedWeapon(primLeft);
-        const bool secHasRanged  = IsRangedWeapon(secRight)  || IsRangedWeapon(secLeft);
-
-        // İki set arasında menzilli/yakın ayrımı yoksa silah değiştirmeye gerek yok
-        if (primHasRanged == secHasRanged) return;
-
-        // Hedef yakın (< 400 birim) -> Yakın dövüş silahına geç
-        // Hedef uzak (> 650 birim) -> Menzilli silaha geç
-        // 400-650 arası histerezis (tampon) bölgesidir, gereksiz el değiştirme yapılmaz
-        bool wantSecondary = false;
-        if (distance > 650.0f) {
-            wantSecondary = secHasRanged; // Menzilli olan Yardımcı ise Yardımcıya geç
-        } else if (distance < 400.0f) {
-            wantSecondary = !secHasRanged; // Yakın dövüş olan Yardımcı ise Yardımcıya geç
-        } else {
-            return; // Tampon bölge
-        }
-
-        auto* currentRight = actor->GetEquippedObject(false);
-        auto* currentLeft  = actor->GetEquippedObject(true);
-
-        RE::FormID desiredRightID = wantSecondary ? profile.assignedSecondaryRight : profile.assignedPrimaryRight;
-        RE::FormID desiredLeftID  = wantSecondary ? profile.assignedSecondaryLeft  : profile.assignedPrimaryLeft;
-
-        bool needsSwitch = false;
-        if (desiredRightID != 0 && (!currentRight || currentRight->GetFormID() != desiredRightID)) needsSwitch = true;
-        if (desiredLeftID != 0 && (!currentLeft || currentLeft->GetFormID() != desiredLeftID)) needsSwitch = true;
-
-        if (needsSwitch) {
-            auto* equipMgr = RE::ActorEquipManager::GetSingleton();
-            if (!equipMgr) return;
-            auto inv = actor->GetInventory();
-
-            auto* rightSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(0x00013F42);
-            auto* leftSlot  = RE::TESForm::LookupByID<RE::BGSEquipSlot>(0x00013F43);
-
-            if (desiredRightID != 0) {
-                if (auto* obj = RE::TESForm::LookupByID<RE::TESBoundObject>(desiredRightID)) {
-                    if (inv.find(obj) != inv.end()) equipMgr->EquipObject(actor, obj, nullptr, 1, rightSlot, false, false, false, true);
-                }
-            }
-            if (desiredLeftID != 0) {
-                if (auto* obj = RE::TESForm::LookupByID<RE::TESBoundObject>(desiredLeftID)) {
-                    if (inv.find(obj) != inv.end()) equipMgr->EquipObject(actor, obj, nullptr, 1, leftSlot, false, false, false, true);
-                }
-            }
-            logger::info("CombatWeaponSwitch: {} switched to {} loadout (distance={:.0f} to target {})",
-                actor->GetName(), wantSecondary ? "Secondary" : "Primary", distance, target->GetName());
-        }
-    }
-
-    void FollowerManager::EnforceAssignedLoadout(RE::Actor* actor, FollowerProfile& profile, bool forcePrimary)
+    void FollowerManager::EnforceAssignedLoadout(RE::Actor* actor, FollowerProfile& profile)
     {
         if (!actor || actor->IsDead() || profile.isAnimal) return;
+
+        // SAVAŞTA İKEN ASLA MÜDAHALE ETME!
+        // Skyrim'in yerel Combat AI'ı büyü, kılıç, kalkan ve yay kullanımını kendi yönetir.
+        if (actor->IsInCombat()) return;
+
         auto* equipMgr = RE::ActorEquipManager::GetSingleton();
         if (!equipMgr) return;
 
@@ -330,13 +247,7 @@ namespace FollowerUnbound
         tryEquipForm(profile.assignedHands);
         tryEquipForm(profile.assignedFeet);
 
-        // Eğer savaşta ise ve dinamik geçiş geçerliyse, silah kontrolünü UpdateCombatWeaponSwitching'e bırak
-        if (actor->IsInCombat() && !forcePrimary && (profile.assignedSecondaryRight != 0 || profile.assignedSecondaryLeft != 0)) {
-            UpdateCombatWeaponSwitching(actor, profile);
-            return;
-        }
-
-        // Silahlar (Öncelikle Asli Silahlar)
+        // Silahlar (Sadece savaş dışındayken barış halinde kuşanılır)
         auto* rightSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(0x00013F42);
         auto* leftSlot  = RE::TESForm::LookupByID<RE::BGSEquipSlot>(0x00013F43);
 

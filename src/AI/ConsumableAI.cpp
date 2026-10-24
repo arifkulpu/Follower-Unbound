@@ -69,8 +69,7 @@ namespace FollowerUnbound
             if (life == RE::ACTOR_LIFE_STATE::kBleedout || life == RE::ACTOR_LIFE_STATE::kDead || life == RE::ACTOR_LIFE_STATE::kDying) return;
         }
 
-        // Dinamik savaş silahı geçişi (hedef mesafesine göre yay <-> kılıç/asa geçişi)
-        FollowerManager::GetSingleton()->UpdateCombatWeaponSwitching(follower, profile);
+
 
         if (TryCurePoison(follower)) return;
 
