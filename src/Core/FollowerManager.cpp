@@ -247,6 +247,38 @@ namespace FollowerUnbound
         tryEquipForm(profile.assignedHands);
         tryEquipForm(profile.assignedFeet);
 
+        // Kıyafet Bütünlüğü Kuralı (Otomatik Çıkartma):
+        // Eğer takipçinin tercih ettiği bir zırh tipi varsa (Default değilse) ve motor
+        // envanterdeki uygunsuz bir parçayı (mesela büyücüye ağır kask) taktıysa,
+        // ve bu eşya oyuncu tarafından kilitli/korumalı değilse derhal üzerinden çıkart.
+        if (profile.preferences.preferredArmorType != 0) {
+            for (const auto& [item, invData] : inv) {
+                if (invData.first <= 0 || !invData.second || !invData.second->extraLists || !item) continue;
+                auto* armor = item->As<RE::TESObjectARMO>();
+                if (!armor) continue;
+
+                bool worn = false;
+                for (auto* xList : *invData.second->extraLists) {
+                    if (xList && (xList->HasType(RE::ExtraDataType::kWorn) ||
+                                  xList->HasType(RE::ExtraDataType::kWornLeft))) {
+                        worn = true;
+                        break;
+                    }
+                }
+                if (!worn) continue;
+
+                // Eğer oyuncu bilerek bu eşyayı kilitleyip atadıysa çıkarma
+                if (profile.IsProtected(armor->GetFormID())) continue;
+
+                // Eğer bu parça tercih edilen zırh tipine uymuyorsa çıkart!
+                if (!ItemEvaluator::MatchesPreferredArmor(armor, profile.preferences.preferredArmorType)) {
+                    equipMgr->UnequipObject(actor, armor, nullptr, 1, nullptr, false, false, false, true);
+                    logger::info("EnforceAssignedLoadout: {} unequipped mismatched armor {} due to preferred type rule.",
+                        actor->GetName(), armor->GetName());
+                }
+            }
+        }
+
         // Silahlar (Sadece savaş dışındayken barış halinde kuşanılır)
         auto* rightSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(0x00013F42);
         auto* leftSlot  = RE::TESForm::LookupByID<RE::BGSEquipSlot>(0x00013F43);
