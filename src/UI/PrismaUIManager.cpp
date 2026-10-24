@@ -419,7 +419,8 @@ namespace FollowerUnbound
             _api->Hide(_view);
             return;
         }
-        if (SKSEMenuFramework::IsInstalled()) {
+        // SKSEMenuFramework açık ise kapat, değilse beklemeden DOĞRUDAN ShowView aç!
+        if (SKSEMenuFramework::IsInstalled() && SKSEMenuFramework::IsAnyBlockingWindowOpened()) {
             if (auto* tasks = SKSE::GetTaskInterface()) {
                 tasks->AddTask([]() { GetSingleton()->BeginFrameworkClose(); });
                 return;
