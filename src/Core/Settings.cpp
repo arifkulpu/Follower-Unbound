@@ -125,6 +125,12 @@ namespace FollowerUnbound
         notifySelling             = readBool("Notifications", "NotifySelling",             true);
         notifyAutoEquip           = readBool("Notifications", "NotifyAutoEquip",           true);
 
+        // ── HOTKEY ──
+        menuHotkey         = static_cast<uint32_t>(readInt("Hotkey", "MenuHotkey", 0x17));
+        menuHotkeyModifier = static_cast<uint32_t>(readInt("Hotkey", "MenuHotkeyModifier", 1));
+        GetPrivateProfileStringA("Hotkey", "MenuHotkeyText", "Shift + I", buf, sizeof(buf), path);
+        menuHotkeyText     = buf[0] ? std::string(buf) : std::string("Shift + I");
+
         logger::info("Settings loaded: hunger={:.1f}h thirst={:.1f}h fatigue={:.1f}h "
             "eat<{:.0f}% drink<{:.0f}% delay={:.1f}s potions H<{:.0f}% M<{:.0f}% S<{:.0f}% "
             "systems=[combat:{} needs:{} equip:{} shop:{} sell:{} poison:{}]",
@@ -228,6 +234,11 @@ namespace FollowerUnbound
         writeBool("Notifications", "NotifyShopping",            notifyShopping);
         writeBool("Notifications", "NotifySelling",             notifySelling);
         writeBool("Notifications", "NotifyAutoEquip",           notifyAutoEquip);
+
+        // ── HOTKEY ──
+        writeInt("Hotkey", "MenuHotkey",         static_cast<int>(menuHotkey));
+        writeInt("Hotkey", "MenuHotkeyModifier", static_cast<int>(menuHotkeyModifier));
+        WritePrivateProfileStringA("Hotkey", "MenuHotkeyText", menuHotkeyText.c_str(), iniPath.string().c_str());
 
         logger::info("Settings saved to {}", iniPath.string());
     }

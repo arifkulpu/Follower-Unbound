@@ -210,7 +210,7 @@ namespace FollowerUnbound
             // Savaştaki veya 3D hazır olmayan aktöre auto-equip yapma:
             // EquipObject animasyon geçişi sırasında çağrılırsa silah
             // "T-pose" gibi elde asılı takılı kalabilir.
-            if (follower->IsInCombat() || !follower->Is3DLoaded()) return;
+            if (follower->IsInCombat() || !follower->Is3DLoaded() || follower->IsOnMount()) return;
 
             auto equipMgr = RE::ActorEquipManager::GetSingleton();
             if (!equipMgr) return;
@@ -289,6 +289,12 @@ namespace FollowerUnbound
                                                   static_cast<uint32_t>(Slot::kRing);
                 constexpr uint32_t kIgnoredBits = kJewelryMask | static_cast<uint32_t>(Slot::kShield);
                 if ((newMask & kJewelryMask) != 0 && (newMask & ~kIgnoredBits) == 0) {
+                    return;
+                }
+
+                // Kıyafet Bütünlüğü Kuralı: Takipçinin tercih ettiği zırh türüne uymuyorsa giyme
+                if (profile && !ItemEvaluator::MatchesPreferredArmor(armor, profile->preferences.preferredArmorType)) {
+                    logger::info("AutoEquip: {} skipped {} due to preferred armor weight rule.", follower->GetName(), armor->GetName());
                     return;
                 }
 
@@ -451,6 +457,19 @@ namespace FollowerUnbound
     void LootManager::QueuePlayerLootDistribution(RE::FormID containerID, uint32_t delayMs)
     {
         if (containerID == 0 || !Settings::GetSingleton()->autoLootCorpses) return;
+        if (FollowerManager::GetSingleton()->IsFollower(containerID)) {
+            logger::info("LootShare: refused to queue follower {:08X} for looting.", containerID);
+            return;
+        }
+        auto* targetRef = RE::TESForm::LookupByID<RE::TESObjectREFR>(containerID);
+        if (!targetRef) return;
+        if (auto* actor = targetRef->As<RE::Actor>()) {
+            if (!actor->IsDead() || FollowerManager::GetSingleton()->IsFollower(actor->GetFormID())) {
+                logger::info("LootShare: refused to queue living actor / follower {:08X} ({}) for looting.", containerID, actor->GetName());
+                return;
+            }
+        }
+
         EquipPrompt::LootWorkStarted();
         std::lock_guard lock(_lootMutex);
         // Avoid duplicate if the same corpse is already at the end of the queue
@@ -538,9 +557,19 @@ namespace FollowerUnbound
             logger::info("LootShare: skipped container {:08X} because autoLootCorpses setting is false.", corpseRef->GetFormID());
             return true;
         }
+        if (FollowerManager::GetSingleton()->IsFollower(corpseRef->GetFormID())) {
+            logger::info("LootShare: skipped follower {:08X}.", corpseRef->GetFormID());
+            return true;
+        }
+        auto* corpseActor = corpseRef->As<RE::Actor>();
+        if (corpseActor) {
+            if (!corpseActor->IsDead() || FollowerManager::GetSingleton()->IsFollower(corpseActor->GetFormID())) {
+                logger::info("LootShare: skipped living actor / follower {:08X} ({}).", corpseRef->GetFormID(), corpseActor->GetName());
+                return true;
+            }
+        }
         // Static quest containers (chests tied to a quest alias) are protected.
         // Dead actors/NPCs are enemy corpses and must NEVER be skipped by alias checks!
-        auto* corpseActor = corpseRef->As<RE::Actor>();
         if (!corpseActor && IsQuestItem(corpseRef)) {
             logger::info("LootShare: skipped container {:08X} because it is a quest item / alias.", corpseRef->GetFormID());
             return true;
@@ -596,6 +625,10 @@ namespace FollowerUnbound
             }
             if (follower->IsDead()) {
                 logger::info("LootShare: follower {} is dead, skipping.", follower->GetName());
+                continue;
+            }
+            if (follower->IsOnMount()) {
+                logger::info("LootShare: follower {} is mounted on a horse, skipping loot.", follower->GetName());
                 continue;
             }
             // If follower is in combat, only skip if the player is also actively in combat.

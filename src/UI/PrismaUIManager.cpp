@@ -40,6 +40,10 @@ namespace FollowerUnbound
 
         std::atomic_bool g_leftShiftDown{ false };
         std::atomic_bool g_rightShiftDown{ false };
+        std::atomic_bool g_leftCtrlDown{ false };
+        std::atomic_bool g_rightCtrlDown{ false };
+        std::atomic_bool g_leftAltDown{ false };
+        std::atomic_bool g_rightAltDown{ false };
 
         void PressEscapeForFramework()
         {
@@ -73,12 +77,12 @@ namespace FollowerUnbound
                 {"maxDrinkNormal",p.maxDrinkNormal},{"maxDrinkAlcohol",p.maxDrinkAlcohol},
                 {"buyArrows",p.buyArrows},{"maxArrows",p.maxArrows},{"buyBolts",p.buyBolts},{"maxBolts",p.maxBolts},
                 {"buySoulGems",p.buySoulGems},{"maxSoulGems",p.maxSoulGems},{"buyTorches",p.buyTorches},
-                {"buyPettySoulGems",p.buyPettySoulGems},{"maxPettySoulGems",p.maxPettySoulGems},
-                {"buyLesserSoulGems",p.buyLesserSoulGems},{"maxLesserSoulGems",p.maxLesserSoulGems},
-                {"buyCommonSoulGems",p.buyCommonSoulGems},{"maxCommonSoulGems",p.maxCommonSoulGems},
-                {"buyGreaterSoulGems",p.buyGreaterSoulGems},{"maxGreaterSoulGems",p.maxGreaterSoulGems},
-                {"buyGrandSoulGems",p.buyGrandSoulGems},{"maxGrandSoulGems",p.maxGrandSoulGems},
-                {"buyBlackSoulGems",p.buyBlackSoulGems},{"maxBlackSoulGems",p.maxBlackSoulGems},
+                {"buyPettySoulGems",p.buyPettySoulGems},{"maxPettySoulGems",p.maxPettySoulGems},{"soulGemFillPetty",p.soulGemFillPetty},
+                {"buyLesserSoulGems",p.buyLesserSoulGems},{"maxLesserSoulGems",p.maxLesserSoulGems},{"soulGemFillLesser",p.soulGemFillLesser},
+                {"buyCommonSoulGems",p.buyCommonSoulGems},{"maxCommonSoulGems",p.maxCommonSoulGems},{"soulGemFillCommon",p.soulGemFillCommon},
+                {"buyGreaterSoulGems",p.buyGreaterSoulGems},{"maxGreaterSoulGems",p.maxGreaterSoulGems},{"soulGemFillGreater",p.soulGemFillGreater},
+                {"buyGrandSoulGems",p.buyGrandSoulGems},{"maxGrandSoulGems",p.maxGrandSoulGems},{"soulGemFillGrand",p.soulGemFillGrand},
+                {"buyBlackSoulGems",p.buyBlackSoulGems},{"maxBlackSoulGems",p.maxBlackSoulGems},{"soulGemFillBlack",p.soulGemFillBlack},
                 {"maxPotionFlowers",p.maxPotionFlowers},
                 {"buyHealthMinor",p.buyHealthMinor},{"buyHealthStandard",p.buyHealthStandard},{"buyHealthPlentiful",p.buyHealthPlentiful},
                 {"buyHealthVigorous",p.buyHealthVigorous},{"buyHealthExtreme",p.buyHealthExtreme},{"buyHealthUltimate",p.buyHealthUltimate},
@@ -109,7 +113,14 @@ namespace FollowerUnbound
                 {"savingsEnabled",p.savingsEnabled},{"savingsTarget",p.savingsTarget},
                 {"savingsPercent",p.savingsPercent},{"savedGold",p.savedGold},
                 {"allowCraftPotions",p.allowCraftPotions},{"allowUpgradeEquipment",p.allowUpgradeEquipment},
-                {"receiveQuestRewards",p.receiveQuestRewards},{"rewardSharePercent",p.rewardSharePercent}
+                {"receiveQuestRewards",p.receiveQuestRewards},{"rewardSharePercent",p.rewardSharePercent},
+                {"preferredArmorType",p.preferredArmorType},
+                {"primaryWeaponStyle",p.primaryWeaponStyle},
+                {"primaryRightHand",p.primaryRightHand},{"primaryLeftHand",p.primaryLeftHand},
+                {"primaryTwoHandType",p.primaryTwoHandType},
+                {"secondaryWeaponStyle",p.secondaryWeaponStyle},
+                {"secondaryRightHand",p.secondaryRightHand},{"secondaryLeftHand",p.secondaryLeftHand},
+                {"secondaryTwoHandType",p.secondaryTwoHandType}
             };
         }
 
@@ -162,12 +173,12 @@ namespace FollowerUnbound
             FU_UINT_PREF("maxArrows", maxArrows, 0, 250) FU_BOOL_PREF("buyBolts", buyBolts)
             FU_UINT_PREF("maxBolts", maxBolts, 0, 250) FU_BOOL_PREF("buySoulGems", buySoulGems)
             FU_UINT_PREF("maxSoulGems", maxSoulGems, 0, 20) FU_BOOL_PREF("buyTorches", buyTorches)
-            FU_BOOL_PREF("buyPettySoulGems", buyPettySoulGems) FU_UINT_PREF("maxPettySoulGems", maxPettySoulGems, 1, 20)
-            FU_BOOL_PREF("buyLesserSoulGems", buyLesserSoulGems) FU_UINT_PREF("maxLesserSoulGems", maxLesserSoulGems, 1, 20)
-            FU_BOOL_PREF("buyCommonSoulGems", buyCommonSoulGems) FU_UINT_PREF("maxCommonSoulGems", maxCommonSoulGems, 1, 20)
-            FU_BOOL_PREF("buyGreaterSoulGems", buyGreaterSoulGems) FU_UINT_PREF("maxGreaterSoulGems", maxGreaterSoulGems, 1, 20)
-            FU_BOOL_PREF("buyGrandSoulGems", buyGrandSoulGems) FU_UINT_PREF("maxGrandSoulGems", maxGrandSoulGems, 1, 20)
-            FU_BOOL_PREF("buyBlackSoulGems", buyBlackSoulGems) FU_UINT_PREF("maxBlackSoulGems", maxBlackSoulGems, 1, 20)
+            FU_BOOL_PREF("buyPettySoulGems", buyPettySoulGems) FU_UINT_PREF("maxPettySoulGems", maxPettySoulGems, 1, 20) FU_UINT_PREF("soulGemFillPetty", soulGemFillPetty, 0, 2)
+            FU_BOOL_PREF("buyLesserSoulGems", buyLesserSoulGems) FU_UINT_PREF("maxLesserSoulGems", maxLesserSoulGems, 1, 20) FU_UINT_PREF("soulGemFillLesser", soulGemFillLesser, 0, 2)
+            FU_BOOL_PREF("buyCommonSoulGems", buyCommonSoulGems) FU_UINT_PREF("maxCommonSoulGems", maxCommonSoulGems, 1, 20) FU_UINT_PREF("soulGemFillCommon", soulGemFillCommon, 0, 2)
+            FU_BOOL_PREF("buyGreaterSoulGems", buyGreaterSoulGems) FU_UINT_PREF("maxGreaterSoulGems", maxGreaterSoulGems, 1, 20) FU_UINT_PREF("soulGemFillGreater", soulGemFillGreater, 0, 2)
+            FU_BOOL_PREF("buyGrandSoulGems", buyGrandSoulGems) FU_UINT_PREF("maxGrandSoulGems", maxGrandSoulGems, 1, 20) FU_UINT_PREF("soulGemFillGrand", soulGemFillGrand, 0, 2)
+            FU_BOOL_PREF("buyBlackSoulGems", buyBlackSoulGems) FU_UINT_PREF("maxBlackSoulGems", maxBlackSoulGems, 1, 20) FU_UINT_PREF("soulGemFillBlack", soulGemFillBlack, 0, 2)
             FU_UINT_PREF("maxPotionFlowers", maxPotionFlowers, 1, 50)
             FU_BOOL_PREF("buyHealthMinor", buyHealthMinor) FU_BOOL_PREF("buyHealthStandard", buyHealthStandard)
             FU_BOOL_PREF("buyHealthPlentiful", buyHealthPlentiful) FU_BOOL_PREF("buyHealthVigorous", buyHealthVigorous)
@@ -204,6 +215,15 @@ namespace FollowerUnbound
             FU_BOOL_PREF("savingsEnabled", savingsEnabled) FU_UINT_PREF("savingsPercent", savingsPercent, 0, 100)
             FU_BOOL_PREF("allowCraftPotions", allowCraftPotions) FU_BOOL_PREF("allowUpgradeEquipment", allowUpgradeEquipment)
             FU_BOOL_PREF("receiveQuestRewards", receiveQuestRewards)
+            FU_UINT_PREF("preferredArmorType", preferredArmorType, 0, 3)
+            FU_UINT_PREF("primaryWeaponStyle", primaryWeaponStyle, 0, 5)
+            FU_UINT_PREF("primaryRightHand", primaryRightHand, 0, 5)
+            FU_UINT_PREF("primaryLeftHand", primaryLeftHand, 0, 7)
+            FU_UINT_PREF("primaryTwoHandType", primaryTwoHandType, 0, 3)
+            FU_UINT_PREF("secondaryWeaponStyle", secondaryWeaponStyle, 0, 5)
+            FU_UINT_PREF("secondaryRightHand", secondaryRightHand, 0, 5)
+            FU_UINT_PREF("secondaryLeftHand", secondaryLeftHand, 0, 7)
+            FU_UINT_PREF("secondaryTwoHandType", secondaryTwoHandType, 0, 3)
             if (key == "rewardSharePercent") p.rewardSharePercent = std::clamp(value.get<float>(), 0.0f, 100.0f);
 #undef FU_BOOL_PREF
 #undef FU_UINT_PREF
@@ -326,9 +346,36 @@ namespace FollowerUnbound
             } else if (key == RE::BSKeyboardDevice::Keys::kRightShift) {
                 if (button->IsUp()) g_rightShiftDown.store(false, std::memory_order_relaxed);
                 else if (button->IsPressed()) g_rightShiftDown.store(true, std::memory_order_relaxed);
-            } else if (key == RE::BSKeyboardDevice::Keys::kI && button->IsDown() &&
-                (g_leftShiftDown.load(std::memory_order_relaxed) || g_rightShiftDown.load(std::memory_order_relaxed))) {
-                requested = true;
+            } else if (key == RE::BSKeyboardDevice::Keys::kLeftControl) {
+                if (button->IsUp()) g_leftCtrlDown.store(false, std::memory_order_relaxed);
+                else if (button->IsPressed()) g_leftCtrlDown.store(true, std::memory_order_relaxed);
+            } else if (key == RE::BSKeyboardDevice::Keys::kRightControl) {
+                if (button->IsUp()) g_rightCtrlDown.store(false, std::memory_order_relaxed);
+                else if (button->IsPressed()) g_rightCtrlDown.store(true, std::memory_order_relaxed);
+            } else if (key == RE::BSKeyboardDevice::Keys::kLeftAlt) {
+                if (button->IsUp()) g_leftAltDown.store(false, std::memory_order_relaxed);
+                else if (button->IsPressed()) g_leftAltDown.store(true, std::memory_order_relaxed);
+            } else if (key == RE::BSKeyboardDevice::Keys::kRightAlt) {
+                if (button->IsUp()) g_rightAltDown.store(false, std::memory_order_relaxed);
+                else if (button->IsPressed()) g_rightAltDown.store(true, std::memory_order_relaxed);
+            } else if (button->IsPressed()) {
+                // Dinamik kısayol: ayarlardan alınan tuş ve modifier kombinasyonu
+                auto* settings = Settings::GetSingleton();
+                const uint32_t hotkey   = settings->menuHotkey;
+                const uint32_t modifier = settings->menuHotkeyModifier;
+                if (key == hotkey) {
+                    const bool shiftPressed = g_leftShiftDown.load(std::memory_order_relaxed) || g_rightShiftDown.load(std::memory_order_relaxed);
+                    const bool ctrlPressed  = g_leftCtrlDown.load(std::memory_order_relaxed)  || g_rightCtrlDown.load(std::memory_order_relaxed);
+                    const bool altPressed   = g_leftAltDown.load(std::memory_order_relaxed)   || g_rightAltDown.load(std::memory_order_relaxed);
+
+                    const bool wantShift = (modifier & 1) != 0;
+                    const bool wantCtrl  = (modifier & 2) != 0;
+                    const bool wantAlt   = (modifier & 4) != 0;
+
+                    if (shiftPressed == wantShift && ctrlPressed == wantCtrl && altPressed == wantAlt) {
+                        requested = true;
+                    }
+                }
             }
         }
         if (!requested) return false;
@@ -566,6 +613,16 @@ namespace FollowerUnbound
             EquipPrompt::Resolve(a.value("accept", false));
             return;
         }
+        if (kind == "setHotkey") {
+            // JS'den gelen: { kind: "setHotkey", hotkey: 0x17, modifier: 1, text: "Shift + I" }
+            auto* s = Settings::GetSingleton();
+            s->menuHotkey         = a.value("hotkey",   uint32_t{ 0x17 });
+            s->menuHotkeyModifier = a.value("modifier", uint32_t{ 1 });
+            s->menuHotkeyText     = a.value("text",     std::string{ "Shift + I" });
+            s->Save();
+            logger::info("Hotkey updated to {} (modifier={}, text={})", s->menuHotkey, s->menuHotkeyModifier, s->menuHotkeyText);
+            return;
+        }
         const auto followerID = a.value("follower", uint32_t{ 0 });
         auto profile = manager->GetProfile(followerID);
         auto* actor = RE::TESForm::LookupByID<RE::Actor>(followerID);
@@ -612,6 +669,18 @@ namespace FollowerUnbound
                 equip->EquipObject(actor, weapon, nullptr, 1, nullptr, false, false, false, true);
             }
             AnimationManager::GetSingleton()->SheatheWeapon(actor);
+        } else if (kind == "equipHand") {
+            const auto itemID = a.value("item", uint32_t{ 0 });
+            const bool isLeft = a.value("leftHand", false);
+            auto* equip = RE::ActorEquipManager::GetSingleton();
+            if (!equip) return;
+            if (auto* bound = RE::TESForm::LookupByID<RE::TESBoundObject>(itemID)) {
+                profile->ProtectItem(itemID, true);
+                // 0x00013F42 = RightHand, 0x00013F43 = LeftHand
+                auto* slot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(isLeft ? 0x00013F43 : 0x00013F42);
+                equip->EquipObject(actor, bound, nullptr, 1, slot, false, false, false, true);
+                AnimationManager::GetSingleton()->SheatheWeapon(actor);
+            }
         }
     }
 
@@ -640,7 +709,9 @@ namespace FollowerUnbound
             {"lootFood",settings->lootFood},{"lootIngredients",settings->lootIngredients},
             {"lootSoulGems",settings->lootSoulGems},{"lootMisc",settings->lootMisc},
             {"notificationMode",settings->notificationMode},
-            {"lootDelay",settings->lootDelaySeconds},{"equipmentUpgradeChance",settings->equipmentUpgradeChance}
+            {"lootDelay",settings->lootDelaySeconds},{"equipmentUpgradeChance",settings->equipmentUpgradeChance},
+            {"menuHotkey",settings->menuHotkey},{"menuHotkeyModifier",settings->menuHotkeyModifier},
+            {"menuHotkeyText",settings->menuHotkeyText}
         };
         state["followers"] = nlohmann::json::array();
         auto gold = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0000000F);
@@ -669,6 +740,12 @@ namespace FollowerUnbound
                 {"drinks",stock.drinkN},{"alcohol",stock.drinkA},{"arrows",stock.arrows},{"bolts",stock.bolts},
                 {"soulGems",stock.soulGems},{"pettySoulGems",stock.pettySoulGems},{"lesserSoulGems",stock.lesserSoulGems},
                 {"commonSoulGems",stock.commonSoulGems},{"greaterSoulGems",stock.greaterSoulGems},
+                {"pettySoulGemsEmpty",stock.pettySoulGemsEmpty},{"pettySoulGemsFull",stock.pettySoulGemsFull},
+                {"lesserSoulGemsEmpty",stock.lesserSoulGemsEmpty},{"lesserSoulGemsFull",stock.lesserSoulGemsFull},
+                {"commonSoulGemsEmpty",stock.commonSoulGemsEmpty},{"commonSoulGemsFull",stock.commonSoulGemsFull},
+                {"greaterSoulGemsEmpty",stock.greaterSoulGemsEmpty},{"greaterSoulGemsFull",stock.greaterSoulGemsFull},
+                {"grandSoulGemsEmpty",stock.grandSoulGemsEmpty},{"grandSoulGemsFull",stock.grandSoulGemsFull},
+                {"blackSoulGemsEmpty",stock.blackSoulGemsEmpty},{"blackSoulGemsFull",stock.blackSoulGemsFull},
                 {"poisonHealth",stock.poisonHealth},{"poisonMagicka",stock.poisonMagicka},
                 {"poisonStamina",stock.poisonStamina},{"poisonOther",stock.poisonOther},
                 {"invisibilityPotions",stock.invisibilityPotions},
@@ -687,14 +764,34 @@ namespace FollowerUnbound
             };
             f["weapons"] = nlohmann::json::array();
             f["apparel"] = nlohmann::json::array();
+            auto* eqRight = actor->GetEquippedObject(false);
+            auto* eqLeft = actor->GetEquippedObject(true);
+            f["equippedRight"] = eqRight && eqRight->GetName() ? eqRight->GetName() : "Boş";
+            f["equippedLeft"] = eqLeft && eqLeft->GetName() ? eqLeft->GetName() : "Boş";
+
             for (const auto& [item, inv] : actor->GetInventory()) {
                 if (!item || inv.first <= 0) continue;
                 if (auto* weapon = item->As<RE::TESObjectWEAP>()) {
                     bool worn = false;
-                    if (auto* right = actor->GetEquippedObject(false); right && right->GetFormID() == weapon->GetFormID()) worn = true;
-                    if (auto* left = actor->GetEquippedObject(true); left && left->GetFormID() == weapon->GetFormID()) worn = true;
+                    if (eqRight && eqRight->GetFormID() == weapon->GetFormID()) worn = true;
+                    if (eqLeft && eqLeft->GetFormID() == weapon->GetFormID()) worn = true;
+                    uint32_t wType = 1;
+                    switch (weapon->GetWeaponType()) {
+                    case RE::WEAPON_TYPE::kOneHandSword: wType = 1; break;
+                    case RE::WEAPON_TYPE::kOneHandDagger: wType = 2; break;
+                    case RE::WEAPON_TYPE::kOneHandAxe: wType = 3; break;
+                    case RE::WEAPON_TYPE::kOneHandMace: wType = 4; break;
+                    case RE::WEAPON_TYPE::kTwoHandSword: wType = 5; break;
+                    case RE::WEAPON_TYPE::kTwoHandAxe: wType = 6; break;
+                    case RE::WEAPON_TYPE::kBow: wType = 8; break;
+                    case RE::WEAPON_TYPE::kCrossbow: wType = 9; break;
+                    case RE::WEAPON_TYPE::kStaff: wType = 10; break;
+                    default: wType = 1; break;
+                    }
+                    const bool is2H = (wType >= 5 && wType <= 9);
                     f["weapons"].push_back({{"id",weapon->GetFormID()},{"name",weapon->GetName() ? weapon->GetName() : "Weapon"},
                         {"slot",ItemEvaluator::GetWeaponTypeLabel(weapon)},
+                        {"weaponType",wType},{"isTwoHanded",is2H},
                         {"damage",weapon->GetAttackDamage()},{"count",inv.first},{"worn",worn},{"protected",p.IsProtected(weapon->GetFormID())}});
                 } else if (auto* armor = item->As<RE::TESObjectARMO>(); armor && !IsTngHiddenBodyItem(armor) &&
                     (armor->GetFormFlags() & RE::TESObjectARMO::RecordFlags::kNonPlayable) == 0) {
@@ -702,8 +799,13 @@ namespace FollowerUnbound
                     if (inv.second && inv.second->extraLists) for (auto* list : *inv.second->extraLists) {
                         if (list && (list->HasType(RE::ExtraDataType::kWorn) || list->HasType(RE::ExtraDataType::kWornLeft))) { worn = true; break; }
                     }
+                    using ArmorType = RE::BGSBipedObjectForm::ArmorType;
+                    const uint32_t armType = (armor->GetArmorType() == ArmorType::kHeavyArmor) ? 1 :
+                                             ((armor->GetArmorType() == ArmorType::kLightArmor) ? 2 : 3);
+                    const bool isShield = (static_cast<uint32_t>(armor->GetSlotMask()) & static_cast<uint32_t>(RE::BIPED_MODEL::BipedObjectSlot::kShield)) != 0;
                     f["apparel"].push_back({{"id",armor->GetFormID()},{"name",armor->GetName() ? armor->GetName() : "Apparel"},
                         {"slot",ItemEvaluator::GetArmorSlotLabel(armor)},
+                        {"armorType",armType},{"isShield",isShield},
                         {"armor",armor->GetArmorRating()},{"count",inv.first},{"worn",worn},{"protected",p.IsProtected(armor->GetFormID())}});
                 }
             }

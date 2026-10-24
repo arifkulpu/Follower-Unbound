@@ -268,21 +268,27 @@ namespace FollowerUnbound
         TextDisabled("Ruh taslari genel tuccarlardan ve saray buyuculerinden satin alinir.");
         Spacing();
 
-        auto soulGemPreference = [&](const char* label, bool& enabled, uint32_t& target, const char* id) {
+        auto soulGemPreference = [&](const char* label, bool& enabled, uint32_t& target, uint32_t& fillMode, const char* id) {
             bool value = enabled;
             int limit = static_cast<int>(target);
+            int currentFill = static_cast<int>(fillMode);
+            const char* fillOptions[] = { "Any (Both)", "Empty Only", "Full Only" };
             if (Checkbox(std::format("{}##{}_{}", label, id, formID).c_str(), &value)) enabled = value;
             SameLine();
             if (SliderInt(std::format("Limit 1-20##{}_{}", id, formID).c_str(), &limit, 1, 20)) {
                 target = static_cast<uint32_t>(std::clamp(limit, 1, 20));
             }
+            SameLine();
+            if (Combo(std::format("Type##{}_{}", id, formID).c_str(), &currentFill, fillOptions, 3)) {
+                fillMode = static_cast<uint32_t>(std::clamp(currentFill, 0, 2));
+            }
         };
-        soulGemPreference("Petty Soul Gems", pref.buyPettySoulGems, pref.maxPettySoulGems, "PettySoul");
-        soulGemPreference("Lesser Soul Gems", pref.buyLesserSoulGems, pref.maxLesserSoulGems, "LesserSoul");
-        soulGemPreference("Common Soul Gems", pref.buyCommonSoulGems, pref.maxCommonSoulGems, "CommonSoul");
-        soulGemPreference("Greater Soul Gems", pref.buyGreaterSoulGems, pref.maxGreaterSoulGems, "GreaterSoul");
-        soulGemPreference("Grand Soul Gems", pref.buyGrandSoulGems, pref.maxGrandSoulGems, "GrandSoul");
-        soulGemPreference("Black Soul Gems", pref.buyBlackSoulGems, pref.maxBlackSoulGems, "BlackSoul");
+        soulGemPreference("Petty Soul Gems", pref.buyPettySoulGems, pref.maxPettySoulGems, pref.soulGemFillPetty, "PettySoul");
+        soulGemPreference("Lesser Soul Gems", pref.buyLesserSoulGems, pref.maxLesserSoulGems, pref.soulGemFillLesser, "LesserSoul");
+        soulGemPreference("Common Soul Gems", pref.buyCommonSoulGems, pref.maxCommonSoulGems, pref.soulGemFillCommon, "CommonSoul");
+        soulGemPreference("Greater Soul Gems", pref.buyGreaterSoulGems, pref.maxGreaterSoulGems, pref.soulGemFillGreater, "GreaterSoul");
+        soulGemPreference("Grand Soul Gems", pref.buyGrandSoulGems, pref.maxGrandSoulGems, pref.soulGemFillGrand, "GrandSoul");
+        soulGemPreference("Black Soul Gems", pref.buyBlackSoulGems, pref.maxBlackSoulGems, pref.soulGemFillBlack, "BlackSoul");
 
         // Torches (Meşale)
         bool buyTorch = pref.buyTorches;

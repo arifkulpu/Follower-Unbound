@@ -115,6 +115,39 @@ namespace FollowerUnbound
             return "";
         }
 
+        static bool MatchesPreferredArmor(RE::TESObjectARMO* armor, uint32_t preferredType)
+        {
+            if (!armor || preferredType == 0) return true;
+            using Slot = RE::BIPED_MODEL::BipedObjectSlot;
+            const auto mask = static_cast<uint32_t>(armor->GetSlotMask());
+            // Kalkan veya takılar kıyafet bütünlüğü kısıtlamasına dahil değildir
+            if (mask & static_cast<uint32_t>(Slot::kShield) ||
+                mask & static_cast<uint32_t>(Slot::kAmulet) ||
+                mask & static_cast<uint32_t>(Slot::kRing)) {
+                return true;
+            }
+            // Sadece kafa, gövde, eldiven ve ayakkabı için geçerlidir
+            using ArmorType = RE::BGSBipedObjectForm::ArmorType;
+            const auto armorType = armor->GetArmorType();
+            if (preferredType == 1) return armorType == ArmorType::kHeavyArmor;
+            if (preferredType == 2) return armorType == ArmorType::kLightArmor;
+            if (preferredType == 3) return armorType == ArmorType::kClothing || armor->GetArmorRating() == 0;
+            return true;
+        }
+
+        static bool MatchesWeaponCategory(RE::TESObjectWEAP* weapon, uint32_t subType)
+        {
+            if (!weapon || subType == 0) return true;
+            const auto t = weapon->GetWeaponType();
+            // 1=Kılıç, 2=Hançer, 3=Balta, 4=Gürz, 5=Asa
+            if (subType == 1) return t == RE::WEAPON_TYPE::kOneHandSword;
+            if (subType == 2) return t == RE::WEAPON_TYPE::kOneHandDagger;
+            if (subType == 3) return t == RE::WEAPON_TYPE::kOneHandAxe;
+            if (subType == 4) return t == RE::WEAPON_TYPE::kOneHandMace;
+            if (subType == 5) return t == RE::WEAPON_TYPE::kStaff;
+            return true;
+        }
+
     private:
         ItemEvaluator() = default;
     };

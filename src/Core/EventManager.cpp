@@ -114,20 +114,27 @@ namespace FollowerUnbound
                 const auto handle = RE::ContainerMenu::GetTargetRefHandle();
                 auto target = RE::TESObjectREFR::LookupByHandle(handle);
                 if (target) {
-                    _lastContainerOpened = target->GetFormID();
+                    auto* actor = target->As<RE::Actor>();
+                    // Asla canlı aktörleri (özellikle diyalogla takas yapılan takipçileri) veya yaşayan NPC'leri kaydetme
+                    if (actor) {
+                        if (actor->IsDead() && !FollowerManager::GetSingleton()->IsFollower(actor->GetFormID())) {
+                            _lastContainerOpened = target->GetFormID();
+                        }
+                    } else {
+                        _lastContainerOpened = target->GetFormID();
+                    }
                 }
             } else {
                 RE::FormID containerID = _lastContainerOpened;
-                if (containerID == 0) {
-                    const auto handle = RE::ContainerMenu::GetTargetRefHandle();
-                    auto target = RE::TESObjectREFR::LookupByHandle(handle);
-                    if (target) {
-                        containerID = target->GetFormID();
-                    }
-                }
                 if (containerID != 0) {
-                    LootManager::GetSingleton()->QueuePlayerLootDistribution(containerID);
-                    LootManager::GetSingleton()->ScheduleProcessing();
+                    auto* target = RE::TESForm::LookupByID<RE::TESObjectREFR>(containerID);
+                    if (target) {
+                        auto* actor = target->As<RE::Actor>();
+                        if (!actor || (actor->IsDead() && !FollowerManager::GetSingleton()->IsFollower(actor->GetFormID()))) {
+                            LootManager::GetSingleton()->QueuePlayerLootDistribution(containerID);
+                            LootManager::GetSingleton()->ScheduleProcessing();
+                        }
+                    }
                 }
                 _lastContainerOpened = 0;
             }
@@ -244,6 +251,24 @@ namespace FollowerUnbound
         // callbacks and also covers pickable mushrooms/eggs and mod ingredients.
         auto* player = RE::PlayerCharacter::GetSingleton();
         const auto playerID = player ? player->GetFormID() : 0;
+
+        // Oyuncudan takipçiye verilen silah ve zırhları otomatik korumalı (PROTECTED) yap:
+        // Takipçi bunları tüccara satamaz; oyuncu isterse Equipment arayüzünden korumayı kaldırabilir.
+        if (playerID && a_event->oldContainer == playerID && a_event->newContainer != 0) {
+            auto* manager = FollowerManager::GetSingleton();
+            if (manager && manager->IsFollower(a_event->newContainer)) {
+                if (auto profile = manager->GetProfile(a_event->newContainer)) {
+                    if (auto* boundObj = RE::TESForm::LookupByID<RE::TESBoundObject>(a_event->baseObj)) {
+                        if (boundObj->As<RE::TESObjectWEAP>() || boundObj->As<RE::TESObjectARMO>()) {
+                            profile->ProtectItem(a_event->baseObj, true);
+                            logger::info("Player gave {} to follower {:08X}; auto-protected from sale.",
+                                boundObj->GetName() ? boundObj->GetName() : "Item", a_event->newContainer);
+                        }
+                    }
+                }
+            }
+        }
+
         if (playerID && a_event->newContainer == playerID) {
             auto* ui = RE::UI::GetSingleton();
             const bool inMenu = ui && (ui->IsMenuOpen(RE::BarterMenu::MENU_NAME) || ui->IsMenuOpen(RE::ContainerMenu::MENU_NAME));
@@ -377,7 +402,7 @@ namespace FollowerUnbound
             if (a_event->oldContainer != 0 && a_event->oldContainer != playerID && Settings::GetSingleton()->autoLootCorpses) {
                 auto* sourceRef = RE::TESForm::LookupByID<RE::TESObjectREFR>(a_event->oldContainer);
                 auto* sourceActor = sourceRef ? sourceRef->As<RE::Actor>() : nullptr;
-                if (sourceActor && sourceActor->IsDead()) {
+                if (sourceActor && sourceActor->IsDead() && !FollowerManager::GetSingleton()->IsFollower(sourceActor->GetFormID())) {
                     LootManager::GetSingleton()->QueuePlayerLootDistribution(sourceActor->GetFormID());
                     LootManager::GetSingleton()->ScheduleProcessing();
                 }

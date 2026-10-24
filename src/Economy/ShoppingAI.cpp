@@ -1,6 +1,7 @@
 #include "Economy/ShoppingAI.h"
 #include "Economy/EconomyManager.h"
 #include "AI/ItemEvaluator.h"
+#include "AI/ConsumableAI.h"
 #include "UI/NotificationManager.h"
 #include "UI/EquipPrompt.h"
 #include "Core/Settings.h"
@@ -480,6 +481,34 @@ namespace FollowerUnbound
         return SOther;
     }
 
+    // Kullanıcının belirttiği FormID'ler veya RE::TESSoulGem::GetContainedSoul() bazlı dolu/boş kontrolü
+    static bool IsSoulGemFull(RE::TESBoundObject* obj)
+    {
+        if (!obj) return false;
+        switch (obj->GetFormID()) {
+        case 0x0002E4E3: // Petty Full
+        case 0x0002E4E5: // Lesser Full
+        case 0x0002E4F3: // Common Full
+        case 0x0002E4FB: // Greater Full
+        case 0x0002E4FF: // Grand Full
+        case 0x0002E504: // Black Full
+            return true;
+        case 0x0002E4E2: // Petty Empty
+        case 0x0002E4E4: // Lesser Empty
+        case 0x0002E4E6: // Common Empty
+        case 0x0002E4F4: // Greater Empty
+        case 0x0002E4FC: // Grand Empty
+        case 0x0002E500: // Black Empty
+            return false;
+        default:
+            break;
+        }
+        if (auto* gem = obj->As<RE::TESSoulGem>()) {
+            return gem->GetContainedSoul() != RE::SOUL_LEVEL::kNone;
+        }
+        return false;
+    }
+
     // Tek geçişte takipçinin tüm sarf stoklarını sayar (performans: 15 ayrı
     // GetInventory çağrısı yerine 1 çağrı).
     static SupplyCounts CountSupplies(RE::Actor* actor, ItemEvaluator* ev)
@@ -488,6 +517,7 @@ namespace FollowerUnbound
         if (!actor) return c;
         for (const auto& [obj, inv] : actor->GetInventory()) {
             if (!obj || inv.first <= 0) continue;
+            const bool isFull = IsSoulGemFull(obj);
             switch (ClassifySupply(ev, obj)) {
             case SHealth:      c.health += inv.first; break;
             case SMagicka:     c.magicka += inv.first; break;
@@ -501,12 +531,36 @@ namespace FollowerUnbound
             case SArrow:       c.arrows += inv.first; break;
             case SBolt:        c.bolts += inv.first; break;
             case SSoulGem:     c.soulGems += inv.first; break;
-            case SSoulPetty: c.pettySoulGems += inv.first; c.soulGems += inv.first; break;
-            case SSoulLesser: c.lesserSoulGems += inv.first; c.soulGems += inv.first; break;
-            case SSoulCommon: c.commonSoulGems += inv.first; c.soulGems += inv.first; break;
-            case SSoulGreater: c.greaterSoulGems += inv.first; c.soulGems += inv.first; break;
-            case SSoulGrand: c.grandSoulGems += inv.first; c.soulGems += inv.first; break;
-            case SSoulBlack: c.blackSoulGems += inv.first; c.soulGems += inv.first; break;
+            case SSoulPetty:
+                c.pettySoulGems += inv.first;
+                c.soulGems += inv.first;
+                if (isFull) c.pettySoulGemsFull += inv.first; else c.pettySoulGemsEmpty += inv.first;
+                break;
+            case SSoulLesser:
+                c.lesserSoulGems += inv.first;
+                c.soulGems += inv.first;
+                if (isFull) c.lesserSoulGemsFull += inv.first; else c.lesserSoulGemsEmpty += inv.first;
+                break;
+            case SSoulCommon:
+                c.commonSoulGems += inv.first;
+                c.soulGems += inv.first;
+                if (isFull) c.commonSoulGemsFull += inv.first; else c.commonSoulGemsEmpty += inv.first;
+                break;
+            case SSoulGreater:
+                c.greaterSoulGems += inv.first;
+                c.soulGems += inv.first;
+                if (isFull) c.greaterSoulGemsFull += inv.first; else c.greaterSoulGemsEmpty += inv.first;
+                break;
+            case SSoulGrand:
+                c.grandSoulGems += inv.first;
+                c.soulGems += inv.first;
+                if (isFull) c.grandSoulGemsFull += inv.first; else c.grandSoulGemsEmpty += inv.first;
+                break;
+            case SSoulBlack:
+                c.blackSoulGems += inv.first;
+                c.soulGems += inv.first;
+                if (isFull) c.blackSoulGemsFull += inv.first; else c.blackSoulGemsEmpty += inv.first;
+                break;
             case SBlueMountainFlower: c.blueMountainFlowers += inv.first; break;
             case SWheat: c.wheat += inv.first; break;
             case SRedMountainFlower: c.redMountainFlowers += inv.first; break;
@@ -605,6 +659,8 @@ namespace FollowerUnbound
         std::unordered_set<RE::TESObjectREFR*> scannedContainers;
         auto scanContainer = [&](RE::TESObjectREFR* container) {
             if (!container || !scannedContainers.insert(container).second) return;
+            // Kesinlikle aktörlerin (NPC) kendi envanterini sandık olarak tarama! Sadece gerçek sandıkları tara.
+            if (container->As<RE::Actor>()) return;
             for (const auto& [obj, invData] : container->GetInventory()) {
                 if (!obj || invData.first <= 0 || obj->GetFormID() == 0x0000000F) continue;
                 SupplyCat cat = ClassifySupply(ev, obj);
@@ -617,10 +673,8 @@ namespace FollowerUnbound
             }
         };
 
-        // Some stock is directly carried by the actor (modded vendors), but
-        // vanilla merchant stock normally lives in the vendor faction's
-        // merchant container. Scan both paths and deduplicate shared chests.
-        scanContainer(vendor);
+        // Satıcıların şahsi envanteri (üstlerindeki kıyafetler, silahlar vb.) ASLA taranmaz.
+        // Yalnızca satıcı fraksiyonuna bağlı merchant container (satıcı sandığı) taranır.
         if (auto* faction = vendor->GetVendorFaction()) {
             scanContainer(faction->vendorData.merchantContainer);
         }
@@ -681,6 +735,13 @@ namespace FollowerUnbound
         auto* armor = candidate->As<RE::TESObjectARMO>();
         if (!armor || IsTngHiddenBodyItem(armor) || static_cast<uint32_t>(armor->GetSlotMask()) == 0 ||
             (armor->GetFormFlags() & RE::TESObjectARMO::RecordFlags::kNonPlayable) != 0) return std::nullopt;
+
+        // Kıyafet Bütünlüğü Kuralı: Takipçinin tercih ettiği zırh türüne uymuyorsa satın alma teklifi yapma
+        if (auto profile = FollowerManager::GetSingleton()->GetProfile(follower->GetFormID())) {
+            if (!ItemEvaluator::MatchesPreferredArmor(armor, profile->preferences.preferredArmorType)) {
+                return std::nullopt;
+            }
+        }
 
         const auto candidateMask = static_cast<uint32_t>(armor->GetSlotMask());
         RE::TESObjectARMO* current = nullptr;
@@ -798,13 +859,14 @@ namespace FollowerUnbound
             bool isAmmo;
             uint32_t vendMask;
             const char* label;
+            uint8_t soulGemFill{ 0 }; // 0 = Any, 1 = Empty, 2 = Full
         };
 
         std::vector<Need> needs;
         needs.reserve(48);
 
-        auto addNeed = [&](SupplyCat cat, int32_t current, uint32_t limit, bool enabled, bool isAmmo, uint32_t mask, const char* label) {
-            needs.push_back({ cat, current, limit, enabled, isAmmo, mask, label });
+        auto addNeed = [&](SupplyCat cat, int32_t current, uint32_t limit, bool enabled, bool isAmmo, uint32_t mask, const char* label, uint8_t gemFill = 0) {
+            needs.push_back({ cat, current, limit, enabled, isAmmo, mask, label, gemFill });
         };
 
         // Life Again injury events determine treatment potion demand. Keep this
@@ -874,12 +936,23 @@ namespace FollowerUnbound
 
         // SoulKeeper purchasing has been retired; buy each vanilla gem capacity independently.
         constexpr uint32_t soulGemVendors = kVendGeneral | kVendWizard;
-        addNeed(SSoulPetty, supplies.pettySoulGems, pref.maxPettySoulGems, pref.buyPettySoulGems, false, soulGemVendors, "Petty Soul Gem");
-        addNeed(SSoulLesser, supplies.lesserSoulGems, pref.maxLesserSoulGems, pref.buyLesserSoulGems, false, soulGemVendors, "Lesser Soul Gem");
-        addNeed(SSoulCommon, supplies.commonSoulGems, pref.maxCommonSoulGems, pref.buyCommonSoulGems, false, soulGemVendors, "Common Soul Gem");
-        addNeed(SSoulGreater, supplies.greaterSoulGems, pref.maxGreaterSoulGems, pref.buyGreaterSoulGems, false, soulGemVendors, "Greater Soul Gem");
-        addNeed(SSoulGrand, supplies.grandSoulGems, pref.maxGrandSoulGems, pref.buyGrandSoulGems, false, soulGemVendors, "Grand Soul Gem");
-        addNeed(SSoulBlack, supplies.blackSoulGems, pref.maxBlackSoulGems, pref.buyBlackSoulGems, false, soulGemVendors, "Black Soul Gem");
+        auto getGemCount = [](uint8_t fillMode, int32_t total, int32_t emptyCount, int32_t fullCount) -> int32_t {
+            if (fillMode == 1) return emptyCount; // Empty only
+            if (fillMode == 2) return fullCount;  // Full only
+            return total;                         // Any (0)
+        };
+        addNeed(SSoulPetty, getGemCount(pref.soulGemFillPetty, supplies.pettySoulGems, supplies.pettySoulGemsEmpty, supplies.pettySoulGemsFull),
+                pref.maxPettySoulGems, pref.buyPettySoulGems, false, soulGemVendors, "Petty Soul Gem", pref.soulGemFillPetty);
+        addNeed(SSoulLesser, getGemCount(pref.soulGemFillLesser, supplies.lesserSoulGems, supplies.lesserSoulGemsEmpty, supplies.lesserSoulGemsFull),
+                pref.maxLesserSoulGems, pref.buyLesserSoulGems, false, soulGemVendors, "Lesser Soul Gem", pref.soulGemFillLesser);
+        addNeed(SSoulCommon, getGemCount(pref.soulGemFillCommon, supplies.commonSoulGems, supplies.commonSoulGemsEmpty, supplies.commonSoulGemsFull),
+                pref.maxCommonSoulGems, pref.buyCommonSoulGems, false, soulGemVendors, "Common Soul Gem", pref.soulGemFillCommon);
+        addNeed(SSoulGreater, getGemCount(pref.soulGemFillGreater, supplies.greaterSoulGems, supplies.greaterSoulGemsEmpty, supplies.greaterSoulGemsFull),
+                pref.maxGreaterSoulGems, pref.buyGreaterSoulGems, false, soulGemVendors, "Greater Soul Gem", pref.soulGemFillGreater);
+        addNeed(SSoulGrand, getGemCount(pref.soulGemFillGrand, supplies.grandSoulGems, supplies.grandSoulGemsEmpty, supplies.grandSoulGemsFull),
+                pref.maxGrandSoulGems, pref.buyGrandSoulGems, false, soulGemVendors, "Grand Soul Gem", pref.soulGemFillGrand);
+        addNeed(SSoulBlack, getGemCount(pref.soulGemFillBlack, supplies.blackSoulGems, supplies.blackSoulGemsEmpty, supplies.blackSoulGemsFull),
+                pref.maxBlackSoulGems, pref.buyBlackSoulGems, false, soulGemVendors, "Black Soul Gem", pref.soulGemFillBlack);
 
         // Ekstra Gereçler (Meşale, Fener Yağı, Sabun)
         addNeed(STorch, supplies.torches, pref.maxTorches, pref.buyTorches, false, kVendGeneral | kVendInn, "Torch");
@@ -1088,7 +1161,7 @@ namespace FollowerUnbound
             }
         }
 
-        auto purchase = [&](RE::TESBoundObject* obj, uint32_t desiredQty, const char* vendorName) -> uint32_t {
+        auto purchase = [&](RE::TESBoundObject* obj, uint32_t desiredQty, const char* vendorName, RE::FormID containerID) -> uint32_t {
             if (!obj || desiredQty == 0) return 0;
 
             uint32_t unitPrice = 5;
@@ -1120,6 +1193,16 @@ namespace FollowerUnbound
             follower->RemoveItem(goldItem, static_cast<int32_t>(totalCost), RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
             econ->RemoveGold(formID, static_cast<int32_t>(totalCost));
 
+            // Eşyayı satıcının sandığından düş ve ödenen altını sandığa koy (kesinlikle aktör olmamalı)
+            if (containerID != 0) {
+                if (auto* chest = RE::TESForm::LookupByID<RE::TESObjectREFR>(containerID)) {
+                    if (!chest->As<RE::Actor>()) {
+                        chest->RemoveItem(obj, static_cast<int32_t>(finalQty), RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                        chest->AddObjectToContainer(goldItem, nullptr, static_cast<int32_t>(totalCost), nullptr);
+                    }
+                }
+            }
+
             // Add purchased item
             follower->AddObjectToContainer(obj, nullptr, static_cast<int32_t>(finalQty), nullptr);
 
@@ -1137,7 +1220,7 @@ namespace FollowerUnbound
             return finalQty;
         };
 
-        auto tryBuyStock = [&](SupplyCat cat, uint32_t desiredQty, bool isAmmo, uint32_t requiredMask, const char* label) -> bool {
+        auto tryBuyStock = [&](SupplyCat cat, uint32_t desiredQty, bool isAmmo, uint32_t requiredMask, const char* label, uint8_t gemFill = 0) -> bool {
             auto& bucket = stock.buckets[static_cast<int>(cat) - 1];
             if (bucket.empty() || desiredQty == 0) return false;
 
@@ -1148,16 +1231,22 @@ namespace FollowerUnbound
                 // En ucuz stoktan al (adet başı altın değeri)
                 for (auto& e : bucket) {
                     if (e.stock <= 0 || (e.vendorMask & requiredMask) == 0) continue;
+                    // Ruh taşı boş/dolu filtrelemesi (1 = Boş, 2 = Dolu)
+                    if (gemFill == 1 && IsSoulGemFull(e.obj)) continue;
+                    if (gemFill == 2 && !IsSoulGemFull(e.obj)) continue;
                     if (!entry || e.obj->GetGoldValue() < entry->obj->GetGoldValue()) entry = &e;
                 }
             }
             if (!entry || entry->stock <= 0) return false;
 
             uint32_t qty = std::min<uint32_t>(desiredQty, static_cast<uint32_t>(entry->stock));
-            const uint32_t purchasedQty = purchase(entry->obj, qty, entry->vendorName);
+            const uint32_t purchasedQty = purchase(entry->obj, qty, entry->vendorName, entry->stockContainerID);
             if (purchasedQty > 0) {
                 entry->stock -= static_cast<int32_t>(purchasedQty);
                 purchasedByCategory[cat] += purchasedQty;
+                if (cat == SPoisonHealth || cat == SPoisonMagicka || cat == SPoisonStamina || cat == SPoisonOther || cat == SPoison) {
+                    ConsumableAI::GetSingleton()->NotifyPoisonAcquired(formID);
+                }
                 return true;
             }
             return false;
@@ -1178,7 +1267,7 @@ namespace FollowerUnbound
             const uint32_t purchaseTarget = outstanding;
             attemptedCategories.insert(n.cat);
             if (tryBuyStock(n.cat, purchaseTarget,
-                             n.isAmmo, n.vendMask, n.label)) {
+                             n.isAmmo, n.vendMask, n.label, n.soulGemFill)) {
                 purchasesThisRound++;
                 nextCursor = (index + 1) % needs.size();
             }
@@ -1340,7 +1429,8 @@ namespace FollowerUnbound
 
             // 1. KORUMALI EŞYALAR — ASLA SATILMAZ (kıyafet koruma ayarı + ruh taşları filtresi)
             if (itemID == 0x0000000F) continue; // Altın satılmaz
-            if (profile.IsProtected(itemID)) continue; // Oyuncunun koruduğu eşya
+            const bool isGear = (boundObj->As<RE::TESObjectWEAP>() != nullptr || boundObj->As<RE::TESObjectARMO>() != nullptr);
+            if (profile.IsProtected(itemID) && !isGear) continue; // Ekipman dışındaki korunan eşyalar satılmaz
 
             // Life Again treatment items remain in the follower's inventory
             // until Life Again itself consumes them to heal the follower.
@@ -1393,8 +1483,14 @@ namespace FollowerUnbound
             }
 
             int32_t totalEquipped = std::max(equippedWeaponCount, wornArmorCount);
-            int32_t unequippedCount = count - totalEquipped;
-            if (unequippedCount <= 0) continue; // Tüm kopyalar giyili/kuşanılmış → satılmaz!
+            // Korunan veya giyilen eşyaların asıl kullanılan kopyası (en az 1 adet) korunur,
+            // varsa fazladan olan kopyaları (örneğin 4 demir zırhtan 3 tanesi) satılabilir.
+            int32_t protectedCopies = totalEquipped;
+            if (profile.IsProtected(itemID)) {
+                protectedCopies = std::max(protectedCopies, 1);
+            }
+            int32_t unequippedCount = count - protectedCopies;
+            if (unequippedCount <= 0) continue; // Tüm kopyalar giyili/korumalı → satılmaz!
 
             int32_t baseVal = boundObj->GetGoldValue();
             if (baseVal <= 0) continue;

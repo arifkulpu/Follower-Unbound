@@ -22,6 +22,14 @@ namespace FollowerUnbound
         bool enablePoisonSystem{ true };     // Assassin auto-apply poison to weapon
         bool enablePetSystem{ true };        // Animals/Pets (cats, dogs, horses) have hunger/thirst/fatigue needs
 
+        // ── HOTKEY SETTINGS ──
+        // menuHotkey: DirectX scan code (default: 0x17 = 'I')
+        // menuHotkeyModifier: bitmask: 0 = None, 1 = Shift, 2 = Ctrl, 4 = Alt (default: 1 = Shift)
+        // menuHotkeyText: human-readable label (default: "Shift + I")
+        uint32_t menuHotkey{ 0x17 };
+        uint32_t menuHotkeyModifier{ 1 };
+        std::string menuHotkeyText{ "Shift + I" };
+
         // ── LOOTING ──
         bool autoLootCorpses{ true };        // Oyuncu ceset/konteyner menüsünü kapatınca kalan eşyaları takipçilere dağıt
         float lootDelaySeconds{ 10.0f };     // Savaş bittikten kaç saniye sonra cesetler yağmalanır

@@ -1,0 +1,133 @@
+# Follower Unbound - Güncelleme Günlüğü v0.2.2 / Changelog v0.2.2
+
+================================================================================
+TÜRKÇE (TURKISH)
+================================================================================
+
+## Genel Bakış
+v0.2.2 güncellemesi; takipçiler için derinlemesine silah ve zırh kuşanma yönetimi (Tek El, Çift El, Menzilli, Asli/Yardımcı silah tarzları), Kıyafet Bütünlüğü Sistemi (Ağır/Hafif/Cübbe), oyuncunun verdiği eşyaların otomatik korunması, savaşta iksir içme animasyon kilidinin giderilmesi, at sırtındayken animasyonların durdurulması, ruh taşlarında boş/dolu alışveriş seçimi ve özelleştirilebilir klavye kısayol tuşu sistemini oyuna kazandırır.
+
+---
+
+## 🌟 Yeni Özellikler & Geliştirmeler
+
+### 1. Yeni Ekipman Yönetim Sistemi (Equipment 3-Tab Loadout)
+Prisma UI **Equipment** bölümü baştan aşağı yenilendi ve 3 özel sekmeye ayrıldı:
+- ⚔️ **SİLAH (Weapons):**
+  - **Mevcut Kuşanılanlar:** Takipçinin o an sağ ve sol elinde tuttuğu eşyalar anlık olarak görüntülenir.
+  - **1. Tek Elli Silahlar (One-Handed):**
+    - Hançerler (Daggers), Kılıçlar (Swords), Savaş Baltaları (War Axes), Gürzler (Maces).
+    - Tek elli tarz seçildiğinde **Sağ El** ve **Sol El** yuva seçimi açılır (Kılıç+Kalkan, Çift El Kılıç/Hançer vb.).
+  - **2. Çift Elli Silahlar (Two-Handed):**
+    - Büyük Kılıçlar (Greatswords), Büyük Baltalar (Battleaxes), Savaş Çekiçleri (Warhammers).
+  - **3. Menzilli Silahlar ve Asalar:**
+    - Yaylar (Bows), Arbaletler (Crossbows), Asalar (Staves).
+    - Asalar için de sağ ve sol el seçimi mevcuttur (Örn: Sağ elde asa, sol elde kılıç veya büyü).
+  - **Asli (Primary) ve Yardımcı (Secondary) Silah Tarzı:**
+    - Her takipçi için hem genel savaş tarzı (Asli) hem de alternatif/durumsal savaş tarzı (Yardımcı) bağımsız olarak belirlenebilir (Örn: Asli Kılıç+Kalkan, Yardımcı Yay).
+  - **Doğrudan Ele Kuşanma:** Envanterdeki silahlarda tek tıkla `[Sağ El]`, `[Sol El]` veya `[İki Ele Kuşan]` butonları eklendi.
+- 🛡️ **ZIRH (Armor):**
+  - **Kıyafet Bütünlüğü Sistemi:** Takipçinin zırh sınıfı belirlenebilir:
+    - 🛡️ **Ağır Zırh (Heavy Armor Only)**
+    - 🪶 **Hafif Zırh (Light Armor Only)**
+    - 🧙 **Kıyafet & Cübbe (Clothing / Robes Only)**
+    - ⚖️ **Serbest (Any)**
+  - Takipçi kafa, gövde, eldiven ve ayakkabı parçalarında sadece seçilen sınıftaki zırhları giyer. Yerden bulduğu veya dükkandan teklif edilen zırhlar bu kurala uymak zorundadır.
+- 🎒 **ENVANTER (Inventory):**
+  - Takipçinin tüm silah, zırh, kalkan ve giysilerinin listelendiği genel görünüm.
+  - Eşyaların korunma ve kuşanılma durumları yönetilebilir.
+
+### 2. Oyuncunun Verdiği Eşyaların Otomatik Korunması (Auto-Protection)
+- Oyuncu takas penceresinden veya hediye olarak takipçiye bir silah, zırh veya kıyafet verdiğinde, eşya motor düzeyinde anında **PROTECTED (Korumalı)** olarak işaretlenir.
+- Takipçiler oyuncunun kendilerine verdiği bu eşyaları tüccarlara asla satamaz.
+- Oyuncu dilerse Equipment -> Envanter sekmesinden eşyanın koruma kutucuğunun tikini kaldırarak bir sonraki satışta satılabilir yapabilir.
+
+### 3. Savaşta İksir İçme Animasyon Kilidi Giderildi (Combat Potion Fix)
+- Acil durumlarda (`emergency`) takipçinin her tick'te iksir içme komutu alarak animasyon kilitlenmesine girmesi ve silahının elde donup kalması engellendi (1.5 saniyelik animasyon penceresi eklendi).
+- İksir içme tamamlandığında motor düzeyinde `IdleForceDefaultState` ve `EvaluatePackage` çağrılarak takipçinin animasyon grafiği sıfırlanır, silahı hazır hale getirilir ve yapay zeka hemen saldırıya devam eder.
+- Animasyon motoruyla çakışan elle yazılmış `weaponState` değişkeni temizlendi.
+
+### 4. Silah Zehirleme Zamanlaması & Gecikme (Poison Application Delay)
+- Takipçiler artık savaş bittikten ve etraftaki tüm cesetlerin yağmalanması tamamlandıktan **tam 3 saniye sonra** ellerindeki silahlara zehir basar; böylece zehirleme animasyonu net bir şekilde görülebilir.
+- Takipçi zehir satın aldığında veya oyuncudan teslim aldığında da **3 saniyelik doğal gecikmeyle** silaha sürer.
+
+### 5. At Sırtındayken (Mounted) Animasyonların Durdurulması
+- Takipçiler ata bindiğinde (mounted) yeme, içme, silaha zehir sürme, iksir kullanma ve ceset yağmalama gibi animasyonları ve AI eylemleri tamamen durdurulur.
+
+### 6. Ruh Taşı Alışverişinde Boş/Dolu Tercihi (Soul Gem Fill Mode)
+- Petty, Lesser, Common, Greater, Grand ve Black soul gem kategorilerinin her biri için ayrı ayrı:
+  - `Her İkisi (Any)`
+  - `Boş (Empty Only)`
+  - `Dolu (Full Only)`
+  seçim özelliği getirildi. Takipçiler sadece seçilen doluluk durumundaki ruh taşlarını satın alır.
+
+### 7. Menü Kısayol Tuşu Atama Sistemi (Custom Hotkey System)
+- `button->IsPressed()` düzeltmesiyle menünün açılır açılmaz anında kapanma sorunu kökten çözüldü.
+- Tek tuş (örn: I, U, O, K, F1..F11) veya çift tuş kombinasyonları (Shift + I, Ctrl + U, Alt + K vb.) tam desteklenir.
+- Prisma UI Systems sekmesine hem klavyeden basılan tuşu algılayan **"Tuş Ata…"** butonu, hem de doğrudan açılır kutudan seçilebilen **Hazır Seçim Menüsü** eklendi.
+
+### 8. Geriye Dönük Kayıt Uyumluluğu
+- Kayıt sistemi versiyonu 21'e güncellendi. Eski kayıt dosyaları (save game) bozulmadan sorunsuzca yüklenir.
+
+
+================================================================================
+ENGLISH
+================================================================================
+
+## Overview
+v0.2.2 introduces an extensive 3-tab Equipment Loadout System (Weapons, Armor, Inventory), Armor Weight Integrity (Heavy, Light, Clothing), automatic protection for player-gifted gear, combat potion animation recovery, mounted state animation suppression, Soul Gem empty/full shopping filter, and a robust custom hotkey rebinding system.
+
+---
+
+## 🌟 Key Features & Improvements
+
+### 1. New 3-Tab Equipment Loadout System
+The Prisma UI **Equipment** interface has been completely redesigned with 3 distinct tabs:
+- ⚔️ **WEAPONS:**
+  - **Currently Equipped Display:** Real-time visibility of what the follower holds in their Right and Left hands.
+  - **One-Handed Weapons:** Daggers, Swords, War Axes, Maces. Independent Right-Hand and Left-Hand slot configuration (Sword & Shield, Dual Wielding, etc.).
+  - **Two-Handed Weapons:** Greatswords, Battleaxes, Warhammers.
+  - **Ranged Weapons & Staves:** Bows, Crossbows, Staves. Staves also support dual-hand setups (e.g. staff + sword or spell).
+  - **Primary & Secondary Styles:** Configure distinct main and situational loadouts (e.g., Primary: Sword & Shield, Secondary: Bow).
+  - **Direct Hand Equip:** Equip weapons with one click using `[Right Hand]`, `[Left Hand]`, or `[Two-Hand]`.
+- 🛡️ **ARMOR:**
+  - **Armor Weight Integrity:** Followers can be assigned to wear strictly:
+    - 🛡️ **Heavy Armor Only**
+    - 🪶 **Light Armor Only**
+    - 🧙 **Clothing / Robes Only**
+    - ⚖️ **Any / Best Armor**
+  - Applies to Head, Body, Hands, and Feet slots. Followers will never auto-equip or be offered gear outside their chosen armor category.
+- 🎒 **INVENTORY:**
+  - Complete list of all carried weapons, shields, and apparel.
+  - Easily toggle protected status to safeguard items from being sold.
+
+### 2. Auto-Protection for Player-Gifted Items
+- Any weapon, shield, or armor traded/gifted from the player to a follower is automatically marked as **PROTECTED** via engine-level container change events.
+- Followers will never sell player-gifted equipment to merchants.
+- Players can unprotect items at any time in the Inventory tab to allow them to be sold.
+
+### 3. Combat Potion Animation Freeze Fix
+- Resolved an issue where followers spamming potions in emergency states became frozen in idle weapon states.
+- Implemented a 1.5-second animation lock followed by `IdleForceDefaultState` and `EvaluatePackage` resets to immediately return the follower to active combat.
+- Removed desynchronized manual `weaponState` overrides.
+
+### 4. Poison Application Delay & Timing
+- Followers now apply poison to their weapons **3 seconds after** combat and corpse looting are fully completed, ensuring the animation plays visibly and naturally.
+- When buying or receiving poisons, followers wait 3 seconds before applying them.
+
+### 5. Mounted State Animation Suppression
+- While mounted on horseback, followers will no longer perform eating, drinking, poisoning, combat potion consumption, or ground looting animations.
+
+### 6. Soul Gem Empty / Full Shopping Filter
+- Each soul gem tier (Petty, Lesser, Common, Greater, Grand, Black) now features an individual filter:
+  - `Any (Both)`
+  - `Empty Only`
+  - `Full Only`
+
+### 7. Custom Menu Hotkey System
+- Fixed keypress registration using `button->IsPressed()` to prevent instant toggle-closing.
+- Full support for single keys (I, U, O, K, F1..F11) and modifiers (Shift, Ctrl, Alt).
+- Features both interactive keyboard capture and a preset dropdown menu in the Systems settings.
+
+### 8. Save Game Backward Compatibility
+- Bumped serialization version to 21 with seamless backward compatibility for existing game saves.

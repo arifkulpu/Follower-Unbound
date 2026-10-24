@@ -203,6 +203,10 @@ namespace FollowerUnbound
             if (follower && item && profile) {
                 if (prompt.vendorPurchase) {
                     auto* stock = RE::TESForm::LookupByID<RE::TESObjectREFR>(prompt.stockContainerID);
+                    if (!stock || stock->As<RE::Actor>()) {
+                        logger::warn("EquipmentPurchase: stock container {:08X} is invalid or an actor; purchase cancelled.", prompt.stockContainerID);
+                        return;
+                    }
                     auto* gold = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0000000F);
                     const int32_t stockCount = ItemEvaluator::GetItemCount(stock, item);
                     const int32_t physicalGold = gold ? ItemEvaluator::GetItemCount(follower, gold) : 0;
@@ -210,7 +214,7 @@ namespace FollowerUnbound
                     const uint32_t reserve = profile->preferences.savingsEnabled
                         ? std::min(profile->preferences.savedGold, balance) : 0;
                     const uint32_t spendable = balance - reserve;
-                    if (!stock || stockCount <= 0) {
+                    if (stockCount <= 0) {
                         NotificationManager::GetSingleton()->ShowHUDMessage(
                             std::format("{}: {} is no longer in stock.", prompt.followerName, prompt.newObjName));
                     } else if (!gold || spendable < prompt.price || physicalGold < static_cast<int32_t>(prompt.price)) {

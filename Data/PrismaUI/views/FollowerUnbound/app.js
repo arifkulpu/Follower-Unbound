@@ -6,7 +6,7 @@
   let state = { followers: [], settings: {} };
   let page = 'overview';
   let selectedFollower = 0;
-  let gearTab = 'apparel';
+  let gearTab = 'weapons';
   let economyTab = 'buy';
   let buyCategory = 'overview';
   let pickerOpen = false;
@@ -126,11 +126,211 @@
   };
   const renderEquipment = () => {
     const f=follower(); if(!f){$('content').innerHTML='<div class="empty">No follower selected.</div>';return;}
-    const rows=gearTab==='weapons'?(f.weapons||[]):(f.apparel||[]);
-    $('content').innerHTML=`<div class="hero"><div><span class="eyebrow">LOADOUT CONTROL</span><h1>Equipment</h1><p>Protection and equipped status are separate. Protect items without selecting them to wear.</p></div>${followerPicker(f.id)}</div>
-      <div class="panel equipment-panel"><div class="toolbar equipment-toolbar"><div><div class="section-title">${esc(f.name)}’s inventory</div><div class="notice">The EQUIPPED badge shows what they currently wear or wield. Protection keeps an item from sale; card selection plus the button equips it.</div></div><button class="button" data-equip-selected>WEAR & PROTECT SELECTED <span>(${selectedGear.size})</span></button></div>
-      <div class="tabs"><button class="tab ${gearTab==='apparel'?'active':''}" data-gear-tab="apparel">APPAREL & ARMOR (${(f.apparel||[]).length})</button><button class="tab ${gearTab==='weapons'?'active':''}" data-gear-tab="weapons">WEAPONS (${(f.weapons||[]).length})</button></div>
-      <div class="gear-list equipment-gear-list">${rows.length?rows.map(item=>`<div class="gear-card ${selectedGear.has(Number(item.id))?'chosen':''}" data-gear-card="${item.id}" role="button" tabindex="0" aria-pressed="${selectedGear.has(Number(item.id))}"><span class="gear-check" aria-hidden="true">${selectedGear.has(Number(item.id))?'✓':''}</span><span class="gear-name">${itemLabel(esc(item.name),gearTab==='weapons'?'weapon':'armor')}</span><span class="gear-meta">${gearTab==='weapons'?`DMG ${item.damage}`:`ARMOR ${item.armor}`}${item.count>1?` · ×${item.count}`:''}</span>${item.slot?`<span class="tag slot-tag">${esc(item.slot)}</span>`:''}${item.worn?'<span class="tag equipped-tag">EQUIPPED</span>':''}<label class="gear-state" data-protect-wrap><input type="checkbox" data-protect="${item.id}" ${item.protected?'checked':''}> PROTECTED</label></div>`).join(''):'<div class="empty">No items in this category.</div>'}</div></div>`;
+    const weapons = f.weapons || [];
+    const apparel = f.apparel || [];
+    const p = f.prefs || {};
+    const eqR = f.equippedRight || 'Boş';
+    const eqL = f.equippedLeft || 'Boş';
+
+    let bodyHtml = '';
+    if (gearTab === 'weapons') {
+      const pStyle = Number(p.primaryWeaponStyle ?? 0);
+      const sStyle = Number(p.secondaryWeaponStyle ?? 0);
+      const pRHand = Number(p.primaryRightHand ?? 0);
+      const pLHand = Number(p.primaryLeftHand ?? 0);
+      const p2H = Number(p.primaryTwoHandType ?? 0);
+      const sRHand = Number(p.secondaryRightHand ?? 0);
+      const sLHand = Number(p.secondaryLeftHand ?? 0);
+      const s2H = Number(p.secondaryTwoHandType ?? 0);
+
+      bodyHtml = `
+        <div style="background:#1b1d22;border:1px solid #333;border-radius:8px;padding:14px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;border-bottom:1px solid #2a2d34;padding-bottom:10px">
+            <div><strong style="color:#dcdcdc;font-size:14px">⚔️ Mevcut Kuşanılan:</strong> <span style="color:#4fa3e3;margin-left:8px">Sağ El: <b>${esc(eqR)}</b></span> | <span style="color:#81c784;margin-left:6px">Sol El: <b>${esc(eqL)}</b></span></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
+            <!-- ASLİ SİLAH TERCİHİ -->
+            <div style="background:#22252c;border:1px solid #3a3e47;border-radius:6px;padding:12px">
+              <div style="font-weight:600;font-size:13px;color:#f0b429;margin-bottom:6px">👑 ASLİ SİLAH (Primary)</div>
+              <div style="font-size:11px;color:#aaa;margin-bottom:8px">Takipçinin genel savaşlarda öncelikli kullandığı ana silah tarzı.</div>
+              <label style="display:block;margin-bottom:8px"><span style="font-size:12px">Silah Tarzı:</span>
+                <select class="select" data-pref="primaryWeaponStyle" style="width:100%;height:32px;padding:2px 8px;font-size:12px;margin-top:3px">
+                  <option value="0" ${pStyle===0?'selected':''}>Serbest / Otomatik (Any)</option>
+                  <option value="1" ${pStyle===1?'selected':''}>🗡️ Tek Elli (One-Handed)</option>
+                  <option value="2" ${pStyle===2?'selected':''}>🪓 Çift Elli (Two-Handed)</option>
+                  <option value="3" ${pStyle===3?'selected':''}>🏹 Yay (Bow)</option>
+                  <option value="4" ${pStyle===4?'selected':''}>🎯 Arbalet (Crossbow)</option>
+                  <option value="5" ${pStyle===5?'selected':''}>🪄 Asa (Staff)</option>
+                </select>
+              </label>
+              ${(pStyle===1 || pStyle===5)?`
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <label><span style="font-size:11px">Sağ El:</span>
+                    <select class="select" data-pref="primaryRightHand" style="width:100%;height:30px;padding:2px 6px;font-size:11px;margin-top:2px">
+                      <option value="0" ${pRHand===0?'selected':''}>Herhangi</option>
+                      <option value="1" ${pRHand===1?'selected':''}>Kılıç (Sword)</option>
+                      <option value="2" ${pRHand===2?'selected':''}>Hançer (Dagger)</option>
+                      <option value="3" ${pRHand===3?'selected':''}>Savaş Baltası (War Axe)</option>
+                      <option value="4" ${pRHand===4?'selected':''}>Gürz (Mace)</option>
+                      <option value="5" ${pRHand===5?'selected':''}>Asa (Staff)</option>
+                    </select>
+                  </label>
+                  <label><span style="font-size:11px">Sol El:</span>
+                    <select class="select" data-pref="primaryLeftHand" style="width:100%;height:30px;padding:2px 6px;font-size:11px;margin-top:2px">
+                      <option value="0" ${pLHand===0?'selected':''}>Herhangi</option>
+                      <option value="1" ${pLHand===1?'selected':''}>Kalkan (Shield)</option>
+                      <option value="2" ${pLHand===2?'selected':''}>Kılıç (Dual Sword)</option>
+                      <option value="3" ${pLHand===3?'selected':''}>Hançer (Dual Dagger)</option>
+                      <option value="4" ${pLHand===4?'selected':''}>Savaş Baltası (Dual Axe)</option>
+                      <option value="5" ${pLHand===5?'selected':''}>Gürz (Dual Mace)</option>
+                      <option value="6" ${pLHand===6?'selected':''}>Asa (Dual Staff)</option>
+                      <option value="7" ${pLHand===7?'selected':''}>Büyü / Boş (Spell/Empty)</option>
+                    </select>
+                  </label>
+                </div>`:''
+              }
+              ${pStyle===2?`
+                <label style="display:block;margin-top:6px"><span style="font-size:11px">Çift El Türü:</span>
+                  <select class="select" data-pref="primaryTwoHandType" style="width:100%;height:30px;padding:2px 6px;font-size:11px;margin-top:2px">
+                    <option value="0" ${p2H===0?'selected':''}>Herhangi</option>
+                    <option value="1" ${p2H===1?'selected':''}>Büyük Kılıç (Greatsword)</option>
+                    <option value="2" ${p2H===2?'selected':''}>Büyük Balta (Battleaxe)</option>
+                    <option value="3" ${p2H===3?'selected':''}>Savaş Çekici (Warhammer)</option>
+                  </select>
+                </label>`:''
+              }
+            </div>
+
+            <!-- YARDIMCI SİLAH TERCİHİ -->
+            <div style="background:#22252c;border:1px solid #3a3e47;border-radius:6px;padding:12px">
+              <div style="font-weight:600;font-size:13px;color:#38bec9;margin-bottom:6px">🔄 YARDIMCI SİLAH (Secondary)</div>
+              <div style="font-size:11px;color:#aaa;margin-bottom:8px">Duruma veya mesafeye göre geçiş yapacağı alternatif silah (Örn: Yay/Kılıç Kalkan).</div>
+              <label style="display:block;margin-bottom:8px"><span style="font-size:12px">Silah Tarzı:</span>
+                <select class="select" data-pref="secondaryWeaponStyle" style="width:100%;height:32px;padding:2px 8px;font-size:12px;margin-top:3px">
+                  <option value="0" ${sStyle===0?'selected':''}>Yok / Devre Dışı (None)</option>
+                  <option value="3" ${sStyle===3?'selected':''}>🏹 Yay (Bow)</option>
+                  <option value="4" ${sStyle===4?'selected':''}>🎯 Arbalet (Crossbow)</option>
+                  <option value="1" ${sStyle===1?'selected':''}>🗡️ Tek Elli (One-Handed)</option>
+                  <option value="2" ${sStyle===2?'selected':''}>🪓 Çift Elli (Two-Handed)</option>
+                  <option value="5" ${sStyle===5?'selected':''}>🪄 Asa (Staff)</option>
+                </select>
+              </label>
+              ${(sStyle===1 || sStyle===5)?`
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <label><span style="font-size:11px">Sağ El:</span>
+                    <select class="select" data-pref="secondaryRightHand" style="width:100%;height:30px;padding:2px 6px;font-size:11px;margin-top:2px">
+                      <option value="0" ${sRHand===0?'selected':''}>Herhangi</option>
+                      <option value="1" ${sRHand===1?'selected':''}>Kılıç (Sword)</option>
+                      <option value="2" ${sRHand===2?'selected':''}>Hançer (Dagger)</option>
+                      <option value="3" ${sRHand===3?'selected':''}>Savaş Baltası (War Axe)</option>
+                      <option value="4" ${sRHand===4?'selected':''}>Gürz (Mace)</option>
+                      <option value="5" ${sRHand===5?'selected':''}>Asa (Staff)</option>
+                    </select>
+                  </label>
+                  <label><span style="font-size:11px">Sol El:</span>
+                    <select class="select" data-pref="secondaryLeftHand" style="width:100%;height:30px;padding:2px 6px;font-size:11px;margin-top:2px">
+                      <option value="0" ${sLHand===0?'selected':''}>Herhangi</option>
+                      <option value="1" ${sLHand===1?'selected':''}>Kalkan (Shield)</option>
+                      <option value="2" ${sLHand===2?'selected':''}>Kılıç</option>
+                      <option value="3" ${sLHand===3?'selected':''}>Hançer</option>
+                      <option value="4" ${sLHand===4?'selected':''}>Savaş Baltası</option>
+                      <option value="5" ${sLHand===5?'selected':''}>Gürz</option>
+                      <option value="6" ${sLHand===6?'selected':''}>Asa</option>
+                      <option value="7" ${sLHand===7?'selected':''}>Büyü / Boş</option>
+                    </select>
+                  </label>
+                </div>`:''
+              }
+              ${sStyle===2?`
+                <label style="display:block;margin-top:6px"><span style="font-size:11px">Çift El Türü:</span>
+                  <select class="select" data-pref="secondaryTwoHandType" style="width:100%;height:30px;padding:2px 6px;font-size:11px;margin-top:2px">
+                    <option value="0" ${s2H===0?'selected':''}>Herhangi</option>
+                    <option value="1" ${s2H===1?'selected':''}>Büyük Kılıç</option>
+                    <option value="2" ${s2H===2?'selected':''}>Büyük Balta</option>
+                    <option value="3" ${s2H===3?'selected':''}>Savaş Çekici</option>
+                  </select>
+                </label>`:''
+              }
+            </div>
+          </div>
+        </div>
+        <div class="section-title" style="margin-bottom:8px">Envanterdeki Silahlar (${weapons.length})</div>
+        <div class="gear-list equipment-gear-list">${weapons.length?weapons.map(w=>`
+          <div class="gear-card ${w.worn?'chosen':''}" style="cursor:default">
+            <span class="gear-name">${itemLabel(esc(w.name),'weapon')}</span>
+            <span class="gear-meta">DMG ${w.damage}${w.count>1?` · ×${w.count}`:''}</span>
+            ${w.slot?`<span class="tag slot-tag">${esc(w.slot)}</span>`:''}
+            ${w.worn?'<span class="tag equipped-tag">EQUIPPED</span>':''}
+            <div style="display:flex;gap:6px;align-items:center;margin-top:4px">
+              ${w.isTwoHanded?`
+                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="right" style="font-size:11px;padding:3px 10px">İki Ele Kuşan</button>
+              `:`
+                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="right" style="font-size:11px;padding:3px 8px">Sağ El</button>
+                <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="left" style="font-size:11px;padding:3px 8px">Sol El</button>
+              `}
+              <label class="gear-state" data-protect-wrap style="margin-left:auto"><input type="checkbox" data-protect="${w.id}" ${w.protected?'checked':''}> PROTECTED</label>
+            </div>
+          </div>`).join(''):'<div class="empty">Takipçinin envanterinde silah bulunmuyor.</div>'}
+        </div>`;
+    } else if (gearTab === 'armor') {
+      const armPref = Number(p.preferredArmorType ?? 0);
+      bodyHtml = `
+        <div style="background:#1b1d22;border:1px solid #333;border-radius:8px;padding:14px;margin-bottom:16px">
+          <div style="font-weight:600;font-size:14px;color:#e2e8f0;margin-bottom:6px">🛡️ KIYAFET BÜTÜNLÜĞÜ SİSTEMİ (Armor Integrity)</div>
+          <div style="font-size:12px;color:#a0aec0;margin-bottom:12px;line-height:1.5">
+            Takipçinizin hangi zırh sınıfını giyeceğini belirleyin. Ağır zırh seçilirse takipçi <b>sadece ağır zırhları</b>, hafif seçilirse <b>sadece hafif zırhları</b> giyer ve tüccarlardan yalnızca seçilen türde teklif alır. Bu kural <b>kafa, gövde, eldiven ve ayakkabı</b> için geçerlidir.
+          </div>
+          <label style="display:inline-flex;flex-direction:column;gap:6px;min-width:280px"><span style="font-size:12px;font-weight:600">Zırh Türü Tercihi:</span>
+            <select class="select" data-pref="preferredArmorType" style="min-width:260px;height:36px;padding:4px 10px;font-size:13px">
+              <option value="0" ${armPref===0?'selected':''}>⚖️ Serbest / En Yüksek Koruma (Any)</option>
+              <option value="1" ${armPref===1?'selected':''}>🛡️ Ağır Zırh (Heavy Armor Only)</option>
+              <option value="2" ${armPref===2?'selected':''}>🪶 Hafif Zırh (Light Armor Only)</option>
+              <option value="3" ${armPref===3?'selected':''}>🧙 Kıyafet & Cübbe (Clothing / Robes Only)</option>
+            </select>
+          </label>
+        </div>
+        <div class="section-title" style="margin-bottom:8px">Envanterdeki Zırhlar ve Giysiler (${apparel.length})</div>
+        <div class="gear-list equipment-gear-list">${apparel.length?apparel.map(a=>`
+          <div class="gear-card ${a.worn?'chosen':''}" data-gear-card="${a.id}" role="button" tabindex="0" aria-pressed="${a.worn}">
+            <span class="gear-name">${itemLabel(esc(a.name),'armor')}</span>
+            <span class="gear-meta">ARMOR ${a.armor}${a.count>1?` · ×${a.count}`:''} · ${a.armorType===1?'Ağır':(a.armorType===2?'Hafif':'Kıyafet')}</span>
+            ${a.slot?`<span class="tag slot-tag">${esc(a.slot)}</span>`:''}
+            ${a.worn?'<span class="tag equipped-tag">EQUIPPED</span>':''}
+            <label class="gear-state" data-protect-wrap><input type="checkbox" data-protect="${a.id}" ${a.protected?'checked':''}> PROTECTED</label>
+          </div>`).join(''):'<div class="empty">Takipçinin envanterinde giysi bulunmuyor.</div>'}
+        </div>`;
+    } else {
+      // ENVANTER SEKMESİ (Tüm Eşyalar & Koruma Yönetimi)
+      const allItems = [...apparel.map(x=>({...x, kind:'armor'})), ...weapons.map(x=>({...x, kind:'weapon'}))];
+      bodyHtml = `
+        <div class="toolbar equipment-toolbar">
+          <div>
+            <div class="section-title">${esc(f.name)}’s Complete Inventory (${allItems.length})</div>
+            <div class="notice">💡 <b>Otomatik Koruma:</b> Oyuncunun takipçiye verdiği tüm silah ve zırhlar otomatik olarak <b>PROTECTED</b> (Korumalı) sayılır ve satılmaz. İsterseniz buradan korumayı kaldırarak bir sonraki satışta satılabilir yapabilirsiniz. Kart seçimiyle topluca kuşanabilirsiniz.</div>
+          </div>
+          <button class="button" data-equip-selected>WEAR & PROTECT SELECTED <span>(${selectedGear.size})</span></button>
+        </div>
+        <div class="gear-list equipment-gear-list">${allItems.length?allItems.map(item=>`
+          <div class="gear-card ${selectedGear.has(Number(item.id))?'chosen':''}" data-gear-card="${item.id}" role="button" tabindex="0" aria-pressed="${selectedGear.has(Number(item.id))}">
+            <span class="gear-check" aria-hidden="true">${selectedGear.has(Number(item.id))?'✓':''}</span>
+            <span class="gear-name">${itemLabel(esc(item.name),item.kind)}</span>
+            <span class="gear-meta">${item.kind==='weapon'?`DMG ${item.damage}`:`ARMOR ${item.armor}`}${item.count>1?` · ×${item.count}`:''}</span>
+            ${item.slot?`<span class="tag slot-tag">${esc(item.slot)}</span>`:''}
+            ${item.worn?'<span class="tag equipped-tag">EQUIPPED</span>':''}
+            <label class="gear-state" data-protect-wrap><input type="checkbox" data-protect="${item.id}" ${item.protected?'checked':''}> PROTECTED</label>
+          </div>`).join(''):'<div class="empty">Envanterde eşya bulunmuyor.</div>'}
+        </div>`;
+    }
+
+    $('content').innerHTML=`<div class="hero"><div><span class="eyebrow">LOADOUT CONTROL</span><h1>Equipment</h1><p>Takipçilerinizin silah, kıyafet bütünlüğü ve envanter koruma tercihlerini yönetin.</p></div>${followerPicker(f.id)}</div>
+      <div class="panel equipment-panel">
+        <div class="tabs">
+          <button class="tab ${gearTab==='weapons'?'active':''}" data-gear-tab="weapons">⚔️ SİLAH (${weapons.length})</button>
+          <button class="tab ${gearTab==='armor'?'active':''}" data-gear-tab="armor">🛡️ ZIRH (${apparel.length})</button>
+          <button class="tab ${gearTab==='inventory'?'active':''}" data-gear-tab="inventory">🎒 ENVANTER (${weapons.length + apparel.length})</button>
+        </div>
+        ${bodyHtml}
+      </div>`;
   };
   const prefGroup = (title, keys, f) => `<div class="group-label">${title}</div><div class="toggle-grid">${keys.map(([key,label])=>check(label,key,f.prefs?'prefs':'prefs')).join('')}</div>`;
   const prefDefs = {
@@ -147,12 +347,12 @@
     ['buyDrinkAlcohol','maxDrinkAlcohol','alcohol','Alcohol',25],
     ['buyArrows','maxArrows','arrows','Arrows',250],
     ['buyBolts','maxBolts','bolts','Crossbow bolts',250],
-    ['buyPettySoulGems','maxPettySoulGems','pettySoulGems','Petty soul gems',20],
-    ['buyLesserSoulGems','maxLesserSoulGems','lesserSoulGems','Lesser soul gems',20],
-    ['buyCommonSoulGems','maxCommonSoulGems','commonSoulGems','Common soul gems',20],
-    ['buyGreaterSoulGems','maxGreaterSoulGems','greaterSoulGems','Greater soul gems',20],
-    ['buyGrandSoulGems','maxGrandSoulGems','grandSoulGems','Grand soul gems',20],
-    ['buyBlackSoulGems','maxBlackSoulGems','blackSoulGems','Black soul gems',20],
+    ['buyPettySoulGems','maxPettySoulGems','pettySoulGems','Petty soul gems',20,'soulGemFillPetty'],
+    ['buyLesserSoulGems','maxLesserSoulGems','lesserSoulGems','Lesser soul gems',20,'soulGemFillLesser'],
+    ['buyCommonSoulGems','maxCommonSoulGems','commonSoulGems','Common soul gems',20,'soulGemFillCommon'],
+    ['buyGreaterSoulGems','maxGreaterSoulGems','greaterSoulGems','Greater soul gems',20,'soulGemFillGreater'],
+    ['buyGrandSoulGems','maxGrandSoulGems','grandSoulGems','Grand soul gems',20,'soulGemFillGrand'],
+    ['buyBlackSoulGems','maxBlackSoulGems','blackSoulGems','Black soul gems',20,'soulGemFillBlack'],
     ['buyTorches','maxTorches','torches','Torches',20],
     ['buyLanternOil','maxLanternOil','lanternOil','Lantern oil',20],
     ['buySoap','maxSoap','soap','Soap',20],
@@ -195,7 +395,11 @@
         buyDrinkNormal:'Non-alcoholic drinks include water, milk, juice, tea, cider and other drinks recognized by the mod. Waterskins are treated as non-alcoholic.',
         buyDrinkAlcohol:'Alcohol includes ale, mead, wine, brandy, beer, rum, vodka and liquor. Water or waterskins are excluded.'
       };
-      const rowsFor=(items)=>items.map(([buyKey,maxKey,stockKey,label,max])=>{const tip=purchaseTooltips[buyKey];return `<div class="trade-row" ${tip?`data-tooltip="${esc(tip)}" aria-label="${esc(label)}. ${esc(tip)}"`:''}><div class="trade-item"><span class="trade-name">${itemLabel(label,buyKey||maxKey)}${tip?'<span class="info-hint" aria-hidden="true">i</span>':''}</span><span class="stock-badge">OWNED <b>${Number(f.stock?.[stockKey]||0)}</b></span></div><label class="trade-target"><span>Target stock</span><input class="number-input" type="number" min="${buyKey.includes('SoulGems')?'1':'0'}" max="${max}" data-pref="${maxKey}" value="${Number(f.prefs[maxKey]??0)}"></label><label class="toggle"><input type="checkbox" data-pref="${buyKey}" ${f.prefs[buyKey]?'checked':''} aria-label="Buy ${label}"></label></div>`;}).join('');
+      const rowsFor=(items)=>items.map(([buyKey,maxKey,stockKey,label,max,fillKey])=>{
+        const tip=purchaseTooltips[buyKey];
+        const fillHtml=fillKey ? `<select class="select" data-pref="${fillKey}" style="margin:0 6px;padding:3px 6px;font-size:12px;height:32px;background:#1a1c23;color:#e2e8f0;border:1px solid #334155;border-radius:4px;"><option value="0" ${Number(f.prefs[fillKey]??0)===0?'selected':''}>Her İkisi (Any)</option><option value="1" ${Number(f.prefs[fillKey]??0)===1?'selected':''}>Boş (Empty)</option><option value="2" ${Number(f.prefs[fillKey]??0)===2?'selected':''}>Dolu (Full)</option></select>` : '';
+        return `<div class="trade-row" ${tip?`data-tooltip="${esc(tip)}" aria-label="${esc(label)}. ${esc(tip)}"`:''}><div class="trade-item"><span class="trade-name">${itemLabel(label,buyKey||maxKey)}${tip?'<span class="info-hint" aria-hidden="true">i</span>':''}</span><span class="stock-badge">OWNED <b>${Number(f.stock?.[stockKey]||0)}</b></span></div>${fillHtml}<label class="trade-target"><span>Target stock</span><input class="number-input" type="number" min="${buyKey.includes('SoulGems')?'1':'0'}" max="${max}" data-pref="${maxKey}" value="${Number(f.prefs[maxKey]??0)}"></label><label class="toggle"><input type="checkbox" data-pref="${buyKey}" ${f.prefs[buyKey]?'checked':''} aria-label="Buy ${label}"></label></div>`;
+      }).join('');
       const ingredients=[['blueMountainFlowers','Blue Mountain Flower'],['wheat','Wheat'],['redMountainFlowers','Red Mountain Flower'],['whiteCaps','White Cap'],['purpleMountainFlowers','Purple Mountain Flower'],['pineThrushEggs','Pine Thrush Egg']];
       const materialRows=ingredients.map(([key,label])=>`<div class="sale-row"><span class="item-label">${itemLabel(label,key)}</span><span class="stock-badge">OWNED <b>${Number(f.stock?.[key]||0)}</b></span></div>`).join('');
       const categoryContent={
@@ -266,7 +470,7 @@
         ['lootMisc','Other valuables']
       ]]
     ];
-    $('content').innerHTML=`<div class="hero"><div><span class="eyebrow">GLOBAL BEHAVIOR</span><h1>Systems</h1><p>Control companion automation, notifications and global loot behavior.</p></div><div class="settings-actions">${followerPicker(f?.id)}<button class="button secondary" data-refresh>REFRESH STATE</button></div></div><div class="settings-columns">${groups.map(([title,items])=>`<section class="panel"><div class="group-label">${title}</div>${title.includes('NOTIFICATIONS')?`<div class="notification-actions"><button type="button" class="button secondary mini-btn" data-notif-bulk="true">ENABLE ALL</button><button type="button" class="button secondary mini-btn" data-notif-bulk="false">DISABLE ALL</button></div><label class="toggle-row" style="margin-bottom:12px"><span class="toggle-copy-wrap"><span class="toggle-title">${itemLabel('Notification delivery style','notification')}</span><span class="toggle-copy">Consolidate frequent events into single summary alerts to prevent stutter and screen clutter.</span></span><select class="select" data-setting="notificationMode" style="min-width:175px;height:38px;padding:4px 10px;font-size:12px"><option value="0" ${Number(state.settings.notificationMode??0)===0?'selected':''}>Batched (Toplu Özet)</option><option value="1" ${Number(state.settings.notificationMode??0)===1?'selected':''}>Detailed (Ayrıntılı)</option><option value="2" ${Number(state.settings.notificationMode??0)===2?'selected':''}>Critical Only (Sadece Kritik)</option></select></label>`:''}<div class="toggle-grid">${items.map(([key,label,copy])=>globalCheck(label,key,copy)).join('')}</div></section>`).join('')}<section class="panel"><div class="group-label">EQUIPMENT UPGRADES</div><label class="toggle-row"><span><span class="toggle-title">Gear upgrade check chance (%)</span><span class="toggle-copy">Chance (1–100%) that followers look for or offer better weapons and armor.</span></span><input class="number-input" type="number" min="1" max="100" step="1" data-setting="equipmentUpgradeChance" value="${state.settings.equipmentUpgradeChance||35}"></label></section><section class="panel"><div class="group-label">FOLLOWER GOLD SAVINGS</div>${f?`<div class="savings-setting"><div><strong>${esc(f.name)}</strong><span>Saved ${money(f.prefs.savedGold||0)} of ${money(f.prefs.savingsTarget||1000)} gold</span></div><label><span>Target gold (1–10,000)</span><input class="number-input savings-target-input" type="number" min="1" max="10000" step="1" data-pref="savingsTarget" value="${Math.max(1,Math.min(10000,Number(f.prefs.savingsTarget??1000)))}"></label></div>`:'<div class="empty">No follower selected.</div>'}</section><section class="panel"><div class="group-label">LOOT TIMING</div><label class="toggle-row"><span><span class="toggle-title">Post-combat loot delay</span><span class="toggle-copy">Seconds before followers begin looting.</span></span><input class="number-input" type="number" min="0" max="60" step="1" data-setting="lootDelay" value="${state.settings.lootDelay||0}"></label></section></div>`;
+    $('content').innerHTML=`<div class="hero"><div><span class="eyebrow">GLOBAL BEHAVIOR</span><h1>Systems</h1><p>Control companion automation, notifications and global loot behavior.</p></div><div class="settings-actions">${followerPicker(f?.id)}<button class="button secondary" data-refresh>REFRESH STATE</button></div></div><div class="settings-columns">${groups.map(([title,items])=>`<section class="panel"><div class="group-label">${title}</div>${title.includes('NOTIFICATIONS')?`<div class="notification-actions"><button type="button" class="button secondary mini-btn" data-notif-bulk="true">ENABLE ALL</button><button type="button" class="button secondary mini-btn" data-notif-bulk="false">DISABLE ALL</button></div><label class="toggle-row" style="margin-bottom:12px"><span class="toggle-copy-wrap"><span class="toggle-title">${itemLabel('Notification delivery style','notification')}</span><span class="toggle-copy">Consolidate frequent events into single summary alerts to prevent stutter and screen clutter.</span></span><select class="select" data-setting="notificationMode" style="min-width:175px;height:38px;padding:4px 10px;font-size:12px"><option value="0" ${Number(state.settings.notificationMode??0)===0?'selected':''}>Batched (Toplu Özet)</option><option value="1" ${Number(state.settings.notificationMode??0)===1?'selected':''}>Detailed (Ayrıntılı)</option><option value="2" ${Number(state.settings.notificationMode??0)===2?'selected':''}>Critical Only (Sadece Kritik)</option></select></label>`:''}<div class="toggle-grid">${items.map(([key,label,copy])=>globalCheck(label,key,copy)).join('')}</div></section>`).join('')}<section class="panel"><div class="group-label">EQUIPMENT UPGRADES</div><label class="toggle-row"><span><span class="toggle-title">Gear upgrade check chance (%)</span><span class="toggle-copy">Chance (1–100%) that followers look for or offer better weapons and armor.</span></span><input class="number-input" type="number" min="1" max="100" step="1" data-setting="equipmentUpgradeChance" value="${state.settings.equipmentUpgradeChance||35}"></label></section><section class="panel"><div class="group-label">FOLLOWER GOLD SAVINGS</div>${f?`<div class="savings-setting"><div><strong>${esc(f.name)}</strong><span>Saved ${money(f.prefs.savedGold||0)} of ${money(f.prefs.savingsTarget||1000)} gold</span></div><label><span>Target gold (1–10,000)</span><input class="number-input savings-target-input" type="number" min="1" max="10000" step="1" data-pref="savingsTarget" value="${Math.max(1,Math.min(10000,Number(f.prefs.savingsTarget??1000)))}"></label></div>`:'<div class="empty">No follower selected.</div>'}</section><section class="panel"><div class="group-label">LOOT TIMING</div><label class="toggle-row"><span><span class="toggle-title">Post-combat loot delay</span><span class="toggle-copy">Seconds before followers begin looting.</span></span><input class="number-input" type="number" min="0" max="60" step="1" data-setting="lootDelay" value="${state.settings.lootDelay||0}"></label></section><section class="panel"><div class="group-label">MENU HOTKEY</div><div class="toggle-row" style="flex-direction:column;align-items:flex-start;gap:10px"><span><span class="toggle-title">Menüyü açma tuşu</span><span class="toggle-copy">İster 'Tuş Ata' butonuna basıp klavyeden bir tuşa (veya Ctrl/Alt/Shift kombinasyonuna) basın, isterseniz listeden seçin.</span></span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="fu-hotkey-label" style="font-size:13px;font-weight:600;padding:5px 14px;border-radius:6px;background:#222;border:1px solid #444;min-width:80px;text-align:center">${state.settings.menuHotkeyText||'Shift + I'}</span><button type="button" class="button secondary" id="fu-hotkey-bind" data-hotkey-bind style="font-size:12px;padding:6px 14px">Tuş Ata…</button><select class="select" id="fu-hotkey-select" data-hotkey-select style="min-width:140px;height:34px;padding:2px 8px;font-size:12px"><option value="">-- Hazır Seç --</option><option value="0x17,1,Shift + I">Shift + I (Varsayılan)</option><option value="0x17,0,I">Sadece I</option><option value="0x17,2,Ctrl + I">Ctrl + I</option><option value="0x17,4,Alt + I">Alt + I</option><option value="0x16,0,U">Sadece U</option><option value="0x16,2,Ctrl + U">Ctrl + U</option><option value="0x16,4,Alt + U">Alt + U</option><option value="0x18,0,O">Sadece O</option><option value="0x18,2,Ctrl + O">Ctrl + O</option><option value="0x25,0,K">Sadece K</option><option value="0x25,2,Ctrl + K">Ctrl + K</option><option value="0x3B,0,F1">F1</option><option value="0x3C,0,F2">F2</option><option value="0x3D,0,F3">F3</option><option value="0x3E,0,F4">F4</option><option value="0x42,0,F8">F8</option><option value="0x43,0,F9">F9</option><option value="0x44,0,F10">F10</option><option value="0x57,0,F11">F11</option></select><span id="fu-hotkey-hint" style="font-size:11px;color:#aaa;display:none">Bir tuşa basın (Shift/Ctrl/Alt kombinasyonu dahil; vazgeçmek için Esc)…</span></div></div></section></div>`;
   };
   const render = () => {
     if(!state.followers.some(f=>Number(f.id)===Number(selectedFollower))) selectedFollower=state.followers[0]?.id||0;
@@ -282,6 +486,20 @@
     const p=e.target.closest('[data-pref]'); if(p){const val=p.type==='checkbox'?p.checked:Number(p.value);send({kind:'preference',follower:Number(follower()?.id),key:p.dataset.pref,value:val});return;}
     const s=e.target.closest('[data-setting]');if(s){send({kind:'setting',key:s.dataset.setting,value:s.type==='checkbox'?s.checked:Number(s.value)});return;}
     const protect=e.target.closest('[data-protect]');if(protect){send({kind:'protect',follower:Number(follower()?.id),item:Number(protect.dataset.protect),value:protect.checked});return;}
+    const hkSel=e.target.closest('[data-hotkey-select]');
+    if(hkSel && hkSel.value){
+      const [dxStr, modStr, text]=hkSel.value.split(',');
+      const dx=Number(dxStr);
+      const mod=Number(modStr);
+      state.settings.menuHotkey=dx;
+      state.settings.menuHotkeyModifier=mod;
+      state.settings.menuHotkeyText=text;
+      send({kind:'setHotkey',hotkey:dx,modifier:mod,text});
+      const lbl=document.getElementById('fu-hotkey-label');if(lbl)lbl.textContent=text;
+      notify('Menü tuşu güncellendi: '+text);
+      hkSel.value='';
+      return;
+    }
   });
   $('content').addEventListener('click',e=>{
     const notifBulk=e.target.closest('[data-notif-bulk]');if(notifBulk){const enable=notifBulk.dataset.notifBulk==='true';send({kind:'notificationsBulk',enable});notify(enable?'All notifications enabled.':'All notifications disabled.');return;}
@@ -296,6 +514,53 @@
     if(e.target.closest('[data-buy-back]')){buyCategory='overview';render();return;}
     if(e.target.closest('[data-refresh]')){send({kind:'refresh'});notify('Party scan requested.');return;}
     if(e.target.closest('[data-equip-selected]')){if(!selectedGear.size){notify('Select one or more items first.');return;}send({kind:'equipSelected',follower:Number(follower()?.id),items:[...selectedGear]});selectedGear.clear();notify('Selected equipment applied.');return;}
+    const eqHandBtn=e.target.closest('[data-equip-hand]');
+    if(eqHandBtn){
+      const itemId=Number(eqHandBtn.dataset.equipHand);
+      const isLeft=eqHandBtn.dataset.hand==='left';
+      send({kind:'equipHand',follower:Number(follower()?.id),item:itemId,leftHand:isLeft});
+      notify(isLeft?'Sol ele kuşandı.':'Sağ ele kuşandı.');
+      return;
+    }
+    if(e.target.closest('[data-hotkey-bind]')){
+      const btn=document.getElementById('fu-hotkey-bind');
+      const hint=document.getElementById('fu-hotkey-hint');
+      if(!btn)return;
+      btn.textContent='Dinleniyor…';btn.disabled=true;if(hint)hint.style.display='';
+      const dxMap={KeyA:0x1E,KeyB:0x30,KeyC:0x2E,KeyD:0x20,KeyE:0x12,KeyF:0x21,KeyG:0x22,KeyH:0x23,KeyI:0x17,KeyJ:0x24,KeyK:0x25,KeyL:0x26,KeyM:0x32,KeyN:0x31,KeyO:0x18,KeyP:0x19,KeyQ:0x10,KeyR:0x13,KeyS:0x1F,KeyT:0x14,KeyU:0x16,KeyV:0x2F,KeyW:0x11,KeyX:0x2D,KeyY:0x15,KeyZ:0x2C,Digit1:0x02,Digit2:0x03,Digit3:0x04,Digit4:0x05,Digit5:0x06,Digit6:0x07,Digit7:0x08,Digit8:0x09,Digit9:0x0A,Digit0:0x0B,F1:0x3B,F2:0x3C,F3:0x3D,F4:0x3E,F5:0x3F,F6:0x40,F7:0x41,F8:0x42,F9:0x43,F10:0x44,F11:0x57,F12:0x58,Tab:0x0F,CapsLock:0x3A,Space:0x39,Enter:0x1C,Backspace:0x0E,Escape:0x01,Insert:0xD2,Delete:0xD3,Home:0xC7,End:0xCF,PageUp:0xC9,PageDown:0xD1,ArrowUp:0xC8,ArrowDown:0xD0,ArrowLeft:0xCB,ArrowRight:0xCD,Minus:0x0C,Equal:0x0D,BracketLeft:0x1A,BracketRight:0x1B,Semicolon:0x27,Quote:0x28,Backquote:0x29,Backslash:0x2B,Comma:0x33,Period:0x34,Slash:0x35,Numpad0:0x52,Numpad1:0x4F,Numpad2:0x50,Numpad3:0x51,Numpad4:0x4B,Numpad5:0x4C,Numpad6:0x4D,Numpad7:0x47,Numpad8:0x48,Numpad9:0x49,NumpadMultiply:0x37,NumpadAdd:0x4E,NumpadSubtract:0x4A,NumpadDecimal:0x53,NumpadDivide:0xB5};
+      const keyFallback={a:0x1E,b:0x30,c:0x2E,d:0x20,e:0x12,f:0x21,g:0x22,h:0x23,i:0x17,j:0x24,k:0x25,l:0x26,m:0x32,n:0x31,o:0x18,p:0x19,q:0x10,r:0x13,s:0x1F,t:0x14,u:0x16,v:0x2F,w:0x11,x:0x2D,y:0x15,z:0x2C};
+      const modKeys=new Set(['ShiftLeft','ShiftRight','ControlLeft','ControlRight','AltLeft','AltRight','MetaLeft','MetaRight']);
+      const onKey=(ev)=>{
+        if(modKeys.has(ev.code)){return;}
+        ev.preventDefault();ev.stopPropagation();
+        document.removeEventListener('keydown',onKey,true);
+        if(ev.key==='Escape'){
+          if(btn){btn.textContent='Tuş Ata…';btn.disabled=false;}if(hint)hint.style.display='none';
+          notify('Tuş atama iptal edildi.');
+          return;
+        }
+        let dx=dxMap[ev.code]||keyFallback[ev.key.toLowerCase()]||0;
+        if(!dx){
+          if(btn){btn.textContent='Tuş Ata…';btn.disabled=false;}if(hint)hint.style.display='none';
+          notify('Bu tuş desteklenmiyor, lütfen başka bir tuş seçin.');
+          return;
+        }
+        let mod=0;if(ev.shiftKey)mod|=1;if(ev.ctrlKey)mod|=2;if(ev.altKey)mod|=4;
+        const parts=[];if(ev.ctrlKey)parts.push('Ctrl');if(ev.altKey)parts.push('Alt');if(ev.shiftKey)parts.push('Shift');
+        const keyName=(ev.code?ev.code.replace(/^Key/,'').replace(/^Digit/,'').replace(/^Numpad/,'Num'):ev.key.toUpperCase());
+        parts.push(keyName);
+        const text=parts.join(' + ');
+        state.settings.menuHotkey=dx;
+        state.settings.menuHotkeyModifier=mod;
+        state.settings.menuHotkeyText=text;
+        send({kind:'setHotkey',hotkey:dx,modifier:mod,text});
+        const lbl=document.getElementById('fu-hotkey-label');if(lbl)lbl.textContent=text;
+        if(btn){btn.textContent='Tuş Ata…';btn.disabled=false;}if(hint)hint.style.display='none';
+        notify('Menü tuşu güncellendi: '+text);
+      };
+      document.addEventListener('keydown',onKey,true);
+      return;
+    }
   });
   document.addEventListener('pointerdown',e=>{if(!pickerOpen||e.target.closest('.follower-picker-wrap'))return;pickerOpen=false;document.querySelectorAll('.follower-picker-menu').forEach(menu=>menu.remove());document.querySelectorAll('[data-picker-toggle]').forEach(button=>button.setAttribute('aria-expanded','false'));});
   const recipeTooltip=document.createElement('div');recipeTooltip.id='fu-recipe-tooltip';recipeTooltip.className='recipe-tooltip';recipeTooltip.setAttribute('role','tooltip');document.body.append(recipeTooltip);

@@ -492,8 +492,41 @@ namespace FollowerUnbound
                         const auto actual = a_intfc->ReadRecordData(&preferences, legacySize);
                         bytesRead += actual;
                         if (actual != legacySize) recordOK = false;
+                    } else if (version == 18 || version == 19) {
+                        // Version 20 appends soul gem fill preferences.
+                        constexpr auto legacySize = static_cast<uint32_t>(offsetof(FollowerPreferences, soulGemFillPetty));
+                        const auto actual = a_intfc->ReadRecordData(&preferences, legacySize);
+                        bytesRead += actual;
+                        if (actual != legacySize) recordOK = false;
+                    } else if (version == 20) {
+                        // Version 21 appends weapon & armor loadout preferences.
+                        constexpr auto legacySize = static_cast<uint32_t>(offsetof(FollowerPreferences, preferredArmorType));
+                        const auto actual = a_intfc->ReadRecordData(&preferences, legacySize);
+                        bytesRead += actual;
+                        if (actual != legacySize) recordOK = false;
                     } else {
                         read(preferences);
+                    }
+
+                    if (version < 20) {
+                        preferences.soulGemFillPetty = 0;
+                        preferences.soulGemFillLesser = 0;
+                        preferences.soulGemFillCommon = 0;
+                        preferences.soulGemFillGreater = 0;
+                        preferences.soulGemFillGrand = 0;
+                        preferences.soulGemFillBlack = 0;
+                    }
+
+                    if (version < 21) {
+                        preferences.preferredArmorType = 0;
+                        preferences.primaryWeaponStyle = 0;
+                        preferences.primaryRightHand = 0;
+                        preferences.primaryLeftHand = 0;
+                        preferences.primaryTwoHandType = 0;
+                        preferences.secondaryWeaponStyle = 0;
+                        preferences.secondaryRightHand = 0;
+                        preferences.secondaryLeftHand = 0;
+                        preferences.secondaryTwoHandType = 0;
                     }
 
                     // Version 13 changes the out-of-box crafting policy. Old saves

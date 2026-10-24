@@ -31,6 +31,9 @@ namespace FollowerUnbound
         // Envanter (veya takas) kapandığında 3 saniye sonra yemeleri için zamanlayıcı kur
         void NotifyInventoryClosed();
 
+        // Takipçi zehir satın aldığında veya verildiğinde 3 saniye sonra sürmesi için bildir
+        void NotifyPoisonAcquired(RE::FormID actorID);
+
     private:
         ConsumableAI() = default;
         bool TryCurePoison(RE::Actor* follower);
@@ -39,6 +42,7 @@ namespace FollowerUnbound
         std::unordered_map<RE::FormID, CombatPotionType> _lastPotionType;
         std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _lastConsumeTime;
         std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _lastPotionTime;
+        std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _combatDrinkAnimTime;
         std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _lastCurePoisonTime;
 
         // Uyku veya bekleme sonrası 5 saniye bekleme süresi
@@ -54,6 +58,8 @@ namespace FollowerUnbound
 
         // Zehir animasyonu takibi: Animasyon oynarken kına alma çağrılmamalı, animasyon bitince kına alınmalı
         std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _lastPoisonAnimTime;
+        std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _poisonAcquiredTime;
+        std::chrono::steady_clock::time_point _lastLootActiveTime{};
 
         // ── SIRALI YEME/İÇME KİLİDİ ──
         // Çoklu takipçide animasyon hatasını önler: aynı anda yalnızca BİR takipçi

@@ -10,7 +10,7 @@ namespace FollowerUnbound
 {
     bool ConsumableAI::TryCurePoison(RE::Actor* follower)
     {
-        if (!follower || follower->IsDead()) return false;
+        if (!follower || follower->IsDead() || follower->IsOnMount()) return false;
 
         auto* magicTarget = follower->AsMagicTarget();
         auto* activeEffects = magicTarget ? magicTarget->GetActiveEffectList() : nullptr;
@@ -61,8 +61,8 @@ namespace FollowerUnbound
 
     void ConsumableAI::UpdateCombatConsumables(RE::Actor* follower, FollowerProfile& profile)
     {
-        // Yalnızca savaş sırasında ve hayattayken iksir kullanılır
-        if (!follower || follower->IsDead() || !follower->IsInCombat()) return;
+        // Yalnızca savaş sırasında ve hayattayken iksir kullanılır; at sırtındayken animasyon oynatılmaz
+        if (!follower || follower->IsDead() || !follower->IsInCombat() || follower->IsOnMount()) return;
         if (TryCurePoison(follower)) return;
 
         // System toggle
@@ -96,6 +96,19 @@ namespace FollowerUnbound
         float staminaPct = (maxStamina > 0.0f) ? ((curStamina / maxStamina) * 100.0f) : 100.0f;
 
         // ── ACİL DURUM (KRİTİK) ──
+        // İçme animasyonu sürerken yeni içme başlatma (acil durumda bile)
+        if (auto it = _combatDrinkAnimTime.find(actorID); it != _combatDrinkAnimTime.end()) {
+            float since = std::chrono::duration<float>(now - it->second).count();
+            if (since < 1.5f) return;          // animasyon hâlâ oynuyor
+            // Animasyon bitti: grafiği savaş durumuna geri döndür
+            follower->NotifyAnimationGraph("IdleForceDefaultState");
+            if (auto* state = follower->AsActorState(); !state || !state->IsWeaponDrawn()) {
+                follower->DrawWeaponMagicHands(true);
+            }
+            follower->EvaluatePackage();
+            _combatDrinkAnimTime.erase(it);
+        }
+
         // Can %15, mana %5 veya dayanıklılık %5 altına düştüyse: cooldown YOK,
         // takipçi arka arkaya (seri şekilde) iksir içer.
         bool emergency = (healthPct < settings->emergencyHealthPct) ||
@@ -168,6 +181,7 @@ namespace FollowerUnbound
                 follower->RemoveItem(potion, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
 
                 _lastPotionTime[actorID] = now;
+                _combatDrinkAnimTime[actorID] = now;
                 _lastPotionType[actorID] = type;
 
                 const char* potionName = (type == CombatPotionType::Health) ? "Health" :
@@ -197,23 +211,32 @@ namespace FollowerUnbound
 
     void ConsumableAI::UpdateOutOfCombatPoison(RE::Actor* follower, FollowerProfile& profile)
     {
-        // Zehirleme işlemi SADECE savaş dışındayken ve takipçi canlıyken yapılır!
-        if (!follower || follower->IsDead() || follower->IsInCombat() || !follower->Is3DLoaded()) return;
+        // Zehirleme işlemi SADECE savaş dışındayken, takipçi canlıyken ve at sırtında DEĞİLKEN yapılır!
+        if (!follower || follower->IsDead() || follower->IsInCombat() || !follower->Is3DLoaded() || follower->IsOnMount()) return;
 
         auto settings = Settings::GetSingleton();
         if (!settings->enablePoisonSystem) return;
-        // Wait until every nearby corpse has been searched and all loot is transferred.
-        if (!CombatTracker::GetSingleton()->IsLootSafe()) return;
-        if (LootManager::GetSingleton()->HasPendingLootWork()) return;
+
+        RE::FormID actorID = follower->GetFormID();
+        auto now = std::chrono::steady_clock::now();
+
+        // 1. Savaş bittikten ve yağma işlemi tamamlandıktan 3 saniye sonra zehir basılır
+        if (!CombatTracker::GetSingleton()->IsLootSafe() || LootManager::GetSingleton()->HasPendingLootWork()) {
+            _lastLootActiveTime = now;
+            return;
+        }
+        if (_lastLootActiveTime.time_since_epoch().count() > 0) {
+            float sinceLoot = std::chrono::duration<float>(now - _lastLootActiveTime).count();
+            if (sinceLoot < 3.0f) {
+                return;
+            }
+        }
 
         // Diyalog sırasında animasyon veya mesaj basma
         auto ui = RE::UI::GetSingleton();
         if (ui && ui->IsMenuOpen(RE::DialogueMenu::MENU_NAME)) return;
 
-        RE::FormID actorID = follower->GetFormID();
-        auto now = std::chrono::steady_clock::now();
-
-        // 1. Oyun yüklendikten hemen sonra (10 saniye) zehir basılmasını engelle
+        // 2. Oyun yüklendikten hemen sonra (10 saniye) zehir basılmasını engelle
         if (_gameLoadedTime.time_since_epoch().count() > 0) {
             float sinceLoad = std::chrono::duration<float>(now - _gameLoadedTime).count();
             if (sinceLoad < 10.0f) {
@@ -221,10 +244,18 @@ namespace FollowerUnbound
             }
         }
 
-        // 2. Savaş bittikten hemen sonra değil, en az 10 saniye sonra zehir basılsın
+        // 3. Savaş bittikten en az 3 saniye sonra zehir basılsın
         if (auto it = _lastCombatEndTime.find(actorID); it != _lastCombatEndTime.end()) {
             float sinceCombat = std::chrono::duration<float>(now - it->second).count();
-            if (sinceCombat < 10.0f) {
+            if (sinceCombat < 3.0f) {
+                return;
+            }
+        }
+
+        // 4. Takipçi zehir satın aldığında veya oyuncu verdiğinde 3 saniye gecikme
+        if (auto it = _poisonAcquiredTime.find(actorID); it != _poisonAcquiredTime.end()) {
+            float sinceAcquired = std::chrono::duration<float>(now - it->second).count();
+            if (sinceAcquired < 3.0f) {
                 return;
             }
         }
@@ -338,13 +369,22 @@ namespace FollowerUnbound
     void ConsumableAI::NotifyInventoryClosed()
     {
         _inventoryClosedTime = std::chrono::steady_clock::now();
+        const auto now = _inventoryClosedTime;
+        for (const auto& [id, p] : FollowerManager::GetSingleton()->GetProfilesSnapshot()) {
+            _poisonAcquiredTime[id] = now;
+        }
+    }
+
+    void ConsumableAI::NotifyPoisonAcquired(RE::FormID actorID)
+    {
+        _poisonAcquiredTime[actorID] = std::chrono::steady_clock::now();
     }
 
     void ConsumableAI::UpdateNeedsConsumption(RE::Actor* follower, FollowerProfile& profile)
     {
         if (follower && !follower->IsDead() && TryCurePoison(follower)) return;
-        // 1. Savaş sırasında yemek yeme ve içme davranışı YAPILMAMALI
-        if (!follower || follower->IsDead() || follower->IsInCombat()) return;
+        // 1. Savaş sırasında ve AT SIRTIINDAYKEN yemek yeme ve içme davranışı YAPILMAMALI
+        if (!follower || follower->IsDead() || follower->IsInCombat() || follower->IsOnMount()) return;
 
         // System toggle
         if (!Settings::GetSingleton()->enableNeedsSystem) return;
@@ -452,8 +492,6 @@ namespace FollowerUnbound
             follower->NotifyAnimationGraph("weaponSheathe");
             follower->NotifyAnimationGraph("BeginWeaponSheathe");
             follower->NotifyAnimationGraph("WeaponSheathe");
-            // Silah durumunu hemen kınada olarak işaretle (animasyon gecikmeli tamamlanır)
-            state->actorState2.weaponState = RE::WEAPON_STATE::kSheathed;
             // Devam et — silah animasyonu arka planda tamamlanır, yeme/içme başlayabilir
         }
 

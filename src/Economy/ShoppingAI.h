@@ -14,6 +14,12 @@ namespace FollowerUnbound
         int32_t soulGems{ 0 };
         int32_t pettySoulGems{ 0 }, lesserSoulGems{ 0 }, commonSoulGems{ 0 };
         int32_t greaterSoulGems{ 0 }, grandSoulGems{ 0 }, blackSoulGems{ 0 };
+        int32_t pettySoulGemsEmpty{ 0 }, pettySoulGemsFull{ 0 };
+        int32_t lesserSoulGemsEmpty{ 0 }, lesserSoulGemsFull{ 0 };
+        int32_t commonSoulGemsEmpty{ 0 }, commonSoulGemsFull{ 0 };
+        int32_t greaterSoulGemsEmpty{ 0 }, greaterSoulGemsFull{ 0 };
+        int32_t grandSoulGemsEmpty{ 0 }, grandSoulGemsFull{ 0 };
+        int32_t blackSoulGemsEmpty{ 0 }, blackSoulGemsFull{ 0 };
         int32_t blueMountainFlowers{ 0 }, wheat{ 0 }, redMountainFlowers{ 0 };
         int32_t whiteCaps{ 0 }, purpleMountainFlowers{ 0 }, pineThrushEggs{ 0 };
         int32_t healthMinor{ 0 }, healthStandard{ 0 }, healthPlentiful{ 0 }, healthVigorous{ 0 }, healthExtreme{ 0 }, healthUltimate{ 0 };

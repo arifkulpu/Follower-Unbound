@@ -6,7 +6,7 @@ namespace FollowerUnbound
     class Serialization
     {
     public:
-        static constexpr uint32_t SerializationVersion = 19;
+        static constexpr uint32_t SerializationVersion = 21;
         static constexpr uint32_t RecordTypeFollowerProfile = 'FOLL';
         static constexpr uint32_t RecordTypeGlobalConfig    = 'CONF';
 

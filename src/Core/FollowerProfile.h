@@ -209,6 +209,36 @@ namespace FollowerUnbound
         uint32_t maxBuyBlueMountainFlowers{ 5 }, maxBuyWheat{ 5 };
         uint32_t maxBuyRedMountainFlowers{ 5 }, maxBuyWhiteCaps{ 5 };
         uint32_t maxBuyPurpleMountainFlowers{ 5 }, maxBuyPineThrushEggs{ 5 };
+
+        // Soul Gem fill preference: 0 = Any (Her İkisi), 1 = Empty (Boş), 2 = Full (Dolu)
+        uint32_t soulGemFillPetty{ 0 };
+        uint32_t soulGemFillLesser{ 0 };
+        uint32_t soulGemFillCommon{ 0 };
+        uint32_t soulGemFillGreater{ 0 };
+        uint32_t soulGemFillGrand{ 0 };
+        uint32_t soulGemFillBlack{ 0 };
+
+        // ── SİLAH VE ZIRH KUŞANMA TERCİHLERİ ──
+        // Zırh Tercihi (Kıyafet Bütünlüğü): 0=Hepsi/Serbest, 1=Ağır Zırh, 2=Hafif Zırh, 3=Kıyafet/Cübbe
+        uint32_t preferredArmorType{ 0 };
+
+        // Asli Silah Tercihi (Primary Weapon Style):
+        // 0=Serbest, 1=Tek Elli, 2=Çift Elli, 3=Yay, 4=Arbalet, 5=Asa
+        uint32_t primaryWeaponStyle{ 0 };
+        // Tek Elli / Asa ise El Seçimleri:
+        // Sağ El: 0=Herhangi, 1=Kılıç, 2=Hançer, 3=Balta, 4=Gürz, 5=Asa
+        uint32_t primaryRightHand{ 0 };
+        // Sol El: 0=Herhangi, 1=Kalkan, 2=Kılıç, 3=Hançer, 4=Balta, 5=Gürz, 6=Asa, 7=Büyü/Boş
+        uint32_t primaryLeftHand{ 0 };
+        // Çift Elli ise Tür: 0=Herhangi, 1=Büyük Kılıç, 2=Büyük Balta, 3=Savaş Çekici
+        uint32_t primaryTwoHandType{ 0 };
+
+        // Yardımcı Silah Tercihi (Secondary Weapon Style):
+        // 0=Yok, 1=Tek Elli, 2=Çift Elli, 3=Yay, 4=Arbalet, 5=Asa
+        uint32_t secondaryWeaponStyle{ 0 };
+        uint32_t secondaryRightHand{ 0 };
+        uint32_t secondaryLeftHand{ 0 };
+        uint32_t secondaryTwoHandType{ 0 };
     };
 
     class FollowerProfile

@@ -118,7 +118,7 @@ namespace FollowerUnbound
 
     bool AnimationManager::PlayLootAnimation(RE::Actor* actor, RE::TESObjectREFR* target)
     {
-        if (!actor || actor->IsDead() || actor->IsInCombat()) {
+        if (!actor || actor->IsDead() || actor->IsInCombat() || actor->IsOnMount()) {
             logger::info("LootAnim: skipped (actor unavailable/dead/in combat).");
             return false;
         }
