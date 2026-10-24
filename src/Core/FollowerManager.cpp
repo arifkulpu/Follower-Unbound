@@ -764,14 +764,14 @@ namespace FollowerUnbound
 
                 // Hayvan olmayan takipçiler yakında satıcı varsa düzenli satış ve alışveriş yapar
                 if (!profile->isAnimal && canTradeTick) {
-                    // Use carried materials before considering vendor purchases.
-                    CheckAutonomousCrafting(actor, *profile);
-                    // Önce satış: Fazla eşyaları/kılıçları satarak altın kazansın
-                    shoppingAI->ProcessSelling(actor, *profile);
-                    // Sonra alışveriş: Kazandığı altınla ihtiyaçlarını alsın
-                    shoppingAI->ProcessShopping(actor, *profile);
-                    // Güvenli bölgelerde (han, oyuncu evi, kasaba) büyü kitaplarını okuma ve öğrenme
+                    // 1. Önce bilmediği büyü kitaplarını oku ve öğren (satıcının eline düşmesin!)
                     CheckSpellTomeLearning(actor, *profile);
+                    // 2. Kendi malzemelerini kullanarak üretim yap
+                    CheckAutonomousCrafting(actor, *profile);
+                    // 3. Fazla eşyaları ve zaten bildiği kopya büyü kitaplarını sat
+                    shoppingAI->ProcessSelling(actor, *profile);
+                    // 4. İhtiyaçlarını satın al
+                    shoppingAI->ProcessShopping(actor, *profile);
                 }
             }
         }

@@ -1626,6 +1626,14 @@ namespace FollowerUnbound
             if (boundObj->As<RE::ScrollItem>()) {
                 if (pref.allowSellScrolls) isScroll = true;
             } else if (auto book = boundObj->As<RE::TESObjectBOOK>()) {
+                // Büyü kitabı kontrolü (Spell Tome):
+                // Eğer kitap bir büyü öğretiyorsa ve takipçi bu büyüyü HENÜZ BİLMİYORSA asla satamaz!
+                // Sadece büyüyü zaten öğrenmişse/biliyorsa satışa izin verilir.
+                if (auto* spell = book->data.teaches.spell) {
+                    if (!follower->HasSpell(spell)) {
+                        continue; // Henüz öğrenmediği büyü kitabını asla satamaz, koru!
+                    }
+                }
                 if (book->IsNoteScroll()) {
                     if (pref.allowSellScrolls) isScroll = true;
                 } else {
