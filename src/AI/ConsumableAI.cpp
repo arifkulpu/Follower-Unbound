@@ -5,6 +5,7 @@
 #include "Core/Settings.h"
 #include "AI/CombatTracker.h"
 #include "AI/LootManager.h"
+#include "Core/FollowerManager.h"
 
 namespace FollowerUnbound
 {
@@ -63,6 +64,10 @@ namespace FollowerUnbound
     {
         // Yalnızca savaş sırasında ve hayattayken iksir kullanılır; at sırtındayken animasyon oynatılmaz
         if (!follower || follower->IsDead() || !follower->IsInCombat() || follower->IsOnMount()) return;
+
+        // Dinamik savaş silahı geçişi (hedef mesafesine göre yay <-> kılıç/asa geçişi)
+        FollowerManager::GetSingleton()->UpdateCombatWeaponSwitching(follower, profile);
+
         if (TryCurePoison(follower)) return;
 
         // System toggle
