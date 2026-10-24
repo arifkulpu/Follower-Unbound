@@ -45,6 +45,16 @@ namespace FollowerUnbound
             for (auto itemID : profile.declinedEquipmentPurchases) {
                 a_intfc->WriteRecordData(itemID);
             }
+
+            // Version 22: Assigned loadout items (Primary/Secondary weapons & Armor)
+            a_intfc->WriteRecordData(profile.assignedPrimaryRight);
+            a_intfc->WriteRecordData(profile.assignedPrimaryLeft);
+            a_intfc->WriteRecordData(profile.assignedSecondaryRight);
+            a_intfc->WriteRecordData(profile.assignedSecondaryLeft);
+            a_intfc->WriteRecordData(profile.assignedHead);
+            a_intfc->WriteRecordData(profile.assignedBody);
+            a_intfc->WriteRecordData(profile.assignedHands);
+            a_intfc->WriteRecordData(profile.assignedFeet);
         }
 
         logger::info("Saved {} follower profiles to co-save.", count);
@@ -635,6 +645,26 @@ namespace FollowerUnbound
                         }
                     }
 
+                    RE::FormID aPR = 0, aPL = 0, aSR = 0, aSL = 0, aHead = 0, aBody = 0, aHands = 0, aFeet = 0;
+                    if (version >= 22) {
+                        auto resolveLoadoutID = [&](RE::FormID& target) {
+                            RE::FormID oldID = 0;
+                            read(oldID);
+                            if (oldID != 0 && resolved) {
+                                RE::FormID newID = 0;
+                                if (a_intfc->ResolveFormID(oldID, newID)) target = newID;
+                            }
+                        };
+                        resolveLoadoutID(aPR);
+                        resolveLoadoutID(aPL);
+                        resolveLoadoutID(aSR);
+                        resolveLoadoutID(aSL);
+                        resolveLoadoutID(aHead);
+                        resolveLoadoutID(aBody);
+                        resolveLoadoutID(aHands);
+                        resolveLoadoutID(aFeet);
+                    }
+
                     if (!resolved) {
                         logger::warn("Failed to resolve FormID {:08X}", oldFormID);
                         continue;
@@ -648,6 +678,14 @@ namespace FollowerUnbound
                     profile.preferences = preferences;
                     profile.protectedEquipment = std::move(protectedItems);
                     profile.declinedEquipmentPurchases = std::move(declinedEquipmentPurchases);
+                    profile.assignedPrimaryRight = aPR;
+                    profile.assignedPrimaryLeft = aPL;
+                    profile.assignedSecondaryRight = aSR;
+                    profile.assignedSecondaryLeft = aSL;
+                    profile.assignedHead = aHead;
+                    profile.assignedBody = aBody;
+                    profile.assignedHands = aHands;
+                    profile.assignedFeet = aFeet;
 
                     // Co-save callbacks run while the game is restoring its
                     // world. Defer actor lookup, follower checks, and inventory

@@ -27,6 +27,7 @@ namespace FollowerUnbound
         void RestoreSavedProfile(FollowerProfile profile);
         void UnregisterFollower(RE::FormID formID);
         bool IsFollower(RE::FormID formID) const;
+        void EnforceAssignedLoadout(RE::Actor* actor, FollowerProfile& profile);
 
         // Protect-Equipped-Clothing: captures everything the actor is currently
         // wearing/holding (right hand, left hand, worn armor/clothes) into the

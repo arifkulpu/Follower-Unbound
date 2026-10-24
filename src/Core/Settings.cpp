@@ -5,8 +5,19 @@ namespace FollowerUnbound
 {
     std::filesystem::path Settings::GetINIPath()
     {
-        auto path = std::filesystem::path{ "Data/SKSE/Plugins/FollowerUnbound.ini" };
-        return path;
+        // Mutlak (absolute) yol kullanilmalidir; Windows GetPrivateProfile/WritePrivateProfile
+        // goreli yol alirsa varsayilan olarak C:\Windows dizinine yonlendirir.
+        char modulePath[MAX_PATH];
+        HMODULE hModule = nullptr;
+        GetModuleHandleExA(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            reinterpret_cast<LPCSTR>(&Settings::GetSingleton),
+            &hModule);
+        if (hModule && GetModuleFileNameA(hModule, modulePath, sizeof(modulePath))) {
+            auto dllDir = std::filesystem::path(modulePath).parent_path();
+            return dllDir / "FollowerUnbound.ini";
+        }
+        return std::filesystem::absolute("Data/SKSE/Plugins/FollowerUnbound.ini");
     }
 
     void Settings::Load()

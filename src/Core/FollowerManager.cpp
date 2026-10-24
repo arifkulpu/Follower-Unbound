@@ -219,20 +219,63 @@ namespace FollowerUnbound
         return true;
     }
 
+    void FollowerManager::EnforceAssignedLoadout(RE::Actor* actor, FollowerProfile& profile)
+    {
+        if (!actor || actor->IsDead() || profile.isAnimal) return;
+        auto* equipMgr = RE::ActorEquipManager::GetSingleton();
+        if (!equipMgr) return;
+
+        auto inv = actor->GetInventory();
+        auto tryEquipForm = [&](RE::FormID formID, RE::BGSEquipSlot* slot = nullptr) {
+            if (formID == 0) return;
+            auto* bound = RE::TESForm::LookupByID<RE::TESBoundObject>(formID);
+            if (!bound) return;
+            auto it = inv.find(bound);
+            if (it != inv.end() && it->second.first > 0) {
+                equipMgr->EquipObject(actor, bound, nullptr, 1, slot, false, false, false, true);
+            }
+        };
+
+        // Zırhlar
+        tryEquipForm(profile.assignedHead);
+        tryEquipForm(profile.assignedBody);
+        tryEquipForm(profile.assignedHands);
+        tryEquipForm(profile.assignedFeet);
+
+        // Silahlar (Öncelikle Asli Silahlar)
+        auto* rightSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(0x00013F42);
+        auto* leftSlot  = RE::TESForm::LookupByID<RE::BGSEquipSlot>(0x00013F43);
+
+        if (profile.assignedPrimaryRight != 0) {
+            tryEquipForm(profile.assignedPrimaryRight, rightSlot);
+        }
+        if (profile.assignedPrimaryLeft != 0) {
+            tryEquipForm(profile.assignedPrimaryLeft, leftSlot);
+        }
+    }
+
     void FollowerManager::RestoreSavedProfile(FollowerProfile profile)
     {
-        if (profile.formID == 0) return;
+        const auto targetFormID = profile.formID;
+        if (targetFormID == 0) return;
         if (profile.name.empty()) profile.name = "Follower";
 
         std::unique_lock lock(_mutex);
-        auto it = _profiles.find(profile.formID);
+        auto it = _profiles.find(targetFormID);
         if (it != _profiles.end() && it->second) {
             if (profile.classBoundDisplayName.empty()) profile.classBoundDisplayName = it->second->classBoundDisplayName;
             profile.isAnimal = it->second->isAnimal;
             if (!it->second->name.empty() && it->second->name != "Follower") profile.name = it->second->name;
             *it->second = std::move(profile);
+            if (auto* actor = RE::TESForm::LookupByID<RE::Actor>(targetFormID)) {
+                EnforceAssignedLoadout(actor, *it->second);
+            }
         } else {
-            _profiles.emplace(profile.formID, std::make_shared<FollowerProfile>(std::move(profile)));
+            auto sharedProf = std::make_shared<FollowerProfile>(std::move(profile));
+            _profiles.emplace(targetFormID, sharedProf);
+            if (auto* actor = RE::TESForm::LookupByID<RE::Actor>(targetFormID)) {
+                EnforceAssignedLoadout(actor, *sharedProf);
+            }
         }
     }
 

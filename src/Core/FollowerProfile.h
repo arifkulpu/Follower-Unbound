@@ -263,6 +263,17 @@ namespace FollowerUnbound
         // the same item is never offered again after loading the save.
         std::unordered_set<RE::FormID> declinedEquipmentPurchases;
 
+        // Oyuncu tarafindan secilen kalici loadout (Asli & Yardimci Silahlar ve Zirhlar)
+        // Oyun yuklendiginde (load game) Skyrim'in vanilla ekipman secimi yerine bu esyalar oncelikli kusanilir.
+        RE::FormID assignedPrimaryRight{ 0 };
+        RE::FormID assignedPrimaryLeft{ 0 };
+        RE::FormID assignedSecondaryRight{ 0 };
+        RE::FormID assignedSecondaryLeft{ 0 };
+        RE::FormID assignedHead{ 0 };
+        RE::FormID assignedBody{ 0 };
+        RE::FormID assignedHands{ 0 };
+        RE::FormID assignedFeet{ 0 };
+
         FollowerProfile() = default;
         explicit FollowerProfile(RE::FormID a_formID, std::string_view a_name = "")
             : formID(a_formID), name(a_name) {}

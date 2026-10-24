@@ -691,22 +691,41 @@ namespace FollowerUnbound
                 }
                 for (auto oldID : conflicts) profile->ProtectItem(oldID, false);
                 profile->ProtectItem(itemID, true);
+
+                // Zırh slotunu kalıcı loadout'a kaydet
+                using Slot = RE::BIPED_MODEL::BipedObjectSlot;
+                if (mask & static_cast<uint32_t>(Slot::kHead)) profile->assignedHead = itemID;
+                if (mask & static_cast<uint32_t>(Slot::kBody)) profile->assignedBody = itemID;
+                if (mask & static_cast<uint32_t>(Slot::kHands)) profile->assignedHands = itemID;
+                if (mask & static_cast<uint32_t>(Slot::kFeet)) profile->assignedFeet = itemID;
+
                 equip->EquipObject(actor, armor, nullptr, 1, nullptr, false, false, false, true);
             }
             for (auto itemID : ids) {
                 auto* weapon = RE::TESForm::LookupByID<RE::TESObjectWEAP>(itemID);
                 if (!weapon) continue;
                 profile->ProtectItem(itemID, true);
+                profile->assignedPrimaryRight = itemID;
                 equip->EquipObject(actor, weapon, nullptr, 1, nullptr, false, false, false, true);
             }
             AnimationManager::GetSingleton()->SheatheWeapon(actor);
         } else if (kind == "equipHand") {
             const auto itemID = a.value("item", uint32_t{ 0 });
             const bool isLeft = a.value("leftHand", false);
+            const bool isSecondary = a.value("secondary", false);
             auto* equip = RE::ActorEquipManager::GetSingleton();
             if (!equip) return;
             if (auto* bound = RE::TESForm::LookupByID<RE::TESBoundObject>(itemID)) {
                 profile->ProtectItem(itemID, true);
+
+                if (isSecondary) {
+                    if (isLeft) profile->assignedSecondaryLeft = itemID;
+                    else profile->assignedSecondaryRight = itemID;
+                } else {
+                    if (isLeft) profile->assignedPrimaryLeft = itemID;
+                    else profile->assignedPrimaryRight = itemID;
+                }
+
                 // 0x00013F42 = RightHand, 0x00013F43 = LeftHand
                 auto* slot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(isLeft ? 0x00013F43 : 0x00013F42);
                 equip->EquipObject(actor, bound, nullptr, 1, slot, false, false, false, true);
@@ -795,6 +814,14 @@ namespace FollowerUnbound
             };
             f["weapons"] = nlohmann::json::array();
             f["apparel"] = nlohmann::json::array();
+            f["assignedPrimaryRight"] = p.assignedPrimaryRight;
+            f["assignedPrimaryLeft"] = p.assignedPrimaryLeft;
+            f["assignedSecondaryRight"] = p.assignedSecondaryRight;
+            f["assignedSecondaryLeft"] = p.assignedSecondaryLeft;
+            f["assignedHead"] = p.assignedHead;
+            f["assignedBody"] = p.assignedBody;
+            f["assignedHands"] = p.assignedHands;
+            f["assignedFeet"] = p.assignedFeet;
             auto* eqRight = actor->GetEquippedObject(false);
             auto* eqLeft = actor->GetEquippedObject(true);
             f["equippedRight"] = eqRight && eqRight->GetName() ? eqRight->GetName() : "Boş";
