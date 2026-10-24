@@ -267,8 +267,12 @@ namespace FollowerUnbound
                 }
                 if (!worn) continue;
 
-                // Eğer oyuncu bilerek bu eşyayı kilitleyip atadıysa çıkarma
-                if (profile.IsProtected(armor->GetFormID())) continue;
+                // Eğer oyuncu bilerek bu eşyayı doğrudan loadout olarak atadıysa çıkarma
+                const auto armorID = armor->GetFormID();
+                if (armorID == profile.assignedHead || armorID == profile.assignedBody ||
+                    armorID == profile.assignedHands || armorID == profile.assignedFeet) {
+                    continue;
+                }
 
                 // Eğer bu parça tercih edilen zırh tipine uymuyorsa çıkart!
                 if (!ItemEvaluator::MatchesPreferredArmor(armor, profile.preferences.preferredArmorType)) {

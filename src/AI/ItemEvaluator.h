@@ -126,7 +126,15 @@ namespace FollowerUnbound
                 mask & static_cast<uint32_t>(Slot::kRing)) {
                 return true;
             }
-            // Sadece kafa, gövde, eldiven ve ayakkabı için geçerlidir
+            // Sadece 4 ana biped slotu (Kafa, Govde, Eller, Ayaklar) kontrol edilir; fener/aksesuar/eklenti slotlari serbesttir
+            constexpr uint32_t kMainArmorSlots = static_cast<uint32_t>(Slot::kHead) |
+                                                 static_cast<uint32_t>(Slot::kBody) |
+                                                 static_cast<uint32_t>(Slot::kHands) |
+                                                 static_cast<uint32_t>(Slot::kFeet);
+            if ((mask & kMainArmorSlots) == 0) {
+                return true;
+            }
+
             using ArmorType = RE::BGSBipedObjectForm::ArmorType;
             const auto armorType = armor->GetArmorType();
             if (preferredType == 1) return armorType == ArmorType::kHeavyArmor;
