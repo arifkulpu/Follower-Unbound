@@ -451,7 +451,8 @@
         ['selling','Selling','Sell excess items to nearby merchants.'],
         ['promptBetterGear','Ask before equipping looted gear','Show a prompt before equipping a better item found in loot.'],
         ['equipmentPurchaseOffers','Offer better gear from merchants','Ask before a follower buys a better weapon or armor from a merchant.'],
-        ['mageRobes','Mage robe preference','Prefer robes for mage-class followers.']
+        ['mageRobes','Mage robe preference','Prefer robes for mage-class followers.'],
+        ['spellTomes','Spell tome learning','Followers read and learn spells from spell tomes in safe places (inns, homes, towns).']
       ]],
       ['NOTIFICATIONS & ALERTS',[
         ['notifications','Enable all notifications','Master switch for all on-screen companion messages and alerts.'],

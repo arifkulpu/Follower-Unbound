@@ -116,6 +116,53 @@ namespace FollowerUnbound
         SendAnimEvent(actor, "IdleForceDefaultState");
     }
 
+    bool AnimationManager::PlayReadAnimation(RE::Actor* actor, bool isSitting)
+    {
+        if (!actor || actor->IsDead() || actor->IsInCombat() || actor->IsOnMount()) return false;
+        if (!actor->Is3DLoaded()) return false;
+
+        if (auto* actorState = actor->AsActorState(); actorState && actorState->IsWeaponDrawn()) {
+            SheatheWeapon(actor);
+        }
+
+        auto* dataHandler = RE::TESDataHandler::GetSingleton();
+        auto* process = actor->GetActorRuntimeData().currentProcess;
+
+        // 1. Immersive Interactions / Vanilla Idle Formlari:
+        // Stand: IdleBook_Reading (0x000BB052), Sit: IdleBookSitting_Reading (0x0003505C)
+        const RE::FormID idleID = isSitting ? 0x0003505C : 0x000BB052;
+        auto* readIdle = dataHandler ? dataHandler->LookupForm<RE::TESIdleForm>(idleID, "Skyrim.esm") : nullptr;
+        if (readIdle && process && process->PlayIdle(actor, readIdle, nullptr)) {
+            logger::info("ReadAnim: Idle {:08X} started for {} (sitting={}).", idleID, actor->GetName(), isSitting);
+            return true;
+        }
+
+        // 2. Behavior graph fallbackleri
+        if (actor->NotifyAnimationGraph("AO_BookStart") || actor->NotifyAnimationGraph("IdleBook_Reading") ||
+            actor->NotifyAnimationGraph("IdleRead") || actor->NotifyAnimationGraph("IdleBookEnter")) {
+            logger::info("ReadAnim: Graph event accepted for {}.", actor->GetName());
+            return true;
+        }
+
+        return false;
+    }
+
+    void AnimationManager::StopReadAnimation(RE::Actor* actor)
+    {
+        if (!actor || !actor->Is3DLoaded()) return;
+
+        auto* dataHandler = RE::TESDataHandler::GetSingleton();
+        auto* process = actor->GetActorRuntimeData().currentProcess;
+
+        auto* stopIdle = dataHandler ? dataHandler->LookupForm<RE::TESIdleForm>(0x0010D9EE, "Skyrim.esm") : nullptr;
+        if (stopIdle && process) {
+            process->PlayIdle(actor, stopIdle, nullptr);
+        }
+
+        actor->NotifyAnimationGraph("IdleForceDefaultState");
+        actor->NotifyAnimationGraph("OffsetStop");
+    }
+
     bool AnimationManager::PlayLootAnimation(RE::Actor* actor, RE::TESObjectREFR* target)
     {
         if (!actor || actor->IsDead() || actor->IsInCombat() || actor->IsOnMount()) {

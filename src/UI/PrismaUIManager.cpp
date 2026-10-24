@@ -603,6 +603,7 @@ namespace FollowerUnbound
             FU_SET_BOOL("poison", enablePoisonSystem) FU_SET_BOOL("protectOutfit", protectEquippedClothing)
             FU_SET_BOOL("promptBetterGear", promptOnBetterEquipment) FU_SET_BOOL("mageRobes", magePreferRobes)
             FU_SET_BOOL("equipmentPurchaseOffers", enableEquipmentPurchaseOffers)
+            FU_SET_BOOL("spellTomes", enableSpellTomeLearning)
             FU_SET_BOOL("notifyLoot", notifyLoot)
             FU_SET_BOOL("notifyShopping", notifyShopping)
             FU_SET_BOOL("notifySelling", notifySelling)
@@ -745,7 +746,7 @@ namespace FollowerUnbound
             {"combatPotions",settings->enableCombatPotions},{"needs",settings->enableNeedsSystem},
             {"poison",settings->enablePoisonSystem},{"protectOutfit",settings->protectEquippedClothing},
             {"promptBetterGear",settings->promptOnBetterEquipment},{"mageRobes",settings->magePreferRobes},
-            {"equipmentPurchaseOffers",settings->enableEquipmentPurchaseOffers},
+            {"equipmentPurchaseOffers",settings->enableEquipmentPurchaseOffers},{"spellTomes",settings->enableSpellTomeLearning},
             {"notifications",settings->enableNotifications},
             {"notifyLoot",settings->notifyLoot},
             {"notifyShopping",settings->notifyShopping},

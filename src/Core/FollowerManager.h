@@ -21,6 +21,7 @@ namespace FollowerUnbound
         void UpdateGameTimeNeeds();
         void TriggerFollowerConsumption(); // İhtiyaç seansındaki takipçilerin tüketimlerini tetikler
         void CheckAutonomousCrafting(RE::Actor* actor, FollowerProfile& profile); // Ok ve arbalet oku üretimi
+        void CheckSpellTomeLearning(RE::Actor* actor, FollowerProfile& profile);   // Büyü kitaplarını okuma ve öğrenme
         void OnSleepStop(); // Oyuncu uyudu — tum takipciler dinlendirilir
 
         bool RegisterFollower(RE::Actor* actor);

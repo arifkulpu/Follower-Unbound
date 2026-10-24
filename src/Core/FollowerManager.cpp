@@ -770,6 +770,8 @@ namespace FollowerUnbound
                     shoppingAI->ProcessSelling(actor, *profile);
                     // Sonra alışveriş: Kazandığı altınla ihtiyaçlarını alsın
                     shoppingAI->ProcessShopping(actor, *profile);
+                    // Güvenli bölgelerde (han, oyuncu evi, kasaba) büyü kitaplarını okuma ve öğrenme
+                    CheckSpellTomeLearning(actor, *profile);
                 }
             }
         }
@@ -952,6 +954,114 @@ namespace FollowerUnbound
             }
         }
         logger::info("OnSleepStop: {} follower(s) rested and restored.", _profiles.size());
+    }
+
+
+    static bool IsInSafeLocation(RE::Actor* actor)
+    {
+        if (!actor) return false;
+        auto* cell = actor->GetParentCell();
+        if (!cell) return false;
+
+        auto* loc = cell->GetLocation();
+        auto* kwLoc = loc ? loc->As<RE::BGSKeywordForm>() : nullptr;
+
+        // 1. İç mekan kontrolü (Hanlar, Evler, Şehir binaları)
+        if (cell->IsInteriorCell()) {
+            if (kwLoc) {
+                if (kwLoc->HasKeywordString("LocTypeDungeon") || kwLoc->HasKeywordString("LocSetDungeon")) {
+                    return false;
+                }
+                if (kwLoc->HasKeywordString("LocTypeInn") || kwLoc->HasKeywordString("LocTypePlayerHouse") ||
+                    kwLoc->HasKeywordString("LocTypeHouse") || kwLoc->HasKeywordString("LocTypeDwelling") ||
+                    kwLoc->HasKeywordString("LocTypeStore") || kwLoc->HasKeywordString("LocTypeGuild") ||
+                    kwLoc->HasKeywordString("LocTypeTemple") || kwLoc->HasKeywordString("LocTypeCastle")) {
+                    return true;
+                }
+            }
+            // Zindan değilse iç mekanlar (oyuncu evi, han vb.) güvenli sayılır
+            return true;
+        }
+
+        // 2. Dış mekan / Şehir / Kasaba kontrolü
+        if (kwLoc) {
+            if (kwLoc->HasKeywordString("LocTypeCity") || kwLoc->HasKeywordString("LocTypeTown") ||
+                kwLoc->HasKeywordString("LocTypeSettlement") || kwLoc->HasKeywordString("LocTypeHabitation")) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void FollowerManager::CheckSpellTomeLearning(RE::Actor* actor, FollowerProfile& profile)
+    {
+        if (!actor || actor->IsDead() || actor->IsInCombat() || profile.isAnimal) return;
+        auto* settings = Settings::GetSingleton();
+        if (!settings->enableSpellTomeLearning) return;
+
+        // Güvenli ortam kontrolü: Han, Oyuncu Evi, Şehir/Kasaba
+        if (!IsInSafeLocation(actor)) return;
+
+        static std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> s_lastReadTime;
+        auto now = std::chrono::steady_clock::now();
+        const auto actorID = actor->GetFormID();
+        if (auto it = s_lastReadTime.find(actorID); it != s_lastReadTime.end()) {
+            if (std::chrono::duration<float>(now - it->second).count() < 12.0f) {
+                return; // Kitaplar arasında makul bekleme süresi
+            }
+        }
+
+        auto* animMgr = AnimationManager::GetSingleton();
+        auto* notifMgr = NotificationManager::GetSingleton();
+
+        for (const auto& [item, invData] : actor->GetInventory()) {
+            if (!item || invData.first <= 0) continue;
+            auto* book = item->As<RE::TESObjectBOOK>();
+            if (!book) continue;
+
+            // Büyü kitabı mı (Spell Tome)? Büyü öğretmeli
+            auto* spell = book->data.teaches.spell;
+            if (!spell) continue;
+
+            // Takipçi bu büyüyü zaten biliyor mu?
+            if (actor->HasSpell(spell)) continue;
+
+            // Oturuyor mu kontrol et
+            auto* actorState = actor->AsActorState();
+            const bool isSitting = actorState && (actorState->GetSitSleepState() != RE::SIT_SLEEP_STATE::kNormal);
+
+            // Okuma animasyonu başlat (Immersive Interactions uyumlu)
+            animMgr->PlayReadAnimation(actor, isSitting);
+
+            // Büyüyü öğren
+            actor->AddSpell(spell);
+
+            // Kitabı envanterden tüket (1 adet)
+            actor->RemoveItem(book, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+
+            s_lastReadTime[actorID] = now;
+
+            const char* spellName = spell->GetName() ? spell->GetName() : "Spell";
+            const char* bookName = book->GetName() ? book->GetName() : "Spell Tome";
+
+            if (settings->notifySpellLearned) {
+                std::string msg = std::format("{} read {} and learned {}!", actor->GetName(), bookName, spellName);
+                notifMgr->ShowHUDMessage(msg);
+            }
+            logger::info("SpellTomeLearning: {} read '{}' [{:08X}] and learned spell '{}' [{:08X}].",
+                actor->GetName(), bookName, book->GetFormID(), spellName, spell->GetFormID());
+
+            // 3 saniye sonra animasyonu sonlandır
+            if (auto* tasks = SKSE::GetTaskInterface()) {
+                tasks->AddTask([actorID]() {
+                    if (auto* a = RE::TESForm::LookupByID<RE::Actor>(actorID)) {
+                        AnimationManager::GetSingleton()->StopReadAnimation(a);
+                    }
+                });
+            }
+            break; // Seans başına 1 kitap okur
+        }
     }
 
     void FollowerManager::Clear()

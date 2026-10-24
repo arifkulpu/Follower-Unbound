@@ -30,6 +30,10 @@ namespace FollowerUnbound
         // Uyku animasyonu / durumu sifirla.
         void PlaySleepRestoreAnimation(RE::Actor* actor);
 
+        // Kitap ve not okuma animasyonları (Immersive Interactions & Vanilla uyumlu)
+        bool PlayReadAnimation(RE::Actor* actor, bool isSitting = false);
+        void StopReadAnimation(RE::Actor* actor);
+
         // Silahi kinina alir ve animasyon grafini idle'a dondurur.
         // TryAutoEquip sonrasi cagrılarak "silah elde T-pose" sorununu onler.
         // Savaştaki aktörlerde çağrılmaz.

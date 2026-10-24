@@ -87,6 +87,7 @@ namespace FollowerUnbound
         enableSellingSystem  = readBool("Systems", "EnableSellingSystem",  true);
         enablePoisonSystem   = readBool("Systems", "EnablePoisonSystem",   true);
         enablePetSystem      = readBool("Systems", "EnablePetSystem",      true);
+        enableSpellTomeLearning = readBool("Systems", "EnableSpellTomeLearning", true);
         protectEquippedClothing = readBool("Systems", "ProtectEquippedClothing", true);
         promptOnBetterEquipment = readBool("Systems", "PromptOnBetterEquipment", true);
         equipmentUpgradeChance  = static_cast<uint32_t>(std::clamp(readInt("Systems", "EquipmentUpgradeChance", 35), 1, 100));
@@ -135,6 +136,7 @@ namespace FollowerUnbound
         notifyShopping            = readBool("Notifications", "NotifyShopping",            true);
         notifySelling             = readBool("Notifications", "NotifySelling",             true);
         notifyAutoEquip           = readBool("Notifications", "NotifyAutoEquip",           true);
+        notifySpellLearned        = readBool("Notifications", "NotifySpellLearned",        true);
 
         // ── HOTKEY ──
         menuHotkey         = static_cast<uint32_t>(readInt("Hotkey", "MenuHotkey", 0x17));
@@ -197,6 +199,7 @@ namespace FollowerUnbound
         writeBool("Systems", "EnableSellingSystem",  enableSellingSystem);
         writeBool("Systems", "EnablePoisonSystem",   enablePoisonSystem);
         writeBool("Systems", "EnablePetSystem",      enablePetSystem);
+        writeBool("Systems", "EnableSpellTomeLearning", enableSpellTomeLearning);
         writeBool("Systems", "ProtectEquippedClothing", protectEquippedClothing);
         writeBool("Systems", "PromptOnBetterEquipment", promptOnBetterEquipment);
         writeInt("Systems",  "EquipmentUpgradeChance",  static_cast<int>(equipmentUpgradeChance));
@@ -245,6 +248,7 @@ namespace FollowerUnbound
         writeBool("Notifications", "NotifyShopping",            notifyShopping);
         writeBool("Notifications", "NotifySelling",             notifySelling);
         writeBool("Notifications", "NotifyAutoEquip",           notifyAutoEquip);
+        writeBool("Notifications", "NotifySpellLearned",        notifySpellLearned);
 
         // ── HOTKEY ──
         writeInt("Hotkey", "MenuHotkey",         static_cast<int>(menuHotkey));

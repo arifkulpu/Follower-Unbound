@@ -21,6 +21,7 @@ namespace FollowerUnbound
         bool enableSellingSystem{ true };    // Auto-sell excess loot/gear to vendors
         bool enablePoisonSystem{ true };     // Assassin auto-apply poison to weapon
         bool enablePetSystem{ true };        // Animals/Pets (cats, dogs, horses) have hunger/thirst/fatigue needs
+        bool enableSpellTomeLearning{ true }; // Takipçiler büyü kitaplarını okuyup büyüyü öğrensin
 
         // ── HOTKEY SETTINGS ──
         // menuHotkey: DirectX scan code (default: 0x17 = 'I')
@@ -83,6 +84,7 @@ namespace FollowerUnbound
         bool notifyShopping{ true };              // "X purchased Y from Z. (-N Gold)"
         bool notifySelling{ true };               // "X sold Y to Z. (+N Gold)"
         bool notifyAutoEquip{ true };             // "X equipped Y"
+        bool notifySpellLearned{ true };          // "X learned spell Y from Spell Tome"
 
         // ── NEEDS DEPLETION RATES (game hours) ──
         float hungerDepletionHours{ 8.0f };
