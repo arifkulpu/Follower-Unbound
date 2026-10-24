@@ -57,5 +57,6 @@ namespace FollowerUnbound
         std::unordered_map<RE::FormID, std::shared_ptr<FollowerProfile>> _profiles;
         float _timeSinceLastScan{ 0.0f };
         float _lastGameTimeDays{ 0.0f };
+        std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _readingActiveFollowers;
     };
 }

@@ -1003,12 +1003,26 @@ namespace FollowerUnbound
         // Güvenli ortam kontrolü: Han, Oyuncu Evi, Şehir/Kasaba
         if (!IsInSafeLocation(actor)) return;
 
-        static std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> s_lastReadTime;
         auto now = std::chrono::steady_clock::now();
         const auto actorID = actor->GetFormID();
+
+        // Eğer şu anda kitap okuyorsa süresini kontrol et (4 saniye boyunca okur)
+        if (auto it = _readingActiveFollowers.find(actorID); it != _readingActiveFollowers.end()) {
+            float elapsed = std::chrono::duration<float>(now - it->second).count();
+            if (elapsed < 4.0f) {
+                return; // Kitap okuma animasyonu hala devam ediyor
+            } else {
+                // Süre bitti: animasyonu kapat
+                AnimationManager::GetSingleton()->StopReadAnimation(actor);
+                _readingActiveFollowers.erase(it);
+                return;
+            }
+        }
+
+        static std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> s_lastReadTime;
         if (auto it = s_lastReadTime.find(actorID); it != s_lastReadTime.end()) {
-            if (std::chrono::duration<float>(now - it->second).count() < 12.0f) {
-                return; // Kitaplar arasında makul bekleme süresi
+            if (std::chrono::duration<float>(now - it->second).count() < 15.0f) {
+                return; // Kitaplar arasında makul bekleme süresi (15 sn)
             }
         }
 
@@ -1041,6 +1055,7 @@ namespace FollowerUnbound
             actor->RemoveItem(book, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
 
             s_lastReadTime[actorID] = now;
+            _readingActiveFollowers[actorID] = now; // 4 saniye boyunca okumada tut
 
             const char* spellName = spell->GetName() ? spell->GetName() : "Spell";
             const char* bookName = book->GetName() ? book->GetName() : "Spell Tome";
@@ -1052,14 +1067,6 @@ namespace FollowerUnbound
             logger::info("SpellTomeLearning: {} read '{}' [{:08X}] and learned spell '{}' [{:08X}].",
                 actor->GetName(), bookName, book->GetFormID(), spellName, spell->GetFormID());
 
-            // 3 saniye sonra animasyonu sonlandır
-            if (auto* tasks = SKSE::GetTaskInterface()) {
-                tasks->AddTask([actorID]() {
-                    if (auto* a = RE::TESForm::LookupByID<RE::Actor>(actorID)) {
-                        AnimationManager::GetSingleton()->StopReadAnimation(a);
-                    }
-                });
-            }
             break; // Seans başına 1 kitap okur
         }
     }
