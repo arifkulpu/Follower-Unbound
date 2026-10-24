@@ -5,7 +5,7 @@ TÜRKÇE (TURKISH)
 ================================================================================
 
 ## Genel Bakış
-v0.2.2 güncellemesi; takipçiler için derinlemesine silah ve zırh kuşanma yönetimi (Tek El, Çift El, Menzilli, Asli/Yardımcı silah tarzları), Kıyafet Bütünlüğü Sistemi (Ağır/Hafif/Cübbe), oyuncunun verdiği eşyaların otomatik korunması, savaşta iksir içme animasyon kilidinin giderilmesi, at sırtındayken animasyonların durdurulması, ruh taşlarında boş/dolu alışveriş seçimi ve özelleştirilebilir klavye kısayol tuşu sistemini oyuna kazandırır.
+v0.2.2 güncellemesi; takipçiler için derinlemesine silah ve zırh kuşanma yönetimi (Tek El, Çift El, Menzilli, Asli/Yardımcı silah tarzları), Kıyafet Bütünlüğü Sistemi (Ağır/Hafif/Cübbe), ters zırh türlerini otomatik çıkartma, büyü kitabı okuma ve öğrenme sistemi, oyuncunun verdiği eşyaların otomatik korunması, darbe/hasar anında animasyon kilitlenmelerinin giderilmesi, at sırtındayken animasyonların durdurulması, ruh taşlarında boş/dolu alışveriş seçimi ve ClassBound ile birebir uyumlu stabil tuş atama altyapısını oyuna kazandırır.
 
 ---
 
@@ -33,49 +33,58 @@ Prisma UI **Equipment** bölümü baştan aşağı yenilendi ve 3 özel sekmeye 
     - 🧙 **Kıyafet & Cübbe (Clothing / Robes Only)**
     - ⚖️ **Serbest (Any)**
   - Takipçi kafa, gövde, eldiven ve ayakkabı parçalarında sadece seçilen sınıftaki zırhları giyer. Yerden bulduğu veya dükkandan teklif edilen zırhlar bu kurala uymak zorundadır.
+  - **Uyumsuz Zırhları Otomatik Çıkartma:** Takipçi ganimet toplarken Skyrim motorunun otomatik olarak giydirdiği uyumsuz parçalar (örneğin büyücü takipçinin kafasında kalan ağır zırh kask veya ağır zırh giyen takipçinin üzerindeki deri çizme) oyuncu tarafından doğrudan atanmadığı sürece otomatik olarak tespit edilir ve üzerinden çıkartılır.
+  - **Aksesuar & Fener Muafiyeti:** Pelerin, takı ve takılabilir fenerler (Wearable Lanterns) gibi gövde dışı aksesuarlar kıyafet kısıtlamasından muaf tutularak takipçinin üzerinde kalmaya devam eder.
 - 🎒 **ENVANTER (Inventory):**
   - Takipçinin tüm silah, zırh, kalkan ve giysilerinin listelendiği genel görünüm.
   - Eşyaların korunma ve kuşanılma durumları yönetilebilir.
 
-### 2. Oyuncunun Verdiği Eşyaların Otomatik Korunması (Auto-Protection)
+### 2. Büyü Kitaplarını Okuma ve Öğrenme (Spell Tome Learning)
+- Takipçiye bilmediği bir büyü kitabı verildiğinde, takipçi kitabı okur, büyü animasyonu ve ses efekti eşliğinde büyüyü kalıcı olarak öğrenir.
+- Öğrenilen büyü kitabı takipçinin envanterinden silinir.
+- Takipçinin zaten bildiği büyü kitapları ise korunmaz ve tüccarlara satılmak üzere envanterde bırakılır.
+- Öğrenilen büyüler (saldırı, savunma, iyileştirme) takipçinin magicka havuzuna ve sınıfına uygun şekilde Skyrim motoru tarafından savaşta doğrudan kullanılır.
+
+### 3. Oyuncunun Verdiği Eşyaların Otomatik Korunması (Auto-Protection)
 - Oyuncu takas penceresinden veya hediye olarak takipçiye bir silah, zırh veya kıyafet verdiğinde, eşya motor düzeyinde anında **PROTECTED (Korumalı)** olarak işaretlenir.
 - Takipçiler oyuncunun kendilerine verdiği bu eşyaları tüccarlara asla satamaz.
 - Oyuncu dilerse Equipment -> Envanter sekmesinden eşyanın koruma kutucuğunun tikini kaldırarak bir sonraki satışta satılabilir yapabilir.
 
-### 3. Savaşta İksir İçme Animasyon Kilidi Giderildi (Combat Potion Fix)
-- Acil durumlarda (`emergency`) takipçinin her tick'te iksir içme komutu alarak animasyon kilitlenmesine girmesi ve silahının elde donup kalması engellendi (1.5 saniyelik animasyon penceresi eklendi).
-- İksir içme tamamlandığında motor düzeyinde `IdleForceDefaultState` ve `EvaluatePackage` çağrılarak takipçinin animasyon grafiği sıfırlanır, silahı hazır hale getirilir ve yapay zeka hemen saldırıya devam eder.
-- Animasyon motoruyla çakışan elle yazılmış `weaponState` değişkeni temizlendi.
+### 4. Savaşta Animasyon ve Darbe Kilidi Giderildi (Combat Freeze Fix)
+- Takipçinin yüksek hasar aldığı, sendelediği (stagger) veya darbe tepkisine girdiği anlarda motora gönderilen zoraki idle olaylarının Havok grafiğini dondurması (tek bacak havada donma hatası) tamamen engellendi.
+- Savaş esnasında ve animasyon bitişlerinde sendeleme ve darbe tepkileri korunarak takipçinin akıcı şekilde savaşmaya devam etmesi sağlandı.
+- Bleedout durumunda iksir içme ve animasyon başlatma girişimleri tamamen engellendi.
 
-### 4. Silah Zehirleme Zamanlaması & Gecikme (Poison Application Delay)
+### 5. Silah Zehirleme Zamanlaması & Gecikme (Poison Application Delay)
 - Takipçiler artık savaş bittikten ve etraftaki tüm cesetlerin yağmalanması tamamlandıktan **tam 3 saniye sonra** ellerindeki silahlara zehir basar; böylece zehirleme animasyonu net bir şekilde görülebilir.
 - Takipçi zehir satın aldığında veya oyuncudan teslim aldığında da **3 saniyelik doğal gecikmeyle** silaha sürer.
 
-### 5. At Sırtındayken (Mounted) Animasyonların Durdurulması
+### 6. At Sırtındayken (Mounted) Animasyonların Durdurulması
 - Takipçiler ata bindiğinde (mounted) yeme, içme, silaha zehir sürme, iksir kullanma ve ceset yağmalama gibi animasyonları ve AI eylemleri tamamen durdurulur.
 
-### 6. Ruh Taşı Alışverişinde Boş/Dolu Tercihi (Soul Gem Fill Mode)
+### 7. Ruh Taşı Alışverişinde Boş/Dolu Tercihi (Soul Gem Fill Mode)
 - Petty, Lesser, Common, Greater, Grand ve Black soul gem kategorilerinin her biri için ayrı ayrı:
   - `Her İkisi (Any)`
   - `Boş (Empty Only)`
   - `Dolu (Full Only)`
   seçim özelliği getirildi. Takipçiler sadece seçilen doluluk durumundaki ruh taşlarını satın alır.
 
-### 7. Menü Kısayol Tuşu Atama Sistemi (Custom Hotkey System)
-- `button->IsPressed()` düzeltmesiyle menünün açılır açılmaz anında kapanma sorunu kökten çözüldü.
-- Tek tuş (örn: I, U, O, K, F1..F11) veya çift tuş kombinasyonları (Shift + I, Ctrl + U, Alt + K vb.) tam desteklenir.
-- Prisma UI Systems sekmesine hem klavyeden basılan tuşu algılayan **"Tuş Ata…"** butonu, hem de doğrudan açılır kutudan seçilebilen **Hazır Seçim Menüsü** eklendi.
+### 8. Gelişmiş Menü Açma ve Kısayol Tuşu Sistemi (ClassBound Engine)
+- Menü açma ve tuş dinleme altyapısı ClassBound mimarisiyle birebir eşitlendi.
+- Çakışma yaratan BSInputDeviceManager kancaları temizlendi; SKSEMenuFramework ile senkronize, takılmayan ve anında tepki veren tuş dinleyicisi entegre edildi.
+- Tek tuş (I, U, O, K, F1..F12) ve kombinasyonlar (Shift, Ctrl, Alt) kusursuz çalışır.
 
-### 8. Geriye Dönük Kayıt Uyumluluğu
-- Kayıt sistemi versiyonu 21'e güncellendi. Eski kayıt dosyaları (save game) bozulmadan sorunsuzca yüklenir.
+### 9. Geriye Dönük Kayıt Uyumluluğu
+- Kayıt sistemi versiyonu 22'ye güncellendi. Eski kayıt dosyaları (co-save) bozulmadan ve ayarlar korunarak sorunsuzca yüklenir.
 
+---
 
 ================================================================================
 ENGLISH
 ================================================================================
 
 ## Overview
-v0.2.2 introduces an extensive 3-tab Equipment Loadout System (Weapons, Armor, Inventory), Armor Weight Integrity (Heavy, Light, Clothing), automatic protection for player-gifted gear, combat potion animation recovery, mounted state animation suppression, Soul Gem empty/full shopping filter, and a robust custom hotkey rebinding system.
+v0.2.2 introduces an extensive 3-tab Equipment Loadout System (Weapons, Armor, Inventory), Armor Weight Integrity (Heavy, Light, Clothing) with automatic mismatched armor unequip, Spell Tome learning with visual effects, automatic protection for player-gifted gear, combat stagger/damage animation freeze fix, mounted state animation suppression, Soul Gem empty/full shopping filter, and a modernized hotkey system aligned with ClassBound.
 
 ---
 
@@ -97,37 +106,45 @@ The Prisma UI **Equipment** interface has been completely redesigned with 3 dist
     - 🧙 **Clothing / Robes Only**
     - ⚖️ **Any / Best Armor**
   - Applies to Head, Body, Hands, and Feet slots. Followers will never auto-equip or be offered gear outside their chosen armor category.
+  - **Automatic Mismatched Armor Unequip:** When followers acquire items that Skyrim's vanilla outfit AI forces onto empty slots (e.g. an iron helmet on a mage, or leather boots on a heavy armor warrior), the mod detects the mismatch and automatically unequips the offending piece unless explicitly assigned by the player.
+  - **Accessory & Lantern Exemption:** Wearable lanterns, cloaks, amulets, and rings are exempted from armor type restrictions and remain equipped safely.
 - 🎒 **INVENTORY:**
   - Complete list of all carried weapons, shields, and apparel.
   - Easily toggle protected status to safeguard items from being sold.
 
-### 2. Auto-Protection for Player-Gifted Items
+### 2. Spell Tome Reading & Learning
+- When given an unlearned spell tome, the follower reads the book, plays casting animations with visual effects, and learns the spell permanently into their spell list.
+- The spell tome is consumed upon learning.
+- Already known spell tomes are left unprotected for trade/selling to merchants.
+- Learned spells are automatically deployed in combat by Skyrim's AI based on the follower's combat style and magicka pool.
+
+### 3. Auto-Protection for Player-Gifted Items
 - Any weapon, shield, or armor traded/gifted from the player to a follower is automatically marked as **PROTECTED** via engine-level container change events.
 - Followers will never sell player-gifted equipment to merchants.
 - Players can unprotect items at any time in the Inventory tab to allow them to be sold.
 
-### 3. Combat Potion Animation Freeze Fix
-- Resolved an issue where followers spamming potions in emergency states became frozen in idle weapon states.
-- Implemented a 1.5-second animation lock followed by `IdleForceDefaultState` and `EvaluatePackage` resets to immediately return the follower to active combat.
-- Removed desynchronized manual `weaponState` overrides.
+### 4. Combat Stagger & Hit Reaction Freeze Fix
+- Eliminated Havok graph locks caused by competing idle state events when an actor took heavy damage or entered stagger/recoil.
+- Followers no longer get stuck in awkward frozen combat poses after taking big hits.
+- Bleedout states strictly prevent potion drinking and competing animation graph events.
 
-### 4. Poison Application Delay & Timing
+### 5. Poison Application Delay & Timing
 - Followers now apply poison to their weapons **3 seconds after** combat and corpse looting are fully completed, ensuring the animation plays visibly and naturally.
 - When buying or receiving poisons, followers wait 3 seconds before applying them.
 
-### 5. Mounted State Animation Suppression
+### 6. Mounted State Animation Suppression
 - While mounted on horseback, followers will no longer perform eating, drinking, poisoning, combat potion consumption, or ground looting animations.
 
-### 6. Soul Gem Empty / Full Shopping Filter
+### 7. Soul Gem Empty / Full Shopping Filter
 - Each soul gem tier (Petty, Lesser, Common, Greater, Grand, Black) now features an individual filter:
   - `Any (Both)`
   - `Empty Only`
   - `Full Only`
 
-### 7. Custom Menu Hotkey System
-- Fixed keypress registration using `button->IsPressed()` to prevent instant toggle-closing.
-- Full support for single keys (I, U, O, K, F1..F11) and modifiers (Shift, Ctrl, Alt).
-- Features both interactive keyboard capture and a preset dropdown menu in the Systems settings.
+### 8. Modernized Menu Hotkey System (ClassBound Engine)
+- Aligned input handling directly with ClassBound's architecture using SKSEMenuFramework.
+- Removed conflicting raw BSInputDeviceManager listeners to eliminate keypress race conditions and instant toggles.
+- Flawless single-key (I, U, O, K, F1..F12) and combo key support (Shift, Ctrl, Alt).
 
-### 8. Save Game Backward Compatibility
-- Bumped serialization version to 21 with seamless backward compatibility for existing game saves.
+### 9. Save Game Backward Compatibility
+- Bumped serialization version to 22 with seamless backward compatibility for existing game saves.
