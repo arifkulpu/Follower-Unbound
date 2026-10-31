@@ -136,16 +136,9 @@ namespace FollowerUnbound
             }
         }
 
-        // Check ActorBase EditorID (e.g. ACLCatOwnedAnise)
-        if (base) {
-            std::string baseEdID = base->GetFormEditorID();
-            std::transform(baseEdID.begin(), baseEdID.end(), baseEdID.begin(), ::tolower);
-            for (const auto& kw : kAnimalKeywords) {
-                if (!baseEdID.empty() && baseEdID.find(kw) != std::string::npos && baseEdID.find("khajiit") == std::string::npos) {
-                    return true;
-                }
-            }
-        }
+        // (ActorBase EditorID alt dizi eşleşmesi kaldırıldı: "cat", "cow", "elk" gibi kısa kelimeler
+        //  normal NPC EditorID'lerinde de geçebilir. Hayvanlar ırk adı/EditorID'si ve FaceGen
+        //  kontrolüyle zaten yakalanıyor.)
 
         // 6. Humanoid check: FaceGenHead is present on all humanoid races (including Khajiit, Argonian, Elves, Men)
         bool hasFaceGen = race->data.flags.all(RE::RACE_DATA::Flag::kFaceGenHead);
@@ -203,7 +196,19 @@ namespace FollowerUnbound
             profile.classBoundDisplayName = "Animal";
         }
 
-        auto storedProfile = std::make_shared<FollowerProfile>(std::move(profile));
+        std::shared_ptr<FollowerProfile> storedProfile;
+        if (auto d = _dormantProfiles.find(formID); d != _dormantProfiles.end() && d->second) {
+            // Daha önce takipçi olmuş: atanmış loadout, tercihler ve tasarruf korunur.
+            storedProfile = d->second;
+            _dormantProfiles.erase(d);
+            storedProfile->isAnimal = profile.isAnimal;
+            storedProfile->role = profile.role;
+            storedProfile->classBoundDisplayName = profile.classBoundDisplayName;
+            if (storedProfile->name.empty() || storedProfile->name == "Follower") storedProfile->name = profile.name;
+            logger::info("Registered follower {} [{:08X}] restored from dormant profile.", storedProfile->name, formID);
+        } else {
+            storedProfile = std::make_shared<FollowerProfile>(std::move(profile));
+        }
         auto [it, inserted] = _profiles.emplace(formID, std::move(storedProfile));
 
         // Kıyafet koruma ayarı açıksa: yeni kaydedilen takipçinin üzerindeki
@@ -219,38 +224,149 @@ namespace FollowerUnbound
         return true;
     }
 
-    void FollowerManager::EnforceAssignedLoadout(RE::Actor* actor, FollowerProfile& profile)
+    bool FollowerManager::IsTwoHandedWeapon(RE::TESForm* form)
+    {
+        auto* w = form ? form->As<RE::TESObjectWEAP>() : nullptr;
+        return w && (w->IsTwoHandedAxe() || w->IsTwoHandedSword() || w->IsBow() || w->IsCrossbow());
+    }
+
+    void FollowerManager::NoteOwnEquip(RE::FormID actorID)
+    {
+        std::lock_guard lk(_equipStateMutex);
+        _ownEquipTime[actorID] = std::chrono::steady_clock::now();
+    }
+
+    bool FollowerManager::WasOwnEquipRecent(RE::FormID actorID) const
+    {
+        std::lock_guard lk(_equipStateMutex);
+        auto it = _ownEquipTime.find(actorID);
+        return it != _ownEquipTime.end() &&
+            std::chrono::steady_clock::now() - it->second < std::chrono::milliseconds(1500);
+    }
+
+    void FollowerManager::ClearAssignment(FollowerProfile& p, RE::FormID id)
+    {
+        if (!id) return;
+        for (auto* slot : { &p.assignedPrimaryRight, &p.assignedPrimaryLeft, &p.assignedSecondaryRight,
+                            &p.assignedSecondaryLeft, &p.assignedHead, &p.assignedBody,
+                            &p.assignedHands, &p.assignedFeet }) {
+            if (*slot == id) *slot = 0;
+        }
+    }
+
+    void FollowerManager::AssignLoadoutItem(FollowerProfile& p, RE::TESBoundObject* item, bool left, bool secondary)
+    {
+        if (!item) return;
+        using Slot = RE::BIPED_MODEL::BipedObjectSlot;
+        const RE::FormID id = item->GetFormID();
+        p.ProtectItem(id, true);
+
+        auto& R = secondary ? p.assignedSecondaryRight : p.assignedPrimaryRight;
+        auto& L = secondary ? p.assignedSecondaryLeft : p.assignedPrimaryLeft;
+
+        if (auto* armor = item->As<RE::TESObjectARMO>()) {
+            const auto mask = static_cast<uint32_t>(armor->GetSlotMask());
+            if (mask & static_cast<uint32_t>(Slot::kShield)) {
+                // Kalkan sol ele gider; sağda çift elli silah varsa birlikte kuşanılamaz.
+                if (IsTwoHandedWeapon(RE::TESForm::LookupByID(R))) R = 0;
+                L = id;
+                return;
+            }
+            if (mask & static_cast<uint32_t>(Slot::kHead)) p.assignedHead = id;
+            if (mask & static_cast<uint32_t>(Slot::kBody)) p.assignedBody = id;
+            if (mask & static_cast<uint32_t>(Slot::kHands)) p.assignedHands = id;
+            if (mask & static_cast<uint32_t>(Slot::kFeet)) p.assignedFeet = id;
+            return;
+        }
+
+        if (item->As<RE::TESObjectWEAP>()) {
+            if (IsTwoHandedWeapon(item)) {      // yay / arbalet / çift elli: iki el
+                R = id;
+                L = 0;
+            } else if (left) {
+                if (IsTwoHandedWeapon(RE::TESForm::LookupByID(R))) R = 0;
+                L = id;
+            } else {
+                R = id;
+            }
+        }
+    }
+
+    void FollowerManager::ReplaceAssignment(FollowerProfile& p, RE::FormID oldID, RE::TESBoundObject* newItem)
+    {
+        if (!newItem) return;
+
+        // A better-item prompt can legitimately have no currently equipped
+        // counterpart (or replace an item which was never assigned through our
+        // UI).  Leaving the new item unassigned lets a later enforcement pass
+        // restore an unrelated loadout instead of the item the player accepted.
+        // In that case assign it to its natural primary slot.
+        if (!oldID) {
+            AssignLoadoutItem(p, newItem, false, false);
+            return;
+        }
+        bool left = false, secondary = false, found = true;
+        if (p.assignedPrimaryRight == oldID) { left = false; secondary = false; }
+        else if (p.assignedPrimaryLeft == oldID) { left = true; secondary = false; }
+        else if (p.assignedSecondaryRight == oldID) { left = false; secondary = true; }
+        else if (p.assignedSecondaryLeft == oldID) { left = true; secondary = true; }
+        else if (p.assignedHead == oldID || p.assignedBody == oldID ||
+                 p.assignedHands == oldID || p.assignedFeet == oldID) { /* zırh: slot maskesinden */ }
+        else found = false;
+        if (!found) {
+            // The old item was equipped by vanilla/another mod, rather than by
+            // our loadout system.  Keep the accepted upgrade persistent anyway.
+            AssignLoadoutItem(p, newItem, false, false);
+            return;
+        }
+        ClearAssignment(p, oldID);
+        AssignLoadoutItem(p, newItem, left, secondary);
+    }
+
+    void FollowerManager::EnforceAssignedLoadout(RE::Actor* actor, FollowerProfile& profile,
+        bool ignoreCooldown, bool allowInCombat)
     {
         if (!actor || actor->IsDead() || profile.isAnimal) return;
 
-        // SAVAŞTA İKEN ASLA MÜDAHALE ETME!
-        // Skyrim'in yerel Combat AI'ı büyü, kılıç, kalkan ve yay kullanımını kendi yönetir.
-        if (actor->IsInCombat()) return;
+        // Varsayılan olarak savaşta müdahale yok; yalnızca EnforceCombatWeapons (allowInCombat) girer.
+        if (!allowInCombat && actor->IsInCombat()) return;
+        if (!actor->Is3DLoaded() || AnimationManager::IsRidingWithPlayer(actor)) return;
+
+        // Aynı takipçiye 3 sn'de bir dokun (ignoreCooldown: kullanıcı atama yaptı).
+        const auto now = std::chrono::steady_clock::now();
+        {
+            std::lock_guard lk(_equipStateMutex);
+            auto& last = _enforceLast[actor->GetFormID()];
+            if (!ignoreCooldown && last.time_since_epoch().count() != 0 &&
+                now - last < std::chrono::seconds(3)) return;
+            last = now;
+        }
 
         auto* equipMgr = RE::ActorEquipManager::GetSingleton();
         if (!equipMgr) return;
 
         auto inv = actor->GetInventory();
-        auto tryEquipForm = [&](RE::FormID formID, RE::BGSEquipSlot* slot = nullptr) {
-            if (formID == 0) return;
-            auto* bound = RE::TESForm::LookupByID<RE::TESBoundObject>(formID);
-            if (!bound) return;
-            auto it = inv.find(bound);
-            if (it != inv.end() && it->second.first > 0) {
-                equipMgr->EquipObject(actor, bound, nullptr, 1, slot, false, false, false, true);
-            }
+        auto has = [&](RE::TESBoundObject* b) {
+            auto it = inv.find(b);
+            return b && it != inv.end() && it->second.first > 0;
         };
 
-        // Zırhlar
-        tryEquipForm(profile.assignedHead);
-        tryEquipForm(profile.assignedBody);
-        tryEquipForm(profile.assignedHands);
-        tryEquipForm(profile.assignedFeet);
+        // ── ZIRH: zaten giyiliyse tekrar kuşandırma (takıp-çıkarma döngüsünün ana sebebi buydu) ──
+        auto equipArmor = [&](RE::FormID id) {
+            if (!id) return;
+            auto* a = RE::TESForm::LookupByID<RE::TESObjectARMO>(id);
+            if (!a || !has(a)) return;
+            if (actor->GetWornArmor(a->GetSlotMask()) == a) return;
+            NoteOwnEquip(actor->GetFormID());
+            equipMgr->EquipObject(actor, a, nullptr, 1, nullptr, false, false, false, true);
+        };
+        equipArmor(profile.assignedHead);
+        equipArmor(profile.assignedBody);
+        equipArmor(profile.assignedHands);
+        equipArmor(profile.assignedFeet);
 
-        // Kıyafet Bütünlüğü Kuralı (Otomatik Çıkartma):
-        // Eğer takipçinin tercih ettiği bir zırh tipi varsa (Default değilse) ve motor
-        // envanterdeki uygunsuz bir parçayı (mesela büyücüye ağır kask) taktıysa,
-        // ve bu eşya oyuncu tarafından kilitli/korumalı değilse derhal üzerinden çıkart.
+        // Kıyafet Bütünlüğü Kuralı (Otomatik Çıkartma): tercih edilen zırh tipine uymayan,
+        // atanmamış giyili parçayı çıkar.
         if (profile.preferences.preferredArmorType != 0) {
             for (const auto& [item, invData] : inv) {
                 if (invData.first <= 0 || !invData.second || !invData.second->extraLists || !item) continue;
@@ -267,15 +383,13 @@ namespace FollowerUnbound
                 }
                 if (!worn) continue;
 
-                // Eğer oyuncu bilerek bu eşyayı doğrudan loadout olarak atadıysa çıkarma
                 const auto armorID = armor->GetFormID();
                 if (armorID == profile.assignedHead || armorID == profile.assignedBody ||
                     armorID == profile.assignedHands || armorID == profile.assignedFeet) {
                     continue;
                 }
-
-                // Eğer bu parça tercih edilen zırh tipine uymuyorsa çıkart!
                 if (!ItemEvaluator::MatchesPreferredArmor(armor, profile.preferences.preferredArmorType)) {
+                    NoteOwnEquip(actor->GetFormID());
                     equipMgr->UnequipObject(actor, armor, nullptr, 1, nullptr, false, false, false, true);
                     logger::info("EnforceAssignedLoadout: {} unequipped mismatched armor {} due to preferred type rule.",
                         actor->GetName(), armor->GetName());
@@ -283,16 +397,94 @@ namespace FollowerUnbound
             }
         }
 
-        // Silahlar (Sadece savaş dışındayken barış halinde kuşanılır)
+        // ── SİLAH ──
         auto* rightSlot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(0x00013F42);
         auto* leftSlot  = RE::TESForm::LookupByID<RE::BGSEquipSlot>(0x00013F43);
+        auto* rightObj  = RE::TESForm::LookupByID<RE::TESBoundObject>(profile.assignedPrimaryRight);
+        auto* leftObj   = RE::TESForm::LookupByID<RE::TESBoundObject>(profile.assignedPrimaryLeft);
+        const bool rightTwoHanded = IsTwoHandedWeapon(rightObj);
 
-        if (profile.assignedPrimaryRight != 0) {
-            tryEquipForm(profile.assignedPrimaryRight, rightSlot);
+        // Çift el silah kuşanma döngüsü koruması:
+        // Skyrim'in motoru barış anında sol eldeki silahı otomatik kınına sokar (sheathe).
+        // Eğer takipçi savaşta değilse ve silahı kınındaysa, motorun sol eli sürekli tekrar
+        // çekip geri takmasını (draw/sheathe loop) engellemek için barış anında gereksiz yere zorlama yapılmaz.
+        auto* actorState = actor->AsActorState();
+        const bool isSheathed = actorState && actorState->GetWeaponState() == RE::WEAPON_STATE::kSheathed;
+        const bool inCombat = actor->IsInCombat() || allowInCombat;
+
+        if (rightObj && has(rightObj) && actor->GetEquippedObject(false) != rightObj) {
+            if (inCombat || !isSheathed || actor->GetEquippedObject(false) == nullptr) {
+                NoteOwnEquip(actor->GetFormID());
+                equipMgr->EquipObject(actor, rightObj, nullptr, 1, rightTwoHanded ? nullptr : rightSlot,
+                    false, false, false, false);
+            }
         }
-        if (profile.assignedPrimaryLeft != 0) {
-            tryEquipForm(profile.assignedPrimaryLeft, leftSlot);
+
+        // Sağda çift elli varsa sol eli HİÇ kuşandırma: ikisi birbirini düşürür.
+        if (leftObj && has(leftObj) && !rightTwoHanded && actor->GetEquippedObject(true) != leftObj) {
+            const bool isShield = leftObj->As<RE::TESObjectARMO>() != nullptr;
+            // Kalkanlar barış anında da taşınabilir; ancak tek el silahlar barış anında kınındayken
+            // sürekli EquipObject ile çağrılmamalı (döngüyü önler).
+            if (isShield || inCombat || !isSheathed) {
+                NoteOwnEquip(actor->GetFormID());
+                equipMgr->EquipObject(actor, leftObj, nullptr, 1, isShield ? nullptr : leftSlot,
+                    false, false, false, false);
+            }
         }
+    }
+
+    void FollowerManager::EnforceCombatWeapons(RE::Actor* actor)
+    {
+        if (!actor || actor->IsDead() || !actor->Is3DLoaded() || AnimationManager::IsRidingWithPlayer(actor)) return;
+        const auto actorID = actor->GetFormID();
+        auto profile = GetProfile(actorID);
+        if (!profile || profile->isAnimal) return;
+        // Oyuncu asli silah atamadıysa AI'ya karışma.
+        if (!profile->assignedPrimaryRight && !profile->assignedPrimaryLeft) return;
+        if (WasOwnEquipRecent(actorID)) return;
+
+        const RE::FormID allowed[] = { profile->assignedPrimaryRight, profile->assignedPrimaryLeft,
+                                       profile->assignedSecondaryRight, profile->assignedSecondaryLeft };
+        const bool useStyle = ItemEvaluator::HasWeaponStylePreference(profile->preferences);
+        auto isAllowed = [&](RE::TESForm* f) {
+            if (!f) return true;
+            for (auto a : allowed) if (a && a == f->GetFormID()) return true;
+            // Seçilen asli/yardımcı silah stiline uyan her silah da izinli (ör. yardımcı stil: Yay).
+            if (useStyle) {
+                if (auto* w = f->As<RE::TESObjectWEAP>()) {
+                    return ItemEvaluator::MatchesWeaponPreferences(w, profile->preferences);
+                }
+            }
+            return false;
+        };
+        auto isShield = [](RE::TESForm* f) {
+            auto* a = f ? f->As<RE::TESObjectARMO>() : nullptr;
+            return a && (static_cast<uint32_t>(a->GetSlotMask()) &
+                         static_cast<uint32_t>(RE::BIPED_MODEL::BipedObjectSlot::kShield)) != 0;
+        };
+
+        auto* r = actor->GetEquippedObject(false);
+        auto* l = actor->GetEquippedObject(true);
+        const bool badRight = r && r->As<RE::TESObjectWEAP>() && !isAllowed(r);
+        const bool badLeft  = l && (l->As<RE::TESObjectWEAP>() || isShield(l)) && !isAllowed(l);
+        if (!badRight && !badLeft) return;
+
+        // Döngü koruması: 15 sn içinde en fazla 2 düzeltme.
+        const auto now = std::chrono::steady_clock::now();
+        {
+            std::lock_guard lk(_equipStateMutex);
+            auto& st = _combatFix[actorID];
+            if (st.windowStart.time_since_epoch().count() == 0 || now - st.windowStart > std::chrono::seconds(15)) {
+                st.windowStart = now;
+                st.count = 0;
+            }
+            if (st.count >= 2) return;
+            ++st.count;
+        }
+
+        logger::info("CombatWeapons: {} picked unassigned weapon (R={} L={}); restoring assigned loadout.",
+            actor->GetName(), r ? r->GetName() : "-", l ? l->GetName() : "-");
+        EnforceAssignedLoadout(actor, *profile, true, true);
     }
 
     void FollowerManager::RestoreSavedProfile(FollowerProfile profile)
@@ -301,22 +493,25 @@ namespace FollowerUnbound
         if (targetFormID == 0) return;
         if (profile.name.empty()) profile.name = "Follower";
 
-        std::unique_lock lock(_mutex);
-        auto it = _profiles.find(targetFormID);
-        if (it != _profiles.end() && it->second) {
-            if (profile.classBoundDisplayName.empty()) profile.classBoundDisplayName = it->second->classBoundDisplayName;
-            profile.isAnimal = it->second->isAnimal;
-            if (!it->second->name.empty() && it->second->name != "Follower") profile.name = it->second->name;
-            *it->second = std::move(profile);
-            if (auto* actor = RE::TESForm::LookupByID<RE::Actor>(targetFormID)) {
-                EnforceAssignedLoadout(actor, *it->second);
+        std::shared_ptr<FollowerProfile> applied;
+        {
+            std::unique_lock lock(_mutex);
+            _dormantProfiles.erase(targetFormID);
+            auto it = _profiles.find(targetFormID);
+            if (it != _profiles.end() && it->second) {
+                if (profile.classBoundDisplayName.empty()) profile.classBoundDisplayName = it->second->classBoundDisplayName;
+                profile.isAnimal = it->second->isAnimal;
+                if (!it->second->name.empty() && it->second->name != "Follower") profile.name = it->second->name;
+                *it->second = std::move(profile);
+                applied = it->second;
+            } else {
+                applied = std::make_shared<FollowerProfile>(std::move(profile));
+                _profiles.emplace(targetFormID, applied);
             }
-        } else {
-            auto sharedProf = std::make_shared<FollowerProfile>(std::move(profile));
-            _profiles.emplace(targetFormID, sharedProf);
-            if (auto* actor = RE::TESForm::LookupByID<RE::Actor>(targetFormID)) {
-                EnforceAssignedLoadout(actor, *sharedProf);
-            }
+        }
+        // Motor çağrısı kilit dışında (kilit altında EquipObject deadlock riski taşır).
+        if (auto* actor = RE::TESForm::LookupByID<RE::Actor>(targetFormID)) {
+            EnforceAssignedLoadout(actor, *applied);
         }
     }
 
@@ -369,7 +564,9 @@ namespace FollowerUnbound
     {
         std::unique_lock lock(_mutex);
         if (auto it = _profiles.find(formID); it != _profiles.end()) {
-            logger::info("Unregistered follower: {} [FormID: {:08X}]", it->second->name, formID);
+            logger::info("Unregistered follower: {} [FormID: {:08X}] (profile kept dormant)", it->second->name, formID);
+            // Profili silme: oyuncu takipçiyi tekrar alırsa ayarlar (loadout, tercih, tasarruf) kaybolmasın.
+            if (it->second && !it->second->isAnimal) _dormantProfiles[formID] = it->second;
             _profiles.erase(it);
         }
     }
@@ -390,13 +587,18 @@ namespace FollowerUnbound
         return nullptr;
     }
 
-    std::unordered_map<RE::FormID, FollowerProfile> FollowerManager::GetProfilesSnapshot() const
+    std::unordered_map<RE::FormID, FollowerProfile> FollowerManager::GetProfilesSnapshot(bool includeDormant) const
     {
         std::shared_lock lock(_mutex);
         std::unordered_map<RE::FormID, FollowerProfile> snapshot;
-        snapshot.reserve(_profiles.size());
+        snapshot.reserve(_profiles.size() + (includeDormant ? _dormantProfiles.size() : 0));
         for (const auto& [formID, profile] : _profiles) {
             if (profile) snapshot.emplace(formID, *profile);
+        }
+        if (includeDormant) {
+            for (const auto& [formID, profile] : _dormantProfiles) {
+                if (profile) snapshot.emplace(formID, *profile);
+            }
         }
         return snapshot;
     }
@@ -524,15 +726,20 @@ namespace FollowerUnbound
         // Refresh roles for all remaining tracked followers
         RefreshFollowerRoles();
 
-        // Takipçilerin oyuncunun atadığı asli loadout'u taşıdığını doğrula
+        // Takipçilerin oyuncunun atadığı asli loadout'u taşıdığını doğrula.
+        // Motor çağrısı (EquipObject) kilit altında yapılmaz: önce liste kopyalanır.
         {
-            std::shared_lock lock(_mutex);
-            for (const auto& [fid, prof] : _profiles) {
-                if (!prof || prof->isAnimal) continue;
-                if (auto* fActor = RE::TESForm::LookupByID<RE::Actor>(fid)) {
-                    if (fActor->Is3DLoaded() && !fActor->IsDead()) {
-                        EnforceAssignedLoadout(fActor, *prof);
-                    }
+            std::vector<std::pair<RE::FormID, std::shared_ptr<FollowerProfile>>> toEnforce;
+            {
+                std::shared_lock lock(_mutex);
+                for (const auto& [fid, prof] : _profiles) {
+                    if (prof && !prof->isAnimal) toEnforce.emplace_back(fid, prof);
+                }
+            }
+            for (auto& [fid, prof] : toEnforce) {
+                auto* fActor = RE::TESForm::LookupByID<RE::Actor>(fid);
+                if (fActor && fActor->Is3DLoaded() && !fActor->IsDead()) {
+                    EnforceAssignedLoadout(fActor, *prof);
                 }
             }
         }
@@ -885,13 +1092,17 @@ namespace FollowerUnbound
 
         auto animMgr = AnimationManager::GetSingleton();
 
-        std::unique_lock lock(_mutex);
-        for (auto& [formID, profile] : _profiles) {
-            if (!profile) continue;
-            // Yorgunluğu tam doldur
-            profile->needs.RestoreFromSleep();
-
-            // Takipçiye uyku sonrası animasyonu oynat
+        // Animasyon (motor çağrısı) kilit dışında: önce yorgunluk sıfırlanır, FormID'ler toplanır.
+        std::vector<RE::FormID> restedIDs;
+        {
+            std::unique_lock lock(_mutex);
+            for (auto& [formID, profile] : _profiles) {
+                if (!profile) continue;
+                profile->needs.RestoreFromSleep();
+                restedIDs.push_back(formID);
+            }
+        }
+        for (auto formID : restedIDs) {
             auto form = RE::TESForm::LookupByID(formID);
             if (form) {
                 auto actor = form->As<RE::Actor>();
@@ -900,7 +1111,7 @@ namespace FollowerUnbound
                 }
             }
         }
-        logger::info("OnSleepStop: {} follower(s) rested and restored.", _profiles.size());
+        logger::info("OnSleepStop: {} follower(s) rested and restored.", restedIDs.size());
     }
 
 
@@ -954,22 +1165,34 @@ namespace FollowerUnbound
         const auto actorID = actor->GetFormID();
 
         // Eğer şu anda kitap okuyorsa süresini kontrol et (4 saniye boyunca okur)
-        if (auto it = _readingActiveFollowers.find(actorID); it != _readingActiveFollowers.end()) {
-            float elapsed = std::chrono::duration<float>(now - it->second).count();
-            if (elapsed < 4.0f) {
-                return; // Kitap okuma animasyonu hala devam ediyor
-            } else {
-                // Süre bitti: animasyonu kapat
-                AnimationManager::GetSingleton()->StopReadAnimation(actor);
-                _readingActiveFollowers.erase(it);
-                return;
+        bool stillReading = false;
+        bool finishedReading = false;
+        {
+            std::lock_guard rl(_readMutex);
+            if (auto it = _readingActiveFollowers.find(actorID); it != _readingActiveFollowers.end()) {
+                float elapsed = std::chrono::duration<float>(now - it->second).count();
+                if (elapsed < 4.0f) {
+                    stillReading = true;      // Kitap okuma animasyonu hala devam ediyor
+                } else {
+                    finishedReading = true;   // Süre bitti
+                    _readingActiveFollowers.erase(it);
+                }
             }
+        }
+        if (stillReading) return;
+        if (finishedReading) {
+            AnimationManager::GetSingleton()->StopReadAnimation(actor);
+            return;
         }
 
         static std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> s_lastReadTime;
-        if (auto it = s_lastReadTime.find(actorID); it != s_lastReadTime.end()) {
-            if (std::chrono::duration<float>(now - it->second).count() < 15.0f) {
-                return; // Kitaplar arasında makul bekleme süresi (15 sn)
+        static std::mutex s_lastReadMutex;
+        {
+            std::lock_guard rl(s_lastReadMutex);
+            if (auto it = s_lastReadTime.find(actorID); it != s_lastReadTime.end()) {
+                if (std::chrono::duration<float>(now - it->second).count() < 15.0f) {
+                    return; // Kitaplar arasında makul bekleme süresi (15 sn)
+                }
             }
         }
 
@@ -1001,8 +1224,14 @@ namespace FollowerUnbound
             // Kitabı envanterden tüket (1 adet)
             actor->RemoveItem(book, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
 
-            s_lastReadTime[actorID] = now;
-            _readingActiveFollowers[actorID] = now; // 4 saniye boyunca okumada tut
+            {
+                std::lock_guard rl(s_lastReadMutex);
+                s_lastReadTime[actorID] = now;
+            }
+            {
+                std::lock_guard rl(_readMutex);
+                _readingActiveFollowers[actorID] = now; // 4 saniye boyunca okumada tut
+            }
 
             const char* spellName = spell->GetName() ? spell->GetName() : "Spell";
             const char* bookName = book->GetName() ? book->GetName() : "Spell Tome";
@@ -1022,5 +1251,6 @@ namespace FollowerUnbound
     {
         std::unique_lock lock(_mutex);
         _profiles.clear();
+        _dormantProfiles.clear();
     }
 }

@@ -28,6 +28,20 @@ namespace FollowerUnbound
             messaging->Dispatch(KingCore::MESSAGE_TYPE_FOLLOWER_RESTED, &event, sizeof(event), "KingCore");
         }
 
+        // "ore" gibi kısa kelimeler "core", "store", "score" içinde de geçer: tam kelime eşleşmesi.
+        bool ContainsWholeWord(const std::string& text, std::string_view word)
+        {
+            size_t pos = 0;
+            while ((pos = text.find(word, pos)) != std::string::npos) {
+                const bool leftOk = pos == 0 || !std::isalpha(static_cast<unsigned char>(text[pos - 1]));
+                const size_t end = pos + word.size();
+                const bool rightOk = end >= text.size() || !std::isalpha(static_cast<unsigned char>(text[end]));
+                if (leftOk && rightOk) return true;
+                ++pos;
+            }
+            return false;
+        }
+
         bool IsOreOrGem(RE::TESBoundObject* item)
         {
             if (!item) return false;
@@ -46,7 +60,7 @@ namespace FollowerUnbound
             }
             std::string name = misc->GetName() ? misc->GetName() : "";
             std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-            if (name.find("ore") != std::string::npos || name.find("cevher") != std::string::npos || name.find("maden") != std::string::npos || name.find("stalhrim") != std::string::npos) {
+            if (ContainsWholeWord(name, "ore") || name.find("cevher") != std::string::npos || name.find("maden") != std::string::npos || name.find("stalhrim") != std::string::npos) {
                 return true;
             }
             return false;
@@ -96,6 +110,8 @@ namespace FollowerUnbound
             logger::info("Registered TESCellFullyLoadedEvent sink.");
             scriptSource->AddEventSink<RE::TESDeathEvent>(this);
             logger::info("Registered TESDeathEvent sink.");
+            scriptSource->AddEventSink<RE::TESEquipEvent>(this);
+            logger::info("Registered TESEquipEvent sink.");
         }
 
         // InputEvent is handled exclusively via SKSEMenuFramework in PrismaUIManager (matching ClassBound)
@@ -200,7 +216,17 @@ namespace FollowerUnbound
                 } else if (a_event->newState == RE::ACTOR_COMBAT_STATE::kNone) {
                     profile->currentState = FollowerState::PostCombat;
                     // Savaş bittiğinde oyuncunun atadığı Asli silaha dönmesini sağla
-                    manager->EnforceAssignedLoadout(actor, *profile);
+                    // Olay dinleyicisi içinde ekipman değiştirme çakışma/çökme riski taşır:
+                    // görev kuyruğuna ertele (3 sn'lik cooldown'a takılmaması için ignoreCooldown).
+                    if (auto* tasks = SKSE::GetTaskInterface()) {
+                        const auto fid = actor->GetFormID();
+                        tasks->AddTask([fid]() {
+                            auto* fm = FollowerManager::GetSingleton();
+                            auto* a = RE::TESForm::LookupByID<RE::Actor>(fid);
+                            auto p = fm->GetProfile(fid);
+                            if (a && p && !a->IsInCombat()) fm->EnforceAssignedLoadout(a, *p, true);
+                        });
+                    }
                     // Savaş bitti: yeme/içme birkaç saniye geciktirilir
                     ConsumableAI::GetSingleton()->NotifyCombatEnded(actor->GetFormID());
                     tracker->NotifyCombatEnd(actor);
@@ -348,7 +374,9 @@ namespace FollowerUnbound
             const auto ingredientID = static_cast<RE::FormID>(a_event->baseObj);
             auto* ingredient = RE::TESForm::LookupByID<RE::TESBoundObject>(ingredientID);
             const auto harvestedCount = std::clamp(std::abs(a_event->itemCount), 1, 50);
-            if (ingredient && ingredient->As<RE::IngredientItem>()) {
+            // Yalnızca dünyadan toplanan (oldContainer==0) ve menü dışı malzemeler paylaşılır;
+            // satıcıdan alma / sandıktan alma / takipçiden geri alma kopya üretmesin.
+            if (!inMenu && a_event->oldContainer == 0 && ingredient && ingredient->As<RE::IngredientItem>()) {
                 if (auto* tasks = SKSE::GetTaskInterface()) {
                     tasks->AddTask([ingredientID, harvestedCount]() {
                         auto* item = RE::TESForm::LookupByID<RE::TESBoundObject>(ingredientID);
@@ -427,6 +455,32 @@ namespace FollowerUnbound
 
         DroppedItemRecovery::GetSingleton()->RecordDrop(
             a_event->oldContainer, a_event->baseObj, count, a_event->reference);
+        return RE::BSEventNotifyControl::kContinue;
+    }
+
+    RE::BSEventNotifyControl EventManager::ProcessEvent(const RE::TESEquipEvent* a_event, RE::BSTEventSource<RE::TESEquipEvent>*)
+    {
+        if (!a_event || !a_event->equipped || !a_event->actor) return RE::BSEventNotifyControl::kContinue;
+        auto* actor = a_event->actor->As<RE::Actor>();
+        if (!actor || actor->IsPlayerRef()) return RE::BSEventNotifyControl::kContinue;
+
+        auto* manager = FollowerManager::GetSingleton();
+        if (!manager->IsFollower(actor->GetFormID())) return RE::BSEventNotifyControl::kContinue;
+        if (manager->WasOwnEquipRecent(actor->GetFormID())) return RE::BSEventNotifyControl::kContinue;
+
+        auto* form = RE::TESForm::LookupByID(a_event->baseObject);
+        if (!form || !form->As<RE::TESObjectWEAP>()) return RE::BSEventNotifyControl::kContinue;
+
+        // Savaş AI'sı atanmamış bir silah seçtiyse düzelt. Olay içinde ekipman değiştirilmez: görev kuyruğu.
+        if (actor->IsInCombat()) {
+            if (auto* tasks = SKSE::GetTaskInterface()) {
+                const auto fid = actor->GetFormID();
+                tasks->AddTask([fid]() {
+                    auto* a = RE::TESForm::LookupByID<RE::Actor>(fid);
+                    if (a) FollowerManager::GetSingleton()->EnforceCombatWeapons(a);
+                });
+            }
+        }
         return RE::BSEventNotifyControl::kContinue;
     }
 

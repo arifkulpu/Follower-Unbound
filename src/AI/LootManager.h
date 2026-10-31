@@ -58,6 +58,7 @@ namespace FollowerUnbound
         {
             RE::FormID formID{ 0 };
             std::chrono::steady_clock::time_point availableAt{};
+            std::chrono::steady_clock::time_point queuedAt{};   // ilk uygun olduğu an (takılı kalan kayıtları atmak için)
         };
         std::deque<QueuedCorpse> _playerLootRequests;
         size_t _nextRecipientOffset{ 0 };

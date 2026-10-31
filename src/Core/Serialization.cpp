@@ -16,7 +16,7 @@ namespace FollowerUnbound
 
         auto manager = FollowerManager::GetSingleton();
         // GetProfilesSnapshot: shared_lock ile thread-safe kopya (GetAllProfiles lock almaz)
-        const auto profiles = manager->GetProfilesSnapshot();
+        const auto profiles = manager->GetProfilesSnapshot(true);   // pasif (dormant) profiller de kaydedilir
 
         if (!a_intfc->OpenRecord(RecordTypeFollowerProfile, SerializationVersion)) {
             logger::error("Failed to open record for Follower Profiles");
@@ -32,6 +32,10 @@ namespace FollowerUnbound
             a_intfc->WriteRecordData(profile.role);
             a_intfc->WriteRecordData(profile.personality);
             a_intfc->WriteRecordData(profile.needs);
+            // v23+: boyut öneki. Gelecekte FollowerPreferences'a alan eklense bile eski kayıtlar
+            // (kısa) güvenle okunur, eksik alanlar varsayılan kalır; sürüm numarası yine de artırılmalı.
+            const uint32_t preferencesSize = static_cast<uint32_t>(sizeof(FollowerPreferences));
+            a_intfc->WriteRecordData(preferencesSize);
             a_intfc->WriteRecordData(profile.preferences);
 
             uint32_t protectedCount = static_cast<uint32_t>(profile.protectedEquipment.size());
@@ -55,6 +59,14 @@ namespace FollowerUnbound
             a_intfc->WriteRecordData(profile.assignedBody);
             a_intfc->WriteRecordData(profile.assignedHands);
             a_intfc->WriteRecordData(profile.assignedFeet);
+
+            // Version 24: Hidden backpack items
+            uint32_t bpCount = static_cast<uint32_t>(profile.backpackItems.size());
+            a_intfc->WriteRecordData(bpCount);
+            for (const auto& [bpID, bpNum] : profile.backpackItems) {
+                a_intfc->WriteRecordData(bpID);
+                a_intfc->WriteRecordData(bpNum);
+            }
         }
 
         logger::info("Saved {} follower profiles to co-save.", count);
@@ -514,8 +526,29 @@ namespace FollowerUnbound
                         const auto actual = a_intfc->ReadRecordData(&preferences, legacySize);
                         bytesRead += actual;
                         if (actual != legacySize) recordOK = false;
-                    } else {
+                    } else if (version == 21 || version == 22) {
                         read(preferences);
+                    } else {
+                        // v23+: [boyut][ham struct]
+                        uint32_t storedSize = 0;
+                        read(storedSize);
+                        if (storedSize == 0 || storedSize > 65536) {
+                            recordOK = false;
+                        } else {
+                            const uint32_t toRead = std::min<uint32_t>(storedSize, static_cast<uint32_t>(sizeof(FollowerPreferences)));
+                            const auto actual = a_intfc->ReadRecordData(&preferences, toRead);
+                            bytesRead += actual;
+                            if (actual != toRead) recordOK = false;
+                            uint32_t remaining = storedSize > toRead ? storedSize - toRead : 0;
+                            char skipBuf[256];
+                            while (recordOK && remaining > 0) {
+                                const uint32_t n = std::min<uint32_t>(remaining, static_cast<uint32_t>(sizeof(skipBuf)));
+                                const auto got = a_intfc->ReadRecordData(skipBuf, n);
+                                bytesRead += got;
+                                if (got != n) { recordOK = false; break; }
+                                remaining -= n;
+                            }
+                        }
                     }
 
                     if (version < 20) {
@@ -665,6 +698,23 @@ namespace FollowerUnbound
                         resolveLoadoutID(aFeet);
                     }
 
+                    std::unordered_map<RE::FormID, int32_t> backpackItems;
+                    if (version >= 24) {
+                        uint32_t bpCount = 0;
+                        if (read(bpCount) && bpCount <= 4096) {
+                            for (uint32_t b = 0; b < bpCount; ++b) {
+                                RE::FormID oldBpID = 0;
+                                int32_t bpNum = 0;
+                                read(oldBpID);
+                                read(bpNum);
+                                RE::FormID newBpID = 0;
+                                if (resolved && a_intfc->ResolveFormID(oldBpID, newBpID) && bpNum > 0) {
+                                    backpackItems[newBpID] += bpNum;
+                                }
+                            }
+                        }
+                    }
+
                     if (!resolved) {
                         logger::warn("Failed to resolve FormID {:08X}", oldFormID);
                         continue;
@@ -686,6 +736,7 @@ namespace FollowerUnbound
                     profile.assignedBody = aBody;
                     profile.assignedHands = aHands;
                     profile.assignedFeet = aFeet;
+                    profile.backpackItems = std::move(backpackItems);
 
                     // Co-save callbacks run while the game is restoring its
                     // world. Defer actor lookup, follower checks, and inventory

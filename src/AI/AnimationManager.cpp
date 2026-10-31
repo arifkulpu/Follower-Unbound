@@ -4,9 +4,21 @@
 
 namespace FollowerUnbound
 {
+    bool AnimationManager::IsRidingWithPlayer(RE::Actor* actor)
+    {
+        if (!actor || actor->IsDead()) return false;
+        if (actor->IsOnMount()) return true;
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player || !player->IsOnMount() || actor == player || !actor->Is3DLoaded()) return false;
+
+        // RSE follower attachment keeps the companion very close to the mounted
+        // player, even though the follower itself may not report IsOnMount().
+        return actor->GetPosition().GetDistance(player->GetPosition()) <= 420.0f;
+    }
+
     bool AnimationManager::SendAnimEvent(RE::Actor* actor, const char* eventName)
     {
-        if (!actor) return false;
+        if (!actor || IsRidingWithPlayer(actor)) return false;
 
         // NotifyAnimationGraph: SKSE/CommonLibSSE-NG API
         // Behavior graph uzerinden animation event gonderir.
@@ -53,7 +65,7 @@ namespace FollowerUnbound
 
     void AnimationManager::PlayEatAnimation(RE::Actor* actor)
     {
-        if (!actor || actor->IsDead() || actor->IsInCombat()) return;
+        if (!actor || actor->IsDead() || actor->IsInCombat() || IsRidingWithPlayer(actor)) return;
 
         // Eğer takipçinin elinde silah çekiliyse, önce kınına almasını sağla
         if (auto* state = actor->AsActorState(); state && state->IsWeaponDrawn()) {
@@ -68,7 +80,7 @@ namespace FollowerUnbound
 
     void AnimationManager::PlayDrinkAnimation(RE::Actor* actor, RE::TESBoundObject* item)
     {
-        if (!actor || actor->IsDead() || actor->IsInCombat()) return;
+        if (!actor || actor->IsDead() || actor->IsInCombat() || IsRidingWithPlayer(actor)) return;
 
         // Eğer takipçinin elinde silah çekiliyse, önce kınına almasını sağla
         if (auto* state = actor->AsActorState(); state && state->IsWeaponDrawn()) {
@@ -105,7 +117,7 @@ namespace FollowerUnbound
 
     void AnimationManager::PlayPotionAnimation(RE::Actor* actor)
     {
-        if (!actor || actor->IsDead()) return;
+        if (!actor || actor->IsDead() || IsRidingWithPlayer(actor)) return;
 
         // Bleedout (yere diz çökme / can çekişme) durumunda asla ayakta iksir animasyonu başlatma!
         if (auto* state = actor->AsActorState()) {
@@ -125,7 +137,7 @@ namespace FollowerUnbound
 
     void AnimationManager::PlaySleepRestoreAnimation(RE::Actor* actor)
     {
-        if (!actor || actor->IsDead()) return;
+        if (!actor || actor->IsDead() || IsRidingWithPlayer(actor)) return;
 
         // Uyku: once mevcut animasyonu bitir, sonra idle'a don
         SendAnimEvent(actor, "IdleForceDefaultState");
@@ -133,7 +145,7 @@ namespace FollowerUnbound
 
     bool AnimationManager::PlayReadAnimation(RE::Actor* actor, bool isSitting)
     {
-        if (!actor || actor->IsDead() || actor->IsInCombat() || actor->IsOnMount()) return false;
+        if (!actor || actor->IsDead() || actor->IsInCombat() || IsRidingWithPlayer(actor)) return false;
         if (!actor->Is3DLoaded()) return false;
 
         if (auto* actorState = actor->AsActorState(); actorState && actorState->IsWeaponDrawn()) {
@@ -164,7 +176,7 @@ namespace FollowerUnbound
 
     void AnimationManager::StopReadAnimation(RE::Actor* actor)
     {
-        if (!actor || !actor->Is3DLoaded()) return;
+        if (!actor || !actor->Is3DLoaded() || IsRidingWithPlayer(actor)) return;
 
         auto* dataHandler = RE::TESDataHandler::GetSingleton();
         auto* process = actor->GetActorRuntimeData().currentProcess;
@@ -180,7 +192,7 @@ namespace FollowerUnbound
 
     bool AnimationManager::PlayLootAnimation(RE::Actor* actor, RE::TESObjectREFR* target)
     {
-        if (!actor || actor->IsDead() || actor->IsInCombat() || actor->IsOnMount()) {
+        if (!actor || actor->IsDead() || actor->IsInCombat() || IsRidingWithPlayer(actor)) {
             logger::info("LootAnim: skipped (actor unavailable/dead/in combat).");
             return false;
         }
@@ -223,7 +235,7 @@ namespace FollowerUnbound
     void AnimationManager::SheatheWeapon(RE::Actor* actor)
     {
         // Savaştaki veya 3D yüklü olmayan aktörlerde kın alma güvenli değil.
-        if (!actor || actor->IsDead() || actor->IsInCombat() || !actor->Is3DLoaded()) return;
+        if (!actor || actor->IsDead() || actor->IsInCombat() || !actor->Is3DLoaded() || IsRidingWithPlayer(actor)) return;
 
         RE::FormID actorID = actor->GetFormID();
         auto now = std::chrono::steady_clock::now();
@@ -273,7 +285,7 @@ namespace FollowerUnbound
 
     void AnimationManager::PlayPoisonWeaponAnimation(RE::Actor* follower, bool isRanged)
     {
-        if (!follower || follower->IsDead() || !follower->Is3DLoaded()) return;
+        if (!follower || follower->IsDead() || !follower->Is3DLoaded() || IsRidingWithPlayer(follower)) return;
 
         // 1. Zehir sürme ses efekti çal (ITMPotionUse / 0x000B6435)
         auto* audioManager = RE::BSAudioManager::GetSingleton();

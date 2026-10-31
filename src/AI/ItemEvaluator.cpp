@@ -11,8 +11,9 @@ namespace FollowerUnbound
 
         for (auto effect : alchemy->effects) {
             if (effect && effect->baseEffect) {
-                if (effect->baseEffect->GetArchetype() == RE::EffectArchetypes::ArchetypeID::kPeakValueModifier ||
-                    effect->baseEffect->GetArchetype() == RE::EffectArchetypes::ArchetypeID::kValueModifier) {
+                // Yalnızca Restore (kValueModifier). Fortify etkileri kPeakValueModifier'dır ve iyileştirme sayılmaz.
+                if (effect->baseEffect->GetArchetype() == RE::EffectArchetypes::ArchetypeID::kValueModifier &&
+                    !effect->baseEffect->IsHostile()) {
                     if (effect->baseEffect->data.primaryAV == RE::ActorValue::kHealth) {
                         return true;
                     }
@@ -30,8 +31,9 @@ namespace FollowerUnbound
 
         for (auto effect : alchemy->effects) {
             if (effect && effect->baseEffect) {
-                if (effect->baseEffect->GetArchetype() == RE::EffectArchetypes::ArchetypeID::kPeakValueModifier ||
-                    effect->baseEffect->GetArchetype() == RE::EffectArchetypes::ArchetypeID::kValueModifier) {
+                // Yalnızca Restore (kValueModifier). Fortify etkileri kPeakValueModifier'dır ve iyileştirme sayılmaz.
+                if (effect->baseEffect->GetArchetype() == RE::EffectArchetypes::ArchetypeID::kValueModifier &&
+                    !effect->baseEffect->IsHostile()) {
                     if (effect->baseEffect->data.primaryAV == RE::ActorValue::kMagicka) {
                         return true;
                     }
@@ -49,8 +51,9 @@ namespace FollowerUnbound
 
         for (auto effect : alchemy->effects) {
             if (effect && effect->baseEffect) {
-                if (effect->baseEffect->GetArchetype() == RE::EffectArchetypes::ArchetypeID::kPeakValueModifier ||
-                    effect->baseEffect->GetArchetype() == RE::EffectArchetypes::ArchetypeID::kValueModifier) {
+                // Yalnızca Restore (kValueModifier). Fortify etkileri kPeakValueModifier'dır ve iyileştirme sayılmaz.
+                if (effect->baseEffect->GetArchetype() == RE::EffectArchetypes::ArchetypeID::kValueModifier &&
+                    !effect->baseEffect->IsHostile()) {
                     if (effect->baseEffect->data.primaryAV == RE::ActorValue::kStamina) {
                         return true;
                     }

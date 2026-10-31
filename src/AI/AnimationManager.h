@@ -48,6 +48,11 @@ namespace FollowerUnbound
         // Animasyon grafine event gonder — temel yardimci fonksiyon
         static bool SendAnimEvent(RE::Actor* actor, const char* eventName);
 
+        // RSE Shoulder Or Saddle takipçiyi fiziksel olarak oyuncunun atına bağlar;
+        // bu durumda aktör her zaman IsOnMount() dönmez. Yakındaki bağlı takipçide
+        // animasyon başlatmayı durdurmak için tek bir ortak kontrol noktası.
+        static bool IsRidingWithPlayer(RE::Actor* actor);
+
     private:
         AnimationManager() = default;
 

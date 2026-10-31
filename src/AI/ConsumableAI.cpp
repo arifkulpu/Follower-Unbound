@@ -11,7 +11,7 @@ namespace FollowerUnbound
 {
     bool ConsumableAI::TryCurePoison(RE::Actor* follower)
     {
-        if (!follower || follower->IsDead() || follower->IsOnMount()) return false;
+        if (!follower || follower->IsDead() || AnimationManager::IsRidingWithPlayer(follower)) return false;
 
         auto* magicTarget = follower->AsMagicTarget();
         auto* activeEffects = magicTarget ? magicTarget->GetActiveEffectList() : nullptr;
@@ -63,7 +63,7 @@ namespace FollowerUnbound
     void ConsumableAI::UpdateCombatConsumables(RE::Actor* follower, FollowerProfile& profile)
     {
         // Yalnızca savaş sırasında ve hayattayken iksir kullanılır; at sırtındayken veya bleedout durumundayken oynatılmaz
-        if (!follower || follower->IsDead() || !follower->IsInCombat() || follower->IsOnMount()) return;
+        if (!follower || follower->IsDead() || !follower->IsInCombat() || AnimationManager::IsRidingWithPlayer(follower)) return;
         if (auto* state = follower->AsActorState()) {
             auto life = state->GetLifeState();
             if (life == RE::ACTOR_LIFE_STATE::kBleedout || life == RE::ACTOR_LIFE_STATE::kDead || life == RE::ACTOR_LIFE_STATE::kDying) return;
@@ -92,15 +92,21 @@ namespace FollowerUnbound
         auto inventory = follower->GetInventory();
 
         float curHealth = avOwner->GetActorValue(RE::ActorValue::kHealth);
-        float maxHealth = avOwner->GetBaseActorValue(RE::ActorValue::kHealth);
+        // CommonLib sürümünde GetActorValueMax yok. Permanent değer, base değere
+        // göre daha doğru bir üst sınır verir; kullanılamazsa base değere düş.
+        auto maxAV = [&](RE::ActorValue av) {
+            const float m = avOwner->GetPermanentActorValue(av);
+            return m > 0.0f ? m : avOwner->GetBaseActorValue(av);
+        };
+        float maxHealth = maxAV(RE::ActorValue::kHealth);
         float healthPct = (maxHealth > 0.0f) ? ((curHealth / maxHealth) * 100.0f) : 100.0f;
 
         float curMagicka = avOwner->GetActorValue(RE::ActorValue::kMagicka);
-        float maxMagicka = avOwner->GetBaseActorValue(RE::ActorValue::kMagicka);
+        float maxMagicka = maxAV(RE::ActorValue::kMagicka);
         float magickaPct = (maxMagicka > 0.0f) ? ((curMagicka / maxMagicka) * 100.0f) : 100.0f;
 
         float curStamina = avOwner->GetActorValue(RE::ActorValue::kStamina);
-        float maxStamina = avOwner->GetBaseActorValue(RE::ActorValue::kStamina);
+        float maxStamina = maxAV(RE::ActorValue::kStamina);
         float staminaPct = (maxStamina > 0.0f) ? ((curStamina / maxStamina) * 100.0f) : 100.0f;
 
         // ── ACİL DURUM (KRİTİK) ──
@@ -230,7 +236,7 @@ namespace FollowerUnbound
     void ConsumableAI::UpdateOutOfCombatPoison(RE::Actor* follower, FollowerProfile& profile)
     {
         // Zehirleme işlemi SADECE savaş dışındayken, takipçi canlıyken ve at sırtında DEĞİLKEN yapılır!
-        if (!follower || follower->IsDead() || follower->IsInCombat() || !follower->Is3DLoaded() || follower->IsOnMount()) return;
+        if (!follower || follower->IsDead() || follower->IsInCombat() || !follower->Is3DLoaded() || AnimationManager::IsRidingWithPlayer(follower)) return;
 
         auto settings = Settings::GetSingleton();
         if (!settings->enablePoisonSystem) return;
@@ -402,7 +408,7 @@ namespace FollowerUnbound
     {
         if (follower && !follower->IsDead() && TryCurePoison(follower)) return;
         // 1. Savaş sırasında ve AT SIRTIINDAYKEN yemek yeme ve içme davranışı YAPILMAMALI
-        if (!follower || follower->IsDead() || follower->IsInCombat() || follower->IsOnMount()) return;
+        if (!follower || follower->IsDead() || follower->IsInCombat() || AnimationManager::IsRidingWithPlayer(follower)) return;
 
         // System toggle
         if (!Settings::GetSingleton()->enableNeedsSystem) return;

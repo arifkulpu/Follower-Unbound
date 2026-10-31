@@ -155,6 +155,37 @@ namespace FollowerUnbound
             }
         }
 
+        void PlayRandomEquipmentPurchaseSound(RE::Actor* follower)
+        {
+            if (!follower || !follower->Is3DLoaded()) return;
+            static constexpr std::array<const char*, 7> soundPaths{
+                "sound\\fx\\followerunbound\\coin-donation-1.wav",
+                "sound\\fx\\followerunbound\\coin-donation-2.wav",
+                "sound\\fx\\followerunbound\\multi-coin-payout-1.wav",
+                "sound\\fx\\followerunbound\\multi-coin-payout-2.wav",
+                "sound\\fx\\followerunbound\\multi-coin-payout-3.wav",
+                "sound\\fx\\followerunbound\\coin-payout-1.wav",
+                "sound\\fx\\followerunbound\\coin-payout-2.wav"
+            };
+            static std::mt19937 rng{ std::random_device{}() };
+            std::uniform_int_distribution<size_t> pick(0, soundPaths.size() - 1);
+            const size_t index = pick(rng);
+            auto* audioManager = RE::BSAudioManager::GetSingleton();
+            if (!audioManager) return;
+            RE::BSResource::ID soundFile;
+            soundFile.GenerateFromPath(soundPaths[index]);
+            RE::BSSoundHandle handle;
+            audioManager->BuildSoundDataFromFile(handle, soundFile, 0x1A, 128);
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            handle.SetPosition(player ? player->GetPosition() : follower->GetPosition());
+            handle.SetVolume(1.0f);
+            if (handle.Play()) {
+                logger::info("Equipment purchase coin sound variant {} played for {}.", index + 1, follower->GetName());
+            } else {
+                logger::warn("Equipment purchase coin sound variant {} could not be played for {}.", index + 1, follower->GetName());
+            }
+        }
+
         // Keep player-designated armor equipped if an outfit framework changes
         // the follower's gear during fast travel or cell transitions.
         static void RestoreProtectedArmor(RE::Actor* follower, FollowerProfile& profile)
@@ -802,6 +833,11 @@ namespace FollowerUnbound
             }
         }
         return best ? best : firstEligible;
+    }
+
+    void ShoppingAI::PlayEquipmentPurchaseSound(RE::Actor* follower)
+    {
+        PlayRandomEquipmentPurchaseSound(follower);
     }
 
     void ShoppingAI::ProcessShopping(RE::Actor* follower, FollowerProfile& profile)
@@ -1732,6 +1768,75 @@ namespace FollowerUnbound
             if (!overEncumbered || salesThisCall >= kMaxSalesPerCall) {
                 return;
             }
+        }
+
+        // ── SIRTTTAKİ ÇANTA (BACKPACK) SATIŞLARI ──
+        // Takipçi üzerindeki envanterden sonra sanal sırt çantasındaki satılabilir eşyaları da değerlendirir.
+        if (salesThisCall < kMaxSalesPerCall && !profile.backpackItems.empty()) {
+            std::vector<RE::FormID> toErase;
+            for (auto& [bpID, bpCount] : profile.backpackItems) {
+                if (bpCount <= 0) { toErase.push_back(bpID); continue; }
+                if (profile.IsProtected(bpID)) continue;
+
+                auto* boundObj = RE::TESForm::LookupByID<RE::TESBoundObject>(bpID);
+                if (!boundObj) { toErase.push_back(bpID); continue; }
+
+                int32_t baseVal = boundObj->GetGoldValue();
+                if (baseVal <= 0) continue;
+
+                const auto& pref = profile.preferences;
+                bool isWeapon = settings->sellWeapons && pref.allowSellWeapons && (boundObj->As<RE::TESObjectWEAP>() != nullptr);
+                bool isArmor = false, isClothing = false, isJewelry = false;
+                if (auto* armo = boundObj->As<RE::TESObjectARMO>()) {
+                    using Slot = RE::BIPED_MODEL::BipedObjectSlot;
+                    auto mask = static_cast<uint32_t>(armo->GetSlotMask());
+                    if (mask & (static_cast<uint32_t>(Slot::kAmulet) | static_cast<uint32_t>(Slot::kRing))) {
+                        if (pref.allowSellJewelry) isJewelry = true;
+                    } else if (armo->GetArmorType() == RE::BGSBipedObjectForm::ArmorType::kClothing) {
+                        if (pref.allowSellClothing) isClothing = true;
+                    } else {
+                        if (settings->sellArmor && pref.allowSellArmor) isArmor = true;
+                    }
+                }
+
+                if (!isWeapon && !isArmor && !isClothing && !isJewelry) continue;
+
+                const CandidateVendor* chosenVendor = nullptr;
+                uint32_t requiredMask = (isWeapon || isArmor) ? (kVendSmith | kVendGeneral) : (kVendSmith | kVendApothecary | kVendInn | kVendGeneral | kVendWizard);
+                for (const auto& cand : nearbyVendors) {
+                    if (requiredMask & (cand.vendorMask & ~kVendHealer)) {
+                        chosenVendor = &cand;
+                        break;
+                    }
+                }
+                if (!chosenVendor || !chosenVendor->actor) continue;
+
+                int32_t sellCount = overEncumbered ? bpCount : std::min(bpCount, static_cast<int32_t>(batchMult));
+                if (sellCount <= 0) continue;
+
+                uint32_t unitPrice = CalculateGameSellPrice(priceActor, baseVal);
+                uint32_t earnedGold = unitPrice * static_cast<uint32_t>(sellCount);
+
+                bpCount -= sellCount;
+                if (bpCount <= 0) toErase.push_back(bpID);
+
+                follower->AddObjectToContainer(goldItem, nullptr, static_cast<int32_t>(earnedGold), nullptr);
+                econ->AddGold(formID, static_cast<int32_t>(earnedGold));
+
+                _lastSellTime[formID] = now;
+                salesThisCall++;
+
+                if (settings->notifySelling) {
+                    std::string msg = std::format("{} sold {}x {} (from backpack) to {}. (+{} Gold)",
+                        follower->GetName(), sellCount, boundObj->GetName(), chosenVendor->actor->GetName(), earnedGold);
+                    notifier->ShowHUDMessage(msg);
+                }
+                logger::info("Selling: {} sold {}x {} from backpack to {} for {} gold.",
+                    follower->GetName(), sellCount, boundObj->GetName(), chosenVendor->actor->GetName(), earnedGold);
+
+                if (!overEncumbered || salesThisCall >= kMaxSalesPerCall) break;
+            }
+            for (auto id : toErase) profile.backpackItems.erase(id);
         }
     }
 }

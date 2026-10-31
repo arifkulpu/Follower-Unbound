@@ -2,8 +2,8 @@
 #include "Core/FollowerManager.h"
 #include "UI/PrismaUIManager.h"
 #include "UI/SKSEMenuFramework.h"
-#include "AI/AnimationManager.h"
 #include "Economy/EconomyManager.h"
+#include "Economy/ShoppingAI.h"
 #include "AI/ItemEvaluator.h"
 #include "UI/NotificationManager.h"
 
@@ -205,6 +205,14 @@ namespace FollowerUnbound
                     auto* stock = RE::TESForm::LookupByID<RE::TESObjectREFR>(prompt.stockContainerID);
                     if (!stock || stock->As<RE::Actor>()) {
                         logger::warn("EquipmentPurchase: stock container {:08X} is invalid or an actor; purchase cancelled.", prompt.stockContainerID);
+                        NotificationManager::GetSingleton()->ShowHUDMessage(
+                            std::format("{}: {} is no longer available.", prompt.followerName, prompt.newObjName));
+                        // g_activePrompt is already cleared above.  Schedule the
+                        // next queued offer before leaving this invalid branch.
+                        if (!g_promptQueue.empty()) {
+                            g_waitingForLootCompletion = true;
+                            g_showAt = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+                        }
                         return;
                     }
                     auto* gold = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0000000F);
@@ -247,11 +255,13 @@ namespace FollowerUnbound
                             }
                             profile->ProtectItem(prompt.newObjID, true);
                             if (auto* equip = RE::ActorEquipManager::GetSingleton()) {
+                                FollowerManager::ReplaceAssignment(*profile, prompt.oldObjID, item);
+                                FollowerManager::GetSingleton()->NoteOwnEquip(follower->GetFormID());
                                 equip->EquipObject(follower, item, nullptr, 1, nullptr, false, false, false, true);
-                                if (item->IsWeapon()) AnimationManager::GetSingleton()->SheatheWeapon(follower);
                             }
                             NotificationManager::GetSingleton()->ShowHUDMessage(
                                 std::format("{} bought and equipped {} for {} gold; it is now in their inventory.", prompt.followerName, prompt.newObjName, prompt.price));
+                            ShoppingAI::PlayEquipmentPurchaseSound(follower);
                             logger::info("EquipmentPurchase: {} bought {}, paid {} gold, protected it, and released old equipment for sale.",
                                 prompt.followerName, prompt.newObjName, prompt.price);
                         }
@@ -262,8 +272,9 @@ namespace FollowerUnbound
                     if (prompt.oldObjID != 0) profile->ProtectItem(prompt.oldObjID, false);
                     profile->ProtectItem(prompt.newObjID, true);
                     if (auto* equip = RE::ActorEquipManager::GetSingleton()) {
+                        FollowerManager::ReplaceAssignment(*profile, prompt.oldObjID, item);
+                        FollowerManager::GetSingleton()->NoteOwnEquip(follower->GetFormID());
                         equip->EquipObject(follower, item, nullptr, 1, nullptr, false, false, false, true);
-                        if (item->IsWeapon()) AnimationManager::GetSingleton()->SheatheWeapon(follower);
                         logger::info("EquipPrompt: PrismaUI accepted {}; equipped and protected {}.",
                             prompt.followerName, prompt.newObjName);
                     }

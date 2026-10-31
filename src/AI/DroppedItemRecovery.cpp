@@ -105,8 +105,18 @@ namespace FollowerUnbound
             return;
         }
         if (follower->IsInCombat()) return;
-        if (!follower->Is3DLoaded() || groundRef->GetBaseObject() != item) return;
-        if (follower->GetPosition().GetDistance(groundRef->GetPosition()) > dropped.maxDistance) return;
+        if (!follower->Is3DLoaded() || groundRef->GetBaseObject() != item ||
+            follower->GetPosition().GetDistance(groundRef->GetPosition()) > dropped.maxDistance) {
+            // Bu kayıt şimdilik işlenemiyor (uzak/3D yok): arkadakileri bekletmesin, sona al.
+            std::lock_guard lock(_mutex);
+            if (_droppedItems.size() > 1 && _droppedItems.front().followerID == dropped.followerID &&
+                _droppedItems.front().itemID == dropped.itemID) {
+                auto moved = std::move(_droppedItems.front());
+                _droppedItems.pop_front();
+                _droppedItems.push_back(std::move(moved));
+            }
+            return;
+        }
 
         if (dropped.count <= 0) {
             std::lock_guard lock(_mutex);

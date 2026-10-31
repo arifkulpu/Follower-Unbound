@@ -25,7 +25,8 @@ Prisma UI **Equipment** bölümü baştan aşağı yenilendi ve 3 özel sekmeye 
     - Asalar için de sağ ve sol el seçimi mevcuttur (Örn: Sağ elde asa, sol elde kılıç veya büyü).
   - **Asli (Primary) ve Yardımcı (Secondary) Silah Tarzı:**
     - Her takipçi için hem genel savaş tarzı (Asli) hem de alternatif/durumsal savaş tarzı (Yardımcı) bağımsız olarak belirlenebilir (Örn: Asli Kılıç+Kalkan, Yardımcı Yay).
-  - **Doğrudan Ele Kuşanma:** Envanterdeki silahlarda tek tıkla `[Sağ El]`, `[Sol El]` veya `[İki Ele Kuşan]` butonları eklendi.
+  - **Doğrudan Ele Kuşanma ve Atama İptali (Toggle):** Envanterdeki silahlarda tek tıkla `[Asli Sağ]`, `[Asli Sol]`, `[Yardımcı Sağ]`, `[Yardımcı Sol]` veya `[İki El]` butonları eklendi. Zaten o ele atanmış bir butona tekrar tıklandığında atama anında iptal edilir ve silah elden çıkarılır.
+  - **Çift El Kılıç Kınına Koyma/Çekme Döngüsü Giderildi (Dual-Wield Loop Fix):** İki ele tek elli kılıç atandığında takipçinin barış anında sol elindeki kılıcı sürekli çekip geri kınına sokması ve kilitlenmesi engellendi; silahlar kınındayken motorun animasyon grafiğiyle çakışma yaşanmaz.
 - 🛡️ **ZIRH (Armor):**
   - **Kıyafet Bütünlüğü Sistemi:** Takipçinin zırh sınıfı belirlenebilir:
     - 🛡️ **Ağır Zırh (Heavy Armor Only)**
@@ -35,7 +36,13 @@ Prisma UI **Equipment** bölümü baştan aşağı yenilendi ve 3 özel sekmeye 
   - Takipçi kafa, gövde, eldiven ve ayakkabı parçalarında sadece seçilen sınıftaki zırhları giyer. Yerden bulduğu veya dükkandan teklif edilen zırhlar bu kurala uymak zorundadır.
   - **Uyumsuz Zırhları Otomatik Çıkartma:** Takipçi ganimet toplarken Skyrim motorunun otomatik olarak giydirdiği uyumsuz parçalar (örneğin büyücü takipçinin kafasında kalan ağır zırh kask veya ağır zırh giyen takipçinin üzerindeki deri çizme) oyuncu tarafından doğrudan atanmadığı sürece otomatik olarak tespit edilir ve üzerinden çıkartılır.
   - **Aksesuar & Fener Muafiyeti:** Pelerin, takı ve takılabilir fenerler (Wearable Lanterns) gibi gövde dışı aksesuarlar kıyafet kısıtlamasından muaf tutularak takipçinin üzerinde kalmaya devam eder.
-- 🎒 **ENVANTER (Inventory):**
+- 🎒 **GİZLİ SIRT ÇANTASI (Hidden Backpack Storage):**
+  - Takipçiler için Skyrim'in oyun motorundan tamamen izole özel bir sanal sırt çantası depolama mimarisi eklendi.
+  - Yağmalanan silah ve zırhlar (veya Prisma arayüzünden "Çantaya At" denilen eşyalar) doğrudan bu gizli çantaya aktarılır.
+  - **Skyrim Outfit AI Çakışması Engellendi:** Vanilla Skyrim oyun motoru sadece aktörün doğrudan envanterindeki eşyaları görebildiği için, sırt çantasındaki zırh ve silahları asla kafasına göre otomatik giyemez (böylece büyücülerin kask takması veya ağır zırhlı takipçinin deri çizme giymesi gibi motor hataları tamamen çözüldü).
+  - Takipçiler dükkanlara girdiklerinde sırt çantasındaki gereksiz silah ve zırhları tüccarlara satabilir.
+  - Oyuncu Prisma UI üzerinden tek tıkla çantadaki eşyaları aktif envantere alabilir veya envanterindeki eşyaları çantaya atabilir.
+- 📦 **TÜM ENVANTER (Complete Inventory):**
   - Takipçinin tüm silah, zırh, kalkan ve giysilerinin listelendiği genel görünüm.
   - Eşyaların korunma ve kuşanılma durumları yönetilebilir.
 
@@ -98,7 +105,8 @@ The Prisma UI **Equipment** interface has been completely redesigned with 3 dist
   - **Two-Handed Weapons:** Greatswords, Battleaxes, Warhammers.
   - **Ranged Weapons & Staves:** Bows, Crossbows, Staves. Staves also support dual-hand setups (e.g. staff + sword or spell).
   - **Primary & Secondary Styles:** Configure distinct main and situational loadouts (e.g., Primary: Sword & Shield, Secondary: Bow).
-  - **Direct Hand Equip:** Equip weapons with one click using `[Right Hand]`, `[Left Hand]`, or `[Two-Hand]`.
+  - **Direct Hand Equip & Assignment Toggle:** One-click assignment via `[Primary Right]`, `[Primary Left]`, `[Secondary Right]`, `[Secondary Left]`, or `[Two-Hand]`. Clicking an already-assigned hand button cleanly unassigns it and unequips the item.
+  - **Dual-Wield Weapon Draw/Sheathe Loop Resolved:** Eliminated the animation loop where followers wielding dual one-handed weapons repeatedly sheathed and drew their offhand weapon out of combat.
 - 🛡️ **ARMOR:**
   - **Armor Weight Integrity:** Followers can be assigned to wear strictly:
     - 🛡️ **Heavy Armor Only**
@@ -146,5 +154,12 @@ The Prisma UI **Equipment** interface has been completely redesigned with 3 dist
 - Removed conflicting raw BSInputDeviceManager listeners to eliminate keypress race conditions and instant toggles.
 - Flawless single-key (I, U, O, K, F1..F12) and combo key support (Shift, Ctrl, Alt).
 
-### 9. Save Game Backward Compatibility
-- Bumped serialization version to 22 with seamless backward compatibility for existing game saves.
+### 9. Hidden Backpack System (Skyrim Outfit Glitch Prevention)
+- Added an SKSE-managed virtual backpack storage for each follower.
+- Excess looted weapons and armors are automatically diverted into the follower's backpack instead of their active worn inventory.
+- Completely prevents Skyrim's native outfit engine from randomly equipping unwanted armor pieces (e.g., mages wearing iron helmets or warriors wearing leather boots).
+- Follower Shopping AI can sell surplus equipment directly from their backpack to appropriate vendors.
+- Dedicated "🎒 Sırt Çantası (Backpack)" tab in Prisma UI with one-click stash and retrieve options.
+
+### 10. Save Game Backward Compatibility
+- Bumped serialization version to 24 with seamless backward compatibility for existing game saves.

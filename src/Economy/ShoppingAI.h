@@ -40,6 +40,7 @@ namespace FollowerUnbound
         // When in town/inn/market, followers can scan nearby vendors and purchase necessities
         void ProcessShopping(RE::Actor* follower, FollowerProfile& profile);
         static SupplyCounts GetSupplyCounts(RE::Actor* follower);
+        static void PlayEquipmentPurchaseSound(RE::Actor* follower);
 
         // Followers can sell excess loot/weapons/armor/gems to appropriate vendors
         void ProcessSelling(RE::Actor* follower, FollowerProfile& profile);

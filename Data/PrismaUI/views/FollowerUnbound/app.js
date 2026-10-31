@@ -12,12 +12,81 @@
   let pickerOpen = false;
   let selectedGear = new Set();
   const pageTitles = { overview: 'Overview', equipment: 'Equipment', loot: 'Loot rules', economy: 'Trade & supplies', settings: 'Systems' };
+  const language = () => state.settings?.uiLanguage === 'tr' ? 'tr' : 'en';
+  // The UI was originally authored in English with a few Turkish loadout labels.
+  // Keep the markup readable and translate rendered text centrally, including
+  // controls created by every tab and the fixed navigation chrome.
+  const trText = {
+    'Overview':'Genel bakış','Equipment':'Ekipman','Loot rules':'Yağma kuralları','Trade & supplies':'Ticaret ve malzemeler','Systems':'Sistemler',
+    'MANAGEMENT':'YÖNETİM','YOUR COMPANY':'YOLDAŞLARIN','FOLLOWER ECONOMY':'TAKİPÇİ EKONOMİSİ','FOLLOWER PREFERENCES':'TAKİPÇİ TERCİHLERİ','GLOBAL BEHAVIOR':'GENEL DAVRANIŞ','THE PEOPLE AT YOUR SIDE':'YANINDAKİLER','LOADOUT CONTROL':'EKİPMAN YÖNETİMİ',
+    'SELECT COMPANION':'TAKİPÇİ SEÇ','No companion':'Takipçi yok','No follower selected.':'Takipçi seçilmedi.','No active followers found. Press Scan Party to refresh.':'Aktif takipçi bulunamadı. Yenilemek için grubu tara.',
+    'Companions, in one place.':'Tüm takipçiler tek yerde.','Review their condition, equipment and daily routines.':'Durumlarını, ekipmanlarını ve günlük rutinlerini incele.','SCAN PARTY':'GRUBU TARA','Active companions':'Aktif takipçiler','Party gold':'Grup altını','Spendable gold':'Harcanabilir altın','Average hunger':'Ortalama açlık','Average thirst':'Ortalama susuzluk','Average fatigue':'Ortalama yorgunluk','Your followers':'Takipçilerin',
+    'Followers and animal allies':'Takipçiler ve hayvan yoldaşlar','Available for supplies & gear':'Malzeme ve ekipman için kullanılabilir','Across tracked companions':'Takip edilen tüm yoldaşlarda','companion tracked':'takipçi takip ediliyor','companions tracked':'takipçi takip ediliyor','spendable':'harcanabilir','total':'toplam','Carry':'Taşıma',
+    'Automatic loot':'Otomatik yağma','Automatic equipment upgrades':'Otomatik ekipman yükseltmeleri','Protect starting outfit':'Başlangıç kıyafetini koru','Combat potions':'Savaş iksirleri','Needs system':'İhtiyaç sistemi','Poison system':'Zehir sistemi','Shopping':'Alışveriş','Selling':'Satış','Ask before equipping looted gear':'Yağmalanan ekipmanı kuşanmadan önce sor','Offer better gear from merchants':'Tüccarlardan daha iyi ekipman öner','Mage robe preference':'Büyücü cübbe tercihi','Spell tome learning':'Büyü kitabı öğrenme',
+    'NOTIFICATIONS & ALERTS':'BİLDİRİMLER VE UYARILAR','Enable all notifications':'Tüm bildirimleri aç','Looting alerts':'Yağma bildirimleri','Shopping & stock alerts':'Alışveriş ve stok bildirimleri','Trade & sales alerts':'Ticaret ve satış bildirimleri','Needs alerts':'İhtiyaç bildirimleri','Combat potion & poison alerts':'Savaş iksiri ve zehir bildirimleri','Equipment upgrade alerts':'Ekipman yükseltme bildirimleri','ENABLE ALL':'TÜMÜNÜ AÇ','DISABLE ALL':'TÜMÜNÜ KAPAT','Notification delivery style':'Bildirim gösterim biçimi','Batched (Toplu Özet)':'Toplu özet','Detailed (Ayrıntılı)':'Ayrıntılı','Critical Only (Sadece Kritik)':'Yalnızca kritik',
+    'GLOBAL LOOT CATEGORIES':'GENEL YAĞMA KATEGORİLERİ','Hostile corpses only':'Yalnızca düşman cesetleri','Gold':'Altın','Weapons':'Silahlar','Armor':'Zırhlar','Arrows & bolts':'Oklar ve cıvatalar','Potions':'İksirler','Food':'Yiyecek','Ingredients':'Malzemeler','Soul gems':'Ruh taşları','Other valuables':'Diğer değerli eşyalar',
+    'EQUIPMENT UPGRADES':'EKİPMAN YÜKSELTMELERİ','Gear upgrade check chance (%)':'Ekipman yükseltme kontrol şansı (%)','FOLLOWER GOLD SAVINGS':'TAKİPÇİ ALTIN BİRİKİMİ','Saved':'Birikmiş','Target gold (1–10,000)':'Hedef altın (1–10.000)','LOOT TIMING':'YAĞMA ZAMANLAMASI','Post-combat loot delay':'Savaş sonrası yağma gecikmesi','MENU HOTKEY':'MENÜ KISAYOLU','REFRESH STATE':'DURUMU YENİLE','Close':'Kapat','Refresh followers':'Takipçileri yenile',
+    'Equipment upgrade available':'Ekipman yükseltmesi mevcut','Corpse loot equipment offer':'Ceset yağması ekipman önerisi','A better item was found':'Daha iyi bir eşya bulundu','Current equipment':'Mevcut ekipman','Currently equipped':'Şu an kuşanılan','Purchase offer':'Satın alma önerisi','Recovered from corpse':'Cesetten alındı','Loot item':'Yağma eşyası','Price':'Fiyat','Follower spendable gold':'Takipçinin harcanabilir altını','KEEP CURRENT':'MEVCUDU KORU','EQUIP & PROTECT':'KUŞAN VE KORU','BUY, EQUIP & PROTECT':'SATIN AL, KUŞAN VE KORU','NO — NEVER ASK FOR THIS ITEM AGAIN':'HAYIR — BU EŞYAYI TEKRAR SORMA',
+    'WEAR & PROTECT SELECTED':'SEÇİLENLERİ KUŞAN VE KORU','PROTECTED':'KORUMALI','EQUIPPED':'KUŞANILMIŞ','Apparel & armor':'Kıyafet ve zırh','WEAPONS':'SİLAHLAR','Crafting preferences':'Üretim tercihleri','Purchase targets':'Satın alma hedefleri','SELL':'SAT','BUY':'SATIN AL','Maximum':'En fazla','Ingredient stock cap':'Malzeme stok sınırı','Personal gold savings':'Kişisel altın birikimi','Income share':'Gelir payı',
+    'INTERFACE LANGUAGE':'ARAYÜZ DİLİ','Language / Dil':'Dil','Choose the language used by Follower Unbound’s Prisma interface and alerts.':'Follower Unbound Prisma arayüzü ve bildirimleri için dili seçin.',
+    'Control companion automation, notifications and global loot behavior.':'Takipçi otomasyonunu, bildirimleri ve genel yağma davranışını yönetin.','Share eligible leftovers after you close a container.':'Konteyneri kapattıktan sonra uygun kalan eşyaları paylaş.','Automatically equip eligible gear received through Follower Unbound.':'Follower Unbound üzerinden alınan uygun ekipmanı otomatik kuşan.','Capture equipped clothing when a follower is first registered.':'Takipçi ilk kez kaydedildiğinde üzerindeki kıyafetleri korumaya al.','Use potions when combat health or magicka is low.':'Savaşta can veya büyü gücü azaldığında iksir kullan.','Track hunger, thirst and fatigue.':'Açlık, susuzluk ve yorgunluğu takip et.','Apply poison to compatible weapons.':'Uygun silahlara zehir sür.','Buy supplies from nearby merchants.':'Yakındaki tüccarlardan malzeme satın al.','Sell excess items to nearby merchants.':'Fazla eşyaları yakındaki tüccarlara sat.','Show a prompt before equipping a better item found in loot.':'Yağmada bulunan daha iyi eşyayı kuşanmadan önce sor.','Ask before a follower buys a better weapon or armor from a merchant.':'Takipçi tüccardan daha iyi silah veya zırh almadan önce sor.','Prefer robes for mage-class followers.':'Büyücü sınıfı takipçiler cübbe tercih etsin.','Followers read and learn spells from spell tomes in safe places (inns, homes, towns).':'Takipçiler güvenli yerlerde (han, ev ve şehirlerde) büyü kitaplarını okuyup öğrenir.',
+    'Master switch for all on-screen companion messages and alerts.':'Takipçi mesajları ve uyarıları için ana anahtar.','Show messages when companions collect items or gold.':'Takipçiler eşya veya altın topladığında bildir.','Show messages for merchant purchases and low stock warnings.':'Satın alımları ve düşük stok uyarılarını bildir.','Show messages when excess items are sold to merchants.':'Fazla eşya tüccara satıldığında bildir.','Show messages when companions eat, drink or become starved.':'Takipçiler yiyip içtiğinde veya aç kaldığında bildir.','Show messages when potions or weapon poisons are used.':'İksir veya silah zehri kullanıldığında bildir.','Show messages when companions equip upgraded weapons or armor.':'Takipçiler daha iyi silah veya zırh kuşandığında bildir.',
+    'Ignore neutral and friendly actors.':'Tarafsız ve dost karakterleri atla.','Chance (1–100%) that followers look for or offer better weapons and armor.':'Takipçilerin daha iyi silah ve zırh arama/önerme şansı (1–100%).','Seconds before followers begin looting.':'Takipçilerin yağmaya başlamadan önce bekleyeceği saniye.','Set what each companion collects, sells, buys and crafts.':'Her takipçinin toplayacağı, satacağı, alacağı ve üreteceği şeyleri ayarlayın.',
+    'Purchase targets':'Satın alma hedefleri','Items to sell':'Satılacak eşyalar','Choose which categories followers may sell. Worn and protected equipment stays with them; supply limits from Purchases are kept in reserve.':'Takipçilerin satabileceği kategorileri seçin. Kuşanılan ve korunan ekipman kalır; satın alma stok hedefleri ayrılır.','Select a category to jump straight to its settings. Each enabled supply is stocked up to its target.':'Ayarlarına gitmek için kategori seçin. Etkin her ürün hedef stoğa tamamlanır.','Meals, water and beverages':'Yemekler, su ve içecekler','Ammunition supplies':'Mühimmat malzemeleri','Six soul gem types':'Altı ruh taşı türü','Torches, oil and soap':'Meşale, yağ ve sabun','Invisibility potions':'Görünmezlik iksirleri','Health, magicka & stamina potions':'Can, büyü ve dayanıklılık iksirleri','Choose potion strengths and target stock.':'İksir gücünü ve hedef stoğu seçin.','Choose poison effects and target stock.':'Zehir etkilerini ve hedef stoğu seçin.','Potion ingredients':'İksir malzemeleri','Bought from alchemists; harvested ingredients are shared.':'Simyacılardan alınır; toplanan malzemeler paylaşılır.','Ingredients are bought from alchemists (wheat may also come from general merchants). Ingredients you harvest are shared among followers.':'Malzemeler simyacılardan alınır (buğday genel tüccarlarda da bulunabilir). Topladığınız malzemeler takipçiler arasında paylaşılır.',
+    'Target stock':'Hedef stok','Target':'Hedef','OWNED':'MEVCUT','Enable poison purchases':'Zehir satın alımını etkinleştir','Buy selected poison types':'Seçilen zehir türlerini al','Large food':'Büyük yiyecek','Medium food':'Orta boy yiyecek','Small food':'Küçük yiyecek','Water & milk':'Su ve süt','Alcohol':'Alkol','Crossbow bolts':'Arbalet cıvataları','Petty soul gems':'Ufak ruh taşları','Lesser soul gems':'Küçük ruh taşları','Common soul gems':'Orta ruh taşları','Greater soul gems':'Büyük ruh taşları','Grand soul gems':'Görkemli ruh taşları','Black soul gems':'Siyah ruh taşları','Lantern oil':'Fener yağı','Invisibility potions':'Görünmezlik iksirleri','Cure Disease potion':'Hastalık Tedavi İksiri','Cure Poison potion':'Zehir Tedavi İksiri',
+    'Craft arrows':'Ok üret','Craft crossbow bolts':'Arbalet cıvatası üret','Craft torches':'Meşale üret','Craft potions':'İksir üret','Ingredient stock cap':'Malzeme stok sınırı','PER INGREDIENT / FOLLOWER':'HER MALZEME / TAKİPÇİ BAŞINA','Hover over a crafting option to see its recipe. Arrows, bolts and torches require a forge within 400 game units. Potions require an alchemy lab within 400 units. Ingredients harvested by you are shared among followers.':'Tarifi görmek için üretim seçeneğinin üzerine gelin. Ok, cıvata ve meşale için 400 oyun birimi içinde demirci ocağı; iksir için 400 birim içinde simya laboratuvarı gerekir. Topladığınız malzemeler takipçilerle paylaşılır.',
+    'Excess weapons':'Fazla silahlar','Excess armor':'Fazla zırhlar','Clothing':'Kıyafetler','Jewelry':'Takılar','SUPPLIES':'MALZEMELER','VALUABLES':'DEĞERLİ EŞYALAR','Ammunition':'Mühimmat','Food & drink':'Yiyecek ve içecek','Travel & utility':'Seyahat ve araç gereç','Special potions':'Özel iksirler','Treatment potions':'Tedavi iksirleri','Arrows & bolts':'Oklar ve cıvatalar','Stock limits':'Stok sınırları','ALL CATEGORIES':'TÜM KATEGORİLER','OPEN':'AÇ','Currently equipped:':'Şu an kuşanılan:','Right hand:':'Sağ el:','Left hand:':'Sol el:'
+    ,'Allow looting':'Yağmaya izin ver','Clothing & robes':'Kıyafet ve cübbeler','Potions & poisons':'İksirler ve zehirler','Drinks':'İçecekler','Gems & valuables':'Mücevherler ve değerli eşyalar','Books':'Kitaplar','Scrolls':'Parşömenler','Allow Looting':'Yağmaya izin ver',
+    'Health potions':'Can iksirleri','Magicka potions':'Büyü iksirleri','Stamina potions':'Dayanıklılık iksirleri','Poisons':'Zehirler','Large food':'Büyük yiyecek','Medium food':'Orta boy yiyecek','Small food':'Küçük yiyecek','Alcohol':'Alkol','Arrows':'Oklar','Bolts':'Cıvatalar','Torches':'Meşaleler','Lantern oil':'Fener yağı','Soap':'Sabun',
+    'Minor':'Zayıf','Standard':'Standart','Plentiful':'Güçlü','Vigorous':'Çok güçlü','Extreme':'Aşırı güçlü','Ultimate':'En güçlü','Health':'Can','Magicka':'Büyü','Stamina':'Dayanıklılık','Health potions':'Can iksirleri','Magicka potions':'Büyü iksirleri','Stamina potions':'Dayanıklılık iksirleri','Health damage poisons':'Can hasarı zehirleri','Magicka damage poisons':'Büyü hasarı zehirleri','Stamina damage poisons':'Dayanıklılık hasarı zehirleri','Other effects poisons':'Diğer etkili zehirler',
+    'Buy selected poison types':'Seçilen zehir türlerini satın al','Target':'Hedef','Target stock':'Hedef stok','Maximum':'En fazla','Buy':'Satın al','Buy selected':'Seçilenleri satın al','Select only the pieces you want equipped and protected.':'Yalnızca kuşanıp korumak istediğiniz parçaları seçin.','Select the left box to choose items. Protection keeps gear from sale and restores protected apparel after outfit changes.':'Eşya seçmek için soldaki kutuyu işaretleyin. Koruma, eşyanın satılmasını önler ve kıyafet değişikliğinden sonra korunan eşyayı geri kuşandırır.',
+    'APPAREL & ARMOR':'KIYAFET VE ZIRH','INVENTORY':'ENVANTER','WORN':'GİYİLİ','DAMAGE':'HASAR','ARMOR':'ZIRH','VALUE':'DEĞER','PROTECTED':'KORUMALI','EQUIPPED':'KUŞANILMIŞ','WEAR & PROTECT SELECTED':'SEÇİLENLERİ KUŞAN VE KORU','No items found.':'Eşya bulunamadı.','No weapons found.':'Silah bulunamadı.','No apparel or armor found.':'Kıyafet veya zırh bulunamadı.',
+    'Batched (Toplu Özet)':'Toplu özet','Detailed (Ayrıntılı)':'Ayrıntılı','Critical Only (Sadece Kritik)':'Yalnızca kritik','Her İkisi (Any)':'Her ikisi','Boş (Empty)':'Boş','Dolu (Full)':'Dolu','Target stock':'Hedef stok','FOOD':'YİYECEK','DRINKS':'İÇECEKLER','SOUL GEMS':'RUH TAŞLARI','WEAPONS & ARMOR':'SİLAHLAR VE ZIRHLAR','SUPPLIES':'MALZEMELER','VALUABLES':'DEĞERLİ EŞYALAR',
+    'Your followers':'Takipçilerin','Follower':'Takipçi','No active followers detected.':'Aktif takipçi bulunamadı.','Animal companion':'Hayvan yoldaş','Companion':'Yoldaş','Male':'Erkek','Female':'Kadın','FOLLOWER':'TAKİPÇİ','ANIMAL':'HAYVAN','spendable':'harcanabilir','saved':'birikmiş','total':'toplam','Save preferences':'Tercihleri kaydet','Select one or more items first.':'Önce bir veya daha fazla eşya seçin.','Selected equipment applied.':'Seçilen ekipman uygulandı.','Equipment assigned.':'Ekipman atandı.','Equipment removed.':'Ekipman çıkarıldı.','Party scan requested.':'Grup taraması istendi.'
+  };
+  const enText = {
+    ...Object.fromEntries(Object.entries(trText).map(([en,tr]) => [tr,en])),
+    'ZIRH':'ARMOR','ENVANTER':'INVENTORY','Mevcut Kuşanılan:':'Currently equipped:','Sağ El:':'Right hand:','Sol El:':'Left hand:',
+    'ASLİ SİLAH (Primary)':'PRIMARY WEAPON','YARDIMCI SİLAH (Secondary)':'SECONDARY WEAPON','Silah Tarzı:':'Weapon style:','Serbest / Otomatik (Any)':'Any / Automatic','Tek Elli (One-Handed)':'One-handed','Çift Elli (Two-Handed)':'Two-handed','Yay (Bow)':'Bow','Arbalet (Crossbow)':'Crossbow','Asa (Staff)':'Staff','Herhangi':'Any','Kılıç (Sword)':'Sword','Hançer (Dagger)':'Dagger','Savaş Baltası (War Axe)':'War axe','Gürz (Mace)':'Mace','Büyü / Boş (Spell/Empty)':'Spell / Empty','Çift El Türü:':'Two-handed type:','Büyük Kılıç (Greatsword)':'Greatsword','Büyük Balta (Battleaxe)':'Battleaxe','Savaş Çekici (Warhammer)':'Warhammer',
+    'Takipçilerinizin silah, kıyafet bütünlüğü ve envanter koruma tercihlerini yönetin.':'Manage follower weapons, outfit integrity and inventory protection.',
+    'Takipçinin genel savaşlarda öncelikli kullandığı ana silah tarzı.':'The primary weapon style this follower prefers in combat.','Duruma veya mesafeye göre geçiş yapacağı alternatif silah (Örn: Yay/Kılıç Kalkan).':'Alternative weapons used depending on situation or distance (e.g. bow or sword and shield).',
+    'Ekipman atandı.':'Equipment assigned.','Ekipman çıkarıldı.':'Equipment removed.','Grup taraması istendi.':'Party scan requested.','Tüm bildirimler açıldı.':'All notifications enabled.','Tüm bildirimler kapatıldı.':'All notifications disabled.','Menü tuşu güncellendi: ':'Menu hotkey updated: ',
+    'Boş':'Empty','Korumalı':'Protected','Kuşanılmış':'Equipped','Yıpranmış':'Worn','Zırh':'Armor','Silah':'Weapon','Kıyafet':'Clothing','Eldiven':'Gloves','Bot':'Boots','Kask':'Helmet','Kalkan':'Shield','Yüzük':'Ring','Kolye':'Necklace','Hasar':'Damage','Değer':'Value','Zırh puanı':'Armor rating',
+    'Takipçinin envanterinde silah bulunmuyor.':'No weapons in this follower’s inventory.','Takipçinin envanterinde giysi bulunmuyor.':'No apparel in this follower’s inventory.','Envanterde eşya bulunmuyor.':'No items in inventory.',
+    'Mevcut Kuşanılan:':'Currently equipped:','Sağ El:':'Right hand:','Sol El:':'Left hand:','ASLİ SİLAH TERCİHİ':'PRIMARY WEAPON PREFERENCE','ASLİ SİLAH (Primary)':'PRIMARY WEAPON (Primary)','YARDIMCI SİLAH TERCİHİ':'SECONDARY WEAPON PREFERENCE','YARDIMCI SİLAH (Secondary)':'SECONDARY WEAPON (Secondary)',
+    'Takipçinin genel savaşlarda öncelikli kullandığı ana silah tarzı.':'The weapon style this follower prefers in combat.','Duruma veya mesafeye göre geçiş yapacağı alternatif silah (Örn: Yay/Kılıç Kalkan).':'Alternative weapon used depending on situation or distance (e.g. bow or sword and shield).','Silah Tarzı:':'Weapon style:','Sağ El:':'Right hand:','Sol El:':'Left hand:','Çift El Türü:':'Two-handed type:',
+    'Yok / Devre Dışı (None)':'None / Disabled','Kılıç':'Sword','Hançer':'Dagger','Savaş Baltası':'War axe','Gürz':'Mace','Büyü / Boş':'Spell / Empty','Büyük Kılıç':'Greatsword','Büyük Balta':'Battleaxe','Savaş Çekici':'Warhammer','Herhangi':'Any','Asli İki El':'Primary Two-Handed','Yardımcı İki El':'Secondary Two-Handed','Asli Sağ':'Primary Right','Asli Sol':'Primary Left','Yardımcı Sağ':'Secondary Right','Yardımcı Sol':'Secondary Left','KUŞAN':'EQUIP','ÇIKAR':'UNEQUIP','Takipçinin envanterinde silah bulunmuyor.':'No weapons in follower inventory.',
+    'KIYAFET BÜTÜNLÜĞÜ SİSTEMİ (Armor Integrity)':'ARMOR INTEGRITY SYSTEM','Takipçinizin hangi zırh sınıfını giyeceğini belirleyin. Ağır zırh seçilirse takipçi ':'Choose which armor class your follower can wear. If heavy armor is selected, they will wear ','sadece ağır zırhları':'only heavy armor',' hafif seçilirse ':'; if light armor is selected, ','sadece hafif zırhları':'only light armor',' giyer ve tüccarlardan yalnızca seçilen türde teklif alır. Bu kural ':' and only receive offers for the selected type. This rule applies to ','kafa, gövde, eldiven ve ayakkabı':'head, body, hands and feet',' için geçerlidir.':' slots.',
+    'Zırh Türü Tercihi:':'Armor type preference:','⚖️ Serbest / En Yüksek Koruma (Any)':'Any / Highest protection','🛡️ Ağır Zırh (Heavy Armor Only)':'Heavy armor only','🪶 Hafif Zırh (Light Armor Only)':'Light armor only','🧙 Kıyafet & Cübbe (Clothing / Robes Only)':'Clothing / robes only','Envanterdeki Zırhlar ve Giysiler':'Inventory armor and clothing','Ağır':'Heavy','Hafif':'Light','Kıyafet':'Clothing','ENVANTER SEKMESİ (Tüm Eşyalar & Koruma Yönetimi)':'INVENTORY TAB (All items & protection)','Otomatik Koruma:':'Automatic protection:','Oyuncunun takipçiye verdiği tüm silah ve zırhlar otomatik olarak ':'All weapons and armor given to a follower are automatically marked as ',' (Korumalı) sayılır ve satılmaz. İsterseniz buradan korumayı kaldırarak bir sonraki satışta satılabilir yapabilirsiniz. Kart seçimiyle topluca kuşanabilirsiniz.':' and will not be sold. You can remove protection here to make an item eligible for the next sale. Select cards to equip multiple items.',
+    'Sadece I':'I only','Sadece U':'U only','Sadece O':'O only','Sadece P':'P only','Sadece K':'K only','Sadece L':'L only','Sadece N':'N only','Sadece M':'M only','Sadece B':'B only','Sadece H':'H only','Sadece J':'J only','Varsayılan':'Default','Menüyü açma tuşu':'Menu hotkey','Menüyü açmak istediğiniz kısayol tuşunu veya kombinasyonu seçin. Seçtiğiniz anda ayar otomatik olarak kaydedilir.':'Choose the shortcut key or combination to open the menu. Your selection is saved automatically.','Tuş Değiştir':'Change key','Shift Kombinasyonları':'Shift combinations','Ctrl Kombinasyonları':'Ctrl combinations','Alt Kombinasyonları':'Alt combinations','Tek Tuşlar':'Single keys','Fonksiyon Tuşları (F1-F12)':'Function keys (F1–F12)'
+  };
+  const translateNodeText = (text) => {
+    const map = language()==='tr' ? trText : enText;
+    const normalized = text.trim();
+    const exact = map[normalized] ?? Object.entries(map).find(([key]) => key.trim() === normalized)?.[1];
+    if (exact) return text.replace(text.trim(), exact);
+    // Dynamic labels retain game names/numbers while translating their UI part.
+    const replacements = language()==='tr'
+      ? [[' gold available',' altın kullanılabilir'],[' gold',' altın'],[' selected.',' seçildi.'],['Equipment assigned.','Ekipman atandı.'],['Equipment removed.','Ekipman çıkarıldı.'],['Party scan requested.','Grup taraması istendi.'],['All notifications enabled.','Tüm bildirimler açıldı.'],['All notifications disabled.','Tüm bildirimler kapatıldı.']]
+      : [[' altın kullanılabilir',' gold available'],[' altın',' gold'],[' seçildi.',' selected.'],['Ekipman atandı.','Equipment assigned.'],['Ekipman çıkarıldı.','Equipment removed.'],['Grup taraması istendi.','Party scan requested.'],['Tüm bildirimler açıldı.','All notifications enabled.'],['Tüm bildirimler kapatıldı.','All notifications disabled.']];
+    return replacements.reduce((value,[from,to]) => value.split(from).join(to), text);
+  };
+  const localizeRenderedUI = () => {
+    document.documentElement.lang = language();
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => { if(node.parentElement?.tagName !== 'SCRIPT') node.nodeValue=translateNodeText(node.nodeValue); });
+    document.querySelectorAll('[title],[aria-label],[data-tooltip],[placeholder]').forEach(el => {
+      ['title','aria-label','data-tooltip','placeholder'].forEach(attr => { if(el.hasAttribute(attr)) el.setAttribute(attr,translateNodeText(el.getAttribute(attr))); });
+    });
+  };
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   const pct = (v) => Math.max(0, Math.min(100, Number(v) || 0));
   const follower = () => state.followers.find((f) => Number(f.id) === Number(selectedFollower)) || state.followers[0] || null;
   const money = (n) => Number(n || 0).toLocaleString();
-  const notify = (message) => { const t = document.createElement('div'); t.className = 'toast'; t.textContent = message; document.body.append(t); setTimeout(() => t.remove(), 2450); };
+  const notify = (message) => { const t = document.createElement('div'); t.className = 'toast'; t.textContent = translateNodeText(message); document.body.append(t); setTimeout(() => t.remove(), 2450); };
   window.fuShowEquipPrompt = (prompt) => {
+    const tr = language() === 'tr';
     const purchase = prompt?.mode === 'purchase';
     const lootUpgrade = prompt?.mode === 'loot' && Boolean(prompt?.currentStats || prompt?.candidateStats);
     if ($('equip-prompt-slot')) {
@@ -25,23 +94,23 @@
       $('equip-prompt-slot').textContent = slot ? slot.toUpperCase() : '';
       $('equip-prompt-slot').hidden = !slot;
     }
-    $('equip-prompt-title').textContent = purchase ? 'Equipment upgrade available' : (lootUpgrade ? 'Corpse loot equipment offer' : 'A better item was found');
+    $('equip-prompt-title').textContent = purchase ? (tr ? 'Ekipman yükseltmesi mevcut' : 'Equipment upgrade available') : (lootUpgrade ? (tr ? 'Ceset yağması ekipman önerisi' : 'Corpse loot equipment offer') : (tr ? 'Daha iyi bir eşya bulundu' : 'A better item was found'));
     $('equip-prompt-summary').textContent = purchase
-      ? `${prompt?.followerName || 'Your follower'} can buy ${prompt?.itemName || 'this item'} from a nearby seller.`
+      ? tr ? `${prompt?.followerName || 'Takipçin'} yakındaki bir satıcıdan ${prompt?.itemName || 'bu eşyayı'} satın alabilir.` : `${prompt?.followerName || 'Your follower'} can buy ${prompt?.itemName || 'this item'} from a nearby seller.`
       : (lootUpgrade
-        ? `${prompt?.followerName || 'Your follower'} will receive ${prompt?.itemName || 'this item'} from the loot.`
-        : `${prompt?.followerName || 'Your follower'} found ${prompt?.itemName || 'a better item'}.`);
+        ? tr ? `${prompt?.followerName || 'Takipçin'} yağmadan ${prompt?.itemName || 'bu eşyayı'} alacak.` : `${prompt?.followerName || 'Your follower'} will receive ${prompt?.itemName || 'this item'} from the loot.`
+        : tr ? `${prompt?.followerName || 'Takipçin'} ${prompt?.itemName || 'daha iyi bir eşya'} buldu.` : `${prompt?.followerName || 'Your follower'} found ${prompt?.itemName || 'a better item'}.`);
     $('equip-prompt-reason').textContent = purchase
-      ? 'This compatible upgrade is available from a nearby seller.'
-      : (lootUpgrade ? 'Compare the follower’s current gear with the item recovered from the corpse.' : (prompt?.reason || ''));
+      ? (tr ? 'Bu uyumlu yükseltme yakındaki bir satıcıda mevcut.' : 'This compatible upgrade is available from a nearby seller.')
+      : (lootUpgrade ? (tr ? 'Takipçinin mevcut ekipmanını cesetten alınan eşyayla karşılaştır.' : 'Compare the follower’s current gear with the item recovered from the corpse.') : (prompt?.reason || ''));
     $('equip-prompt-vendor').hidden = !purchase;
-    $('equip-prompt-vendor').textContent = purchase ? `Seller: ${prompt.vendorName || 'Nearby merchant'}` : '';
+    $('equip-prompt-vendor').textContent = purchase ? `${tr ? 'Satıcı' : 'Seller'}: ${prompt.vendorName || (tr ? 'Yakındaki tüccar' : 'Nearby merchant')}` : '';
     $('equipment-offer-comparison').hidden = !(purchase || lootUpgrade);
     $('equipment-offer-comparison').classList.toggle('loot-upgrade', lootUpgrade);
     $('equip-prompt-price-row').hidden = !purchase;
     $('equip-prompt-funds-row').hidden = !purchase;
-    $('equipment-offer-comparison').querySelector('div:first-child span').textContent = lootUpgrade ? 'Currently equipped' : 'Current equipment';
-    $('equipment-offer-comparison').querySelector('div:nth-child(2) span').textContent = purchase ? 'Purchase offer' : (lootUpgrade ? 'Recovered from corpse' : 'Loot item');
+    $('equipment-offer-comparison').querySelector('div:first-child span').textContent = lootUpgrade ? (tr ? 'Şu an kuşanılan' : 'Currently equipped') : (tr ? 'Mevcut ekipman' : 'Current equipment');
+    $('equipment-offer-comparison').querySelector('div:nth-child(2) span').textContent = purchase ? (tr ? 'Satın alma önerisi' : 'Purchase offer') : (lootUpgrade ? (tr ? 'Cesetten alındı' : 'Recovered from corpse') : (tr ? 'Yağma eşyası' : 'Loot item'));
     const renderGearStats = (id, value) => {
       const parts = String(value || 'None').split(' · ');
       const name = parts.shift() || 'Unknown item';
@@ -49,17 +118,17 @@
     };
     renderGearStats('equip-prompt-current-stats', prompt?.currentStats);
     renderGearStats('equip-prompt-candidate-stats', prompt?.candidateStats);
-    $('equip-prompt-price').textContent = purchase ? `${money(prompt.price)} gold` : '';
+    $('equip-prompt-price').textContent = purchase ? `${money(prompt.price)} ${tr ? 'altın' : 'gold'}` : '';
     $('equip-prompt-funds').textContent = purchase
-      ? `${prompt?.followerName || 'Follower'}: ${money(prompt.spendableGold)} gold available${Number(prompt.spendableGold || 0) < Number(prompt.price || 0) ? ' — not enough' : ''}`
+      ? `${prompt?.followerName || (tr ? 'Takipçi' : 'Follower')}: ${money(prompt.spendableGold)} ${tr ? 'altın kullanılabilir' : 'gold available'}${Number(prompt.spendableGold || 0) < Number(prompt.price || 0) ? (tr ? ' — yeterli değil' : ' — not enough') : ''}`
       : '';
     $('equip-prompt-copy').textContent = purchase
-      ? 'Buy using this follower’s own spendable gold? The new item will be equipped and protected. Their current item will be unequipped, unprotected and available for sale.'
+      ? (tr ? 'Takipçinin kendi harcanabilir altınıyla satın alınsın mı? Yeni eşya kuşanılır ve korunur. Mevcut eşya çıkarılır, koruması kaldırılır ve satılabilir olur.' : 'Buy using this follower’s own spendable gold? The new item will be equipped and protected. Their current item will be unequipped, unprotected and available for sale.')
       : (lootUpgrade
-        ? 'Give this item to the named follower, equip it and protect it? Their previous item will be unprotected and can be sold.'
-        : 'Equip and protect this item? The previous item may become available for sale.');
-    $('equip-prompt-no').textContent = purchase ? 'NO — NEVER ASK FOR THIS ITEM AGAIN' : 'KEEP CURRENT';
-    $('equip-prompt-yes').textContent = purchase ? 'BUY, EQUIP & PROTECT' : 'EQUIP & PROTECT';
+        ? (tr ? 'Bu eşya adı yazan takipçiye verilsin, kuşanılsın ve korunsun mu? Önceki eşyasının koruması kaldırılır ve satılabilir olur.' : 'Give this item to the named follower, equip it and protect it? Their previous item will be unprotected and can be sold.')
+        : (tr ? 'Bu eşya kuşanılsın ve korunsun mu? Önceki eşya satılabilir hale gelebilir.' : 'Equip and protect this item? The previous item may become available for sale.'));
+    $('equip-prompt-no').textContent = purchase ? (tr ? 'HAYIR — BU EŞYAYI TEKRAR SORMA' : 'NO — NEVER ASK FOR THIS ITEM AGAIN') : (tr ? 'MEVCUDU KORU' : 'KEEP CURRENT');
+    $('equip-prompt-yes').textContent = purchase ? (tr ? 'SATIN AL, KUŞAN VE KORU' : 'BUY, EQUIP & PROTECT') : (tr ? 'KUŞAN VE KORU' : 'EQUIP & PROTECT');
     $('equip-prompt').hidden = false;
   };
   window.fuHideEquipPrompt = () => { $('equip-prompt').hidden = true; };
@@ -113,7 +182,10 @@
   const stat = (label, value, hint) => `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value">${value}</div><div class="stat-hint">${hint}</div></div>`;
   const bar = (label, value, type='') => `<div><div class="bar-label"><span>${label}</span><span>${Math.round(pct(value))}%</span></div><div class="bar ${type}"><i style="width:${pct(value)}%"></i></div></div>`;
   const check = (title, key, obj, copy='') => { const values=obj==='settings'?state.settings:(follower()?.prefs||{}); return `<label class="toggle-row"><span class="toggle-copy-wrap"><span class="toggle-title">${itemLabel(title,key)}</span>${copy ? `<span class="toggle-copy">${copy}</span>` : ''}</span><span class="toggle"><input type="checkbox" data-${obj === 'settings' ? 'setting' : 'pref'}="${key}" ${values?.[key] ? 'checked' : ''}></span></label>`; };
-  const globalCheck = (title,key,copy='') => `<label class="toggle-row"><span class="toggle-copy-wrap"><span class="toggle-title">${itemLabel(title,key)}</span>${copy?`<span class="toggle-copy">${copy}</span>`:''}</span><span class="toggle"><input type="checkbox" data-setting="${key}" ${state.settings?.[key]?'checked':''}></span></label>`;
+  const globalCheck = (title,key,copy='') => {
+    if (key === 'uiLanguage') return `<label class="toggle-row"><span class="toggle-copy-wrap"><span class="toggle-title">${itemLabel(title,key)}</span>${copy?`<span class="toggle-copy">${copy}</span>`:''}</span><select class="select" data-setting="uiLanguage" style="min-width:145px;height:38px;padding:4px 10px;font-size:12px"><option value="en" ${language()==='en'?'selected':''}>English</option><option value="tr" ${language()==='tr'?'selected':''}>Türkçe</option></select></label>`;
+    return `<label class="toggle-row"><span class="toggle-copy-wrap"><span class="toggle-title">${itemLabel(title,key)}</span>${copy?`<span class="toggle-copy">${copy}</span>`:''}</span><span class="toggle"><input type="checkbox" data-setting="${key}" ${state.settings?.[key]?'checked':''}></span></label>`;
+  };
   const renderOverview = () => {
     const humanoids=state.followers.filter(f=>!f.animal), avgNeeds=(key)=>state.followers.length?Math.round(state.followers.reduce((n,f)=>n+Number(f[key]||0),0)/state.followers.length):0;
     const avgHunger=avgNeeds('hunger'), avgThirst=avgNeeds('thirst'), avgFatigue=avgNeeds('fatigue');
@@ -262,6 +334,9 @@
             ${w.slot?`<span class="tag slot-tag">${esc(w.slot)}</span>`:''}
             ${w.worn?'<span class="tag equipped-tag">EQUIPPED</span>':''}
             <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px">
+              <button type="button" class="button mini-btn" data-quick-equip="${w.id}" style="font-size:11px;padding:3px 8px">KUŞAN</button>
+              <button type="button" class="button secondary mini-btn" data-unequip-item="${w.id}" style="font-size:11px;padding:3px 8px">ÇIKAR</button>
+              <button type="button" class="button secondary mini-btn" data-transfer-backpack="${w.id}" data-to-backpack="true" style="font-size:11px;padding:3px 8px">ÇANTAYA AT</button>
               <div style="display:flex;gap:4px;flex-wrap:wrap">
               ${w.isTwoHanded?`
                 <button type="button" class="button secondary mini-btn" data-equip-hand="${w.id}" data-hand="right" data-secondary="false" style="font-size:11px;padding:3px 8px;background:${f.assignedPrimaryRight===w.id?'#b7791f':''}">Asli İki El</button>
@@ -301,8 +376,32 @@
             <span class="gear-meta">ARMOR ${a.armor}${a.count>1?` · ×${a.count}`:''} · ${a.armorType===1?'Ağır':(a.armorType===2?'Hafif':'Kıyafet')}</span>
             ${a.slot?`<span class="tag slot-tag">${esc(a.slot)}</span>`:''}
             ${a.worn?'<span class="tag equipped-tag">EQUIPPED</span>':''}
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <button type="button" class="button mini-btn" data-quick-equip="${a.id}" style="font-size:11px;padding:3px 8px">KUŞAN</button>
+              <button type="button" class="button secondary mini-btn" data-unequip-item="${a.id}" style="font-size:11px;padding:3px 8px">ÇIKAR</button>
+              <button type="button" class="button secondary mini-btn" data-transfer-backpack="${a.id}" data-to-backpack="true" style="font-size:11px;padding:3px 8px">ÇANTAYA AT</button>
+            </div>
             <label class="gear-state" data-protect-wrap><input type="checkbox" data-protect="${a.id}" ${a.protected?'checked':''}> PROTECTED</label>
           </div>`).join(''):'<div class="empty">Takipçinin envanterinde giysi bulunmuyor.</div>'}
+        </div>`;
+    } else if (gearTab === 'backpack') {
+      const bpList = f.backpack || [];
+      bodyHtml = `
+        <div class="toolbar equipment-toolbar">
+          <div>
+            <div class="section-title">${esc(f.name)}’s Hidden Backpack (${bpList.length})</div>
+            <div class="notice">🎒 <b>Gizli Sırt Çantası Sistemi:</b> Yağmalanan veya çantaya konulan silah ve zırhlar burada saklanır. Skyrim\'in oyun motoru bu eşyaları görmediği için takipçiniz kafasına göre uygunsuz kıyafetleri giymez! Buradaki eşyalar tüccarlara satılabilir veya tek tıkla aktif envantere çıkarılabilir.</div>
+          </div>
+        </div>
+        <div class="gear-list equipment-gear-list">${bpList.length?bpList.map(item=>`
+          <div class="gear-card" style="cursor:default">
+            <span class="gear-name">${itemLabel(esc(item.name),item.type)}</span>
+            <span class="gear-meta">${item.type==='weapon'?`DMG ${item.damage}`:(item.type==='apparel'?`ARMOR ${item.armor}`:'')} ${item.count>1?` · ×${item.count}`:''} · ${item.weight} kg · ${item.value} altın</span>
+            ${item.slot?`<span class="tag slot-tag">${esc(item.slot)}</span>`:''}
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <button type="button" class="button mini-btn" data-transfer-backpack="${item.id}" data-to-backpack="false" style="font-size:11px;padding:3px 8px">ENVANTERE AL</button>
+            </div>
+          </div>`).join(''):'<div class="empty">Sırt çantasında eşya bulunmuyor.</div>'}
         </div>`;
     } else {
       // ENVANTER SEKMESİ (Tüm Eşyalar & Koruma Yönetimi)
@@ -332,7 +431,8 @@
         <div class="tabs">
           <button class="tab ${gearTab==='weapons'?'active':''}" data-gear-tab="weapons">⚔️ SİLAH (${weapons.length})</button>
           <button class="tab ${gearTab==='armor'?'active':''}" data-gear-tab="armor">🛡️ ZIRH (${apparel.length})</button>
-          <button class="tab ${gearTab==='inventory'?'active':''}" data-gear-tab="inventory">🎒 ENVANTER (${weapons.length + apparel.length})</button>
+          <button class="tab ${gearTab==='backpack'?'active':''}" data-gear-tab="backpack">🎒 SIRTTTAKİ ÇANTA (${(f.backpack||[]).length})</button>
+          <button class="tab ${gearTab==='inventory'?'active':''}" data-gear-tab="inventory">📦 TÜM ENVANTER (${weapons.length + apparel.length})</button>
         </div>
         ${bodyHtml}
       </div>`;
@@ -440,6 +540,9 @@
   const renderSettings = () => {
     const f=follower();
     const groups=[
+      ['INTERFACE LANGUAGE',[
+        ['uiLanguage','Language / Dil','Choose the language used by Follower Unbound’s Prisma interface and alerts.']
+      ]],
       ['CORE SYSTEMS',[
         ['autoLoot','Automatic loot','Share eligible leftovers after you close a container.'],
         ['autoEquip','Automatic equipment upgrades','Automatically equip eligible gear received through Follower Unbound.'],
@@ -481,16 +584,18 @@
   const render = () => {
     if(!state.followers.some(f=>Number(f.id)===Number(selectedFollower))) selectedFollower=state.followers[0]?.id||0;
     $('page-title').textContent=pageTitles[page];
-    $('follower-count').textContent=`${state.followers.length} companion${state.followers.length===1?'':'s'} tracked`;
+    $('follower-count').textContent=language()==='tr'?`${state.followers.length} takipçi takip ediliyor`:`${state.followers.length} companion${state.followers.length===1?'':'s'} tracked`;
     document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
     if(page==='overview')renderOverview();else if(page==='equipment')renderEquipment();else if(page==='loot'||page==='economy')renderPrefs(page);else renderSettings();
+    localizeRenderedUI();
+    if (typeof window.fuSetLanguage === 'function') window.fuSetLanguage(language());
   };
   window.fuSetState=(next)=>{state={...state,...next};if(!selectedFollower&&state.followers.length)selectedFollower=state.followers[0].id;render();};
   $('navigation').addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(!b)return;page=b.dataset.page;pickerOpen=false;render();});
   const toggleGearCard=(gear)=>{const id=Number(gear.dataset.gearCard);if(selectedGear.has(id))selectedGear.delete(id);else selectedGear.add(id);render();};
   $('content').addEventListener('change',e=>{
     const p=e.target.closest('[data-pref]'); if(p){const val=p.type==='checkbox'?p.checked:Number(p.value);send({kind:'preference',follower:Number(follower()?.id),key:p.dataset.pref,value:val});return;}
-    const s=e.target.closest('[data-setting]');if(s){send({kind:'setting',key:s.dataset.setting,value:s.type==='checkbox'?s.checked:Number(s.value)});return;}
+    const s=e.target.closest('[data-setting]');if(s){const value=s.dataset.setting==='uiLanguage'?s.value:(s.type==='checkbox'?s.checked:Number(s.value));if(s.dataset.setting==='uiLanguage'){state.settings.uiLanguage=value;render();}send({kind:'setting',key:s.dataset.setting,value});return;}
     const protect=e.target.closest('[data-protect]');if(protect){send({kind:'protect',follower:Number(follower()?.id),item:Number(protect.dataset.protect),value:protect.checked});return;}
     const hkSel=e.target.closest('[data-hotkey-select]');
     if(hkSel && hkSel.value){
@@ -502,7 +607,7 @@
       state.settings.menuHotkeyText=text;
       send({kind:'setHotkey',hotkey:dx,modifier:mod,text});
       const lbl=document.getElementById('fu-hotkey-label');if(lbl)lbl.textContent=text;
-      notify('Menü tuşu güncellendi: '+text);
+      notify(language()==='tr'?'Menü tuşu güncellendi: '+text:'Menu hotkey updated: '+text);
       hkSel.value='';
       return;
     }
@@ -511,6 +616,17 @@
     const notifBulk=e.target.closest('[data-notif-bulk]');if(notifBulk){const enable=notifBulk.dataset.notifBulk==='true';send({kind:'notificationsBulk',enable});notify(enable?'All notifications enabled.':'All notifications disabled.');return;}
     const pickerToggle=e.target.closest('[data-picker-toggle]');if(pickerToggle){pickerOpen=!pickerOpen;render();return;}
     const pickerOption=e.target.closest('[data-picker-option]');if(pickerOption){selectedFollower=Number(pickerOption.dataset.pickerOption);selectedGear.clear();pickerOpen=false;render();return;}
+    const tfBp=e.target.closest('[data-transfer-backpack]');
+    if(tfBp){
+      e.stopPropagation();
+      const itemId=Number(tfBp.dataset.transferBackpack);
+      const toBp=tfBp.dataset.toBackpack==='true';
+      send({kind:'transferBackpack',follower:Number(follower()?.id),item:itemId,toBackpack:toBp});
+      notify(toBp?(language()==='tr'?'Eşya sırt çantasına aktarıldı.':'Item stashed into backpack.'):(language()==='tr'?'Eşya sırt çantasından envantere alındı.':'Item retrieved from backpack.'));
+      return;
+    }
+    const quickEquip=e.target.closest('[data-quick-equip]');if(quickEquip){e.stopPropagation();send({kind:'equipItem',follower:Number(follower()?.id),item:Number(quickEquip.dataset.quickEquip)});notify('Equipment assigned.');return;}
+    const unequip=e.target.closest('[data-unequip-item]');if(unequip){e.stopPropagation();send({kind:'unequipItem',follower:Number(follower()?.id),item:Number(unequip.dataset.unequipItem)});notify('Equipment removed.');return;}
     const gear=e.target.closest('[data-gear-card]');if(gear){if(e.target.closest('[data-protect-wrap]'))return;toggleGearCard(gear);return;}
     const gold=e.target.closest('[data-gold]');if(gold){e.stopPropagation();send({kind:'gold',follower:Number(gold.dataset.follower),amount:Number(gold.dataset.gold)});notify(`${gold.dataset.gold} gold given.`);return;}
     const pick=e.target.closest('[data-select-follower]');if(pick){selectedFollower=Number(pick.dataset.selectFollower);selectedGear.clear();render();return;}
@@ -525,8 +641,19 @@
       const itemId=Number(eqHandBtn.dataset.equipHand);
       const isLeft=eqHandBtn.dataset.hand==='left';
       const isSec=eqHandBtn.dataset.secondary==='true';
-      send({kind:'equipHand',follower:Number(follower()?.id),item:itemId,leftHand:isLeft,secondary:isSec});
-      notify(`${isSec?'Yardımcı':'Asli'} ${isLeft?'sol':'sağ'} ele kuşandı ve kaydedildi.`);
+      const f=follower();
+      const currentSlot = isSec ? (isLeft ? f?.assignedSecondaryLeft : f?.assignedSecondaryRight) : (isLeft ? f?.assignedPrimaryLeft : f?.assignedPrimaryRight);
+      const isAlreadyAssigned = currentSlot === itemId;
+      send({kind:'equipHand',follower:Number(f?.id),item:itemId,leftHand:isLeft,secondary:isSec});
+      if(isAlreadyAssigned){
+        notify(language()==='tr'
+          ? `${isSec?'Yardımcı':'Asli'} ${isLeft?'sol':'sağ'} el ataması kaldırıldı.`
+          : `${isSec?'Secondary':'Primary'} ${isLeft?'left':'right'} hand assignment cleared.`);
+      } else {
+        notify(language()==='tr'
+          ? (isSec?`Yardımcı ${isLeft?'sol':'sağ'} el silahı kaydedildi (savaşta geçiş yapabilir).`:`Asli ${isLeft?'sol':'sağ'} ele kuşandı ve kaydedildi.`)
+          : (isSec?`Secondary ${isLeft?'left':'right'} hand weapon assigned (may switch during combat).`:`Primary ${isLeft?'left':'right'} hand weapon equipped and assigned.`));
+      }
       return;
     }
   });

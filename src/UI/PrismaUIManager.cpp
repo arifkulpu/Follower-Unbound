@@ -296,7 +296,8 @@ namespace FollowerUnbound
         if (!Settings::GetSingleton()->enableNotifications) return false;
         if (!_api || !_notificationView || !_notificationViewReady || !_api->IsValid(_notificationView)) return false;
         const auto argument = nlohmann::json(std::string(message)).dump();
-        const auto script = "window.fuNotify && window.fuNotify(" + argument + ");";
+        const auto language = nlohmann::json(Settings::GetSingleton()->uiLanguage == "tr" ? "tr" : "en").dump();
+        const auto script = "window.fuNotify && window.fuNotify(" + argument + ", " + language + ");";
         const auto notificationView = _notificationView;
         if (auto* tasks = SKSE::GetTaskInterface()) {
             tasks->AddTask([this, notificationView, script]() {
@@ -608,6 +609,9 @@ namespace FollowerUnbound
             FU_SET_BOOL("lootArrows", lootArrows) FU_SET_BOOL("lootPotions", lootPotions)
             FU_SET_BOOL("lootFood", lootFood) FU_SET_BOOL("lootIngredients", lootIngredients)
             FU_SET_BOOL("lootSoulGems", lootSoulGems) FU_SET_BOOL("lootMisc", lootMisc)
+            if (key == "uiLanguage" && v.is_string()) {
+                s->uiLanguage = v.get<std::string>() == "tr" ? "tr" : "en";
+            }
             if (key == "notificationMode") s->notificationMode = std::clamp<uint32_t>(v.get<uint32_t>(), 0, 2);
             if (key == "lootDelay") s->lootDelaySeconds = std::clamp(v.get<float>(), 0.0f, 60.0f);
             if (key == "equipmentUpgradeChance") s->equipmentUpgradeChance = std::clamp<uint32_t>(v.get<uint32_t>(), 1, 100);
@@ -654,6 +658,36 @@ namespace FollowerUnbound
         auto profile = manager->GetProfile(followerID);
         auto* actor = RE::TESForm::LookupByID<RE::Actor>(followerID);
         if (!profile || !actor) return;
+        if (kind == "unequipItem") {
+            const auto itemID = a.value("item", uint32_t{ 0 });
+            auto* object = RE::TESForm::LookupByID<RE::TESBoundObject>(itemID);
+            if (!object || ItemEvaluator::GetItemCount(actor, object) <= 0) return;
+            // Kuşanmayı kaldırmak, ilgili sağ/sol el ve zırh atamalarını da
+            // temizler. Böylece arka plan yükleme sistemi eşyayı geri takmaz.
+            FollowerManager::ClearAssignment(*profile, itemID);
+            if (auto* equip = RE::ActorEquipManager::GetSingleton()) {
+                manager->NoteOwnEquip(actor->GetFormID());
+                equip->UnequipObject(actor, object, nullptr, 1, nullptr, false, false, false, false);
+            }
+            logger::info("Equipment: {} unequipped and unassigned {}.", actor->GetName(), object->GetName());
+            return;
+        }
+        if (kind == "equipItem") {
+            const auto itemID = a.value("item", uint32_t{ 0 });
+            auto* object = RE::TESForm::LookupByID<RE::TESBoundObject>(itemID);
+            if (!object || ItemEvaluator::GetItemCount(actor, object) <= 0) return;
+
+            bool leftHand = false;
+            if (auto* weapon = object->As<RE::TESObjectWEAP>(); weapon && !FollowerManager::IsTwoHandedWeapon(weapon)) {
+                // Tek tuşla kuşanmada önce boş asli el kullanılır; iki el doluysa
+                // sağ el değiştirilir. Ayrıntılı el seçimi silah kartında kalır.
+                leftHand = profile->assignedPrimaryRight != 0 && profile->assignedPrimaryLeft == 0;
+            }
+            FollowerManager::AssignLoadoutItem(*profile, object, leftHand, false);
+            manager->EnforceAssignedLoadout(actor, *profile, true);
+            logger::info("Equipment: {} assigned {} through quick equip (left={}).", actor->GetName(), object->GetName(), leftHand);
+            return;
+        }
         if (kind == "protect") {
             const auto itemID = a.value("item", uint32_t{ 0 });
             const bool protect = a.value("value", false);
@@ -663,9 +697,13 @@ namespace FollowerUnbound
             // becomes eligible for the next merchant sale without requiring a
             // second protected item to replace it first.
             if (!protect) {
+                // Atanmış eşyanın korumasını kaldırmak atamayı da kaldırır; aksi halde
+                // EnforceAssignedLoadout çıkarılan eşyayı hemen geri giydirip döngü yaratırdı.
+                FollowerManager::ClearAssignment(*profile, itemID);
                 auto* object = RE::TESForm::LookupByID<RE::TESBoundObject>(itemID);
                 if (object && (object->As<RE::TESObjectARMO>() || object->As<RE::TESObjectWEAP>())) {
                     if (auto* equip = RE::ActorEquipManager::GetSingleton()) {
+                        manager->NoteOwnEquip(actor->GetFormID());
                         equip->UnequipObject(actor, object, nullptr, 1, nullptr, false, false, false, true);
                         logger::info("EquipmentProtection: {} unprotected and unequipped {}; it is now eligible for sale.", actor->GetName(), object->GetName());
                     }
@@ -685,47 +723,92 @@ namespace FollowerUnbound
                     auto* oldArmor = RE::TESForm::LookupByID<RE::TESObjectARMO>(protectedID);
                     if (oldArmor && (static_cast<uint32_t>(oldArmor->GetSlotMask()) & mask)) conflicts.push_back(protectedID);
                 }
-                for (auto oldID : conflicts) profile->ProtectItem(oldID, false);
-                profile->ProtectItem(itemID, true);
+                for (auto oldID : conflicts) {
+                    profile->ProtectItem(oldID, false);
+                    FollowerManager::ClearAssignment(*profile, oldID);
+                }
 
-                // Zırh slotunu kalıcı loadout'a kaydet
-                using Slot = RE::BIPED_MODEL::BipedObjectSlot;
-                if (mask & static_cast<uint32_t>(Slot::kHead)) profile->assignedHead = itemID;
-                if (mask & static_cast<uint32_t>(Slot::kBody)) profile->assignedBody = itemID;
-                if (mask & static_cast<uint32_t>(Slot::kHands)) profile->assignedHands = itemID;
-                if (mask & static_cast<uint32_t>(Slot::kFeet)) profile->assignedFeet = itemID;
+                // Zırh/kalkan atamasını tek yardımcıyla kaydet (kalkan sol ele, zırh slotuna).
+                FollowerManager::AssignLoadoutItem(*profile, armor);
 
-                equip->EquipObject(actor, armor, nullptr, 1, nullptr, false, false, false, true);
+                const bool isShield = (mask & static_cast<uint32_t>(RE::BIPED_MODEL::BipedObjectSlot::kShield)) != 0;
+                if (!isShield) {   // kalkanı aşağıdaki EnforceAssignedLoadout sol ele kuşandırır
+                    manager->NoteOwnEquip(actor->GetFormID());
+                    equip->EquipObject(actor, armor, nullptr, 1, nullptr, false, false, false, true);
+                }
             }
+            // Silahlar: ilk tek elli sağ ele, ikincisi sol ele; çift elli/yay iki eli kaplar.
+            // (Eski kod her silahı sağ ele atıyor ve sol eli temizlemiyordu.)
+            bool rightUsed = false;
             for (auto itemID : ids) {
                 auto* weapon = RE::TESForm::LookupByID<RE::TESObjectWEAP>(itemID);
                 if (!weapon) continue;
-                profile->ProtectItem(itemID, true);
-                profile->assignedPrimaryRight = itemID;
-                equip->EquipObject(actor, weapon, nullptr, 1, nullptr, false, false, false, true);
+                if (FollowerManager::IsTwoHandedWeapon(weapon)) {
+                    FollowerManager::AssignLoadoutItem(*profile, weapon, false, false);
+                    rightUsed = true;
+                } else if (!rightUsed) {
+                    FollowerManager::AssignLoadoutItem(*profile, weapon, false, false);
+                    rightUsed = true;
+                } else {
+                    FollowerManager::AssignLoadoutItem(*profile, weapon, true, false);
+                }
             }
-            AnimationManager::GetSingleton()->SheatheWeapon(actor);
+            manager->EnforceAssignedLoadout(actor, *profile, true);
+        } else if (kind == "transferBackpack") {
+            const auto itemID = a.value("item", uint32_t{ 0 });
+            const bool toBackpack = a.value("toBackpack", true);
+            auto* object = RE::TESForm::LookupByID<RE::TESBoundObject>(itemID);
+            if (!object) return;
+
+            if (toBackpack) {
+                // Oyuncu aktif envanterden çantaya koyuyor
+                int32_t currentCount = ItemEvaluator::GetItemCount(actor, object);
+                if (currentCount > 0) {
+                    FollowerManager::ClearAssignment(*profile, itemID);
+                    if (auto* equip = RE::ActorEquipManager::GetSingleton()) {
+                        manager->NoteOwnEquip(actor->GetFormID());
+                        equip->UnequipObject(actor, object, nullptr, 1, nullptr, false, false, false, false);
+                    }
+                    actor->RemoveItem(object, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                    profile->AddToBackpack(itemID, 1);
+                    logger::info("Backpack: {} moved {} to backpack.", actor->GetName(), object->GetName());
+                }
+            } else {
+                // Oyuncu çantadan aktif envantere çıkarıyor
+                if (profile->GetBackpackCount(itemID) > 0) {
+                    profile->RemoveFromBackpack(itemID, 1);
+                    actor->AddObjectToContainer(object, nullptr, 1, nullptr);
+                    logger::info("Backpack: {} retrieved {} from backpack.", actor->GetName(), object->GetName());
+                }
+            }
+            return;
         } else if (kind == "equipHand") {
             const auto itemID = a.value("item", uint32_t{ 0 });
             const bool isLeft = a.value("leftHand", false);
             const bool isSecondary = a.value("secondary", false);
-            auto* equip = RE::ActorEquipManager::GetSingleton();
-            if (!equip) return;
-            if (auto* bound = RE::TESForm::LookupByID<RE::TESBoundObject>(itemID)) {
-                profile->ProtectItem(itemID, true);
+            auto* bound = RE::TESForm::LookupByID<RE::TESBoundObject>(itemID);
+            if (!bound || ItemEvaluator::GetItemCount(actor, bound) <= 0) return;
 
-                if (isSecondary) {
-                    if (isLeft) profile->assignedSecondaryLeft = itemID;
-                    else profile->assignedSecondaryRight = itemID;
-                } else {
-                    if (isLeft) profile->assignedPrimaryLeft = itemID;
-                    else profile->assignedPrimaryRight = itemID;
+            auto& targetSlot = isSecondary 
+                ? (isLeft ? profile->assignedSecondaryLeft : profile->assignedSecondaryRight)
+                : (isLeft ? profile->assignedPrimaryLeft : profile->assignedPrimaryRight);
+
+            // Toggle mantığı: Eğer bu silah zaten o ele atanmışsa, tekrar tıklandığında atamayı kaldır!
+            if (targetSlot == itemID) {
+                targetSlot = 0;
+                auto* equip = RE::ActorEquipManager::GetSingleton();
+                if (equip) {
+                    manager->NoteOwnEquip(actor->GetFormID());
+                    equip->UnequipObject(actor, bound, nullptr, 1, nullptr, false, false, false, false);
                 }
-
-                // 0x00013F42 = RightHand, 0x00013F43 = LeftHand
-                auto* slot = RE::TESForm::LookupByID<RE::BGSEquipSlot>(isLeft ? 0x00013F43 : 0x00013F42);
-                equip->EquipObject(actor, bound, nullptr, 1, slot, false, false, false, true);
-                AnimationManager::GetSingleton()->SheatheWeapon(actor);
+                logger::info("Equipment: {} unassigned {} from {}.",
+                    actor->GetName(), bound->GetName(), isLeft ? "left hand" : "right hand");
+            } else {
+                // Atama tek yerde: çift elli/yay sol eli temizler, sol el eşyası sağdaki çift elliyi bırakır.
+                FollowerManager::AssignLoadoutItem(*profile, bound, isLeft, isSecondary);
+                if (!isSecondary) {
+                    manager->EnforceAssignedLoadout(actor, *profile, true);
+                }
             }
         }
     }
@@ -757,7 +840,7 @@ namespace FollowerUnbound
             {"notificationMode",settings->notificationMode},
             {"lootDelay",settings->lootDelaySeconds},{"equipmentUpgradeChance",settings->equipmentUpgradeChance},
             {"menuHotkey",settings->menuHotkey},{"menuHotkeyModifier",settings->menuHotkeyModifier},
-            {"menuHotkeyText",settings->menuHotkeyText}
+            {"menuHotkeyText",settings->menuHotkeyText},{"uiLanguage",settings->uiLanguage}
         };
         state["followers"] = nlohmann::json::array();
         auto gold = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0000000F);
@@ -810,6 +893,40 @@ namespace FollowerUnbound
             };
             f["weapons"] = nlohmann::json::array();
             f["apparel"] = nlohmann::json::array();
+            f["backpack"] = nlohmann::json::array();
+
+            for (const auto& [bpID, bpCount] : p.backpackItems) {
+                if (bpCount <= 0) continue;
+                auto* boundObj = RE::TESForm::LookupByID<RE::TESBoundObject>(bpID);
+                if (!boundObj) continue;
+                std::string itemType = "misc";
+                std::string slotLabel = "Çanta";
+                int damage = 0;
+                float armorVal = 0.0f;
+                bool isShield = false;
+                if (auto* weap = boundObj->As<RE::TESObjectWEAP>()) {
+                    itemType = "weapon";
+                    slotLabel = ItemEvaluator::GetWeaponTypeLabel(weap);
+                    damage = weap->GetAttackDamage();
+                } else if (auto* armo = boundObj->As<RE::TESObjectARMO>()) {
+                    itemType = "apparel";
+                    slotLabel = ItemEvaluator::GetArmorSlotLabel(armo);
+                    armorVal = armo->GetArmorRating();
+                    isShield = (static_cast<uint32_t>(armo->GetSlotMask()) & static_cast<uint32_t>(RE::BIPED_MODEL::BipedObjectSlot::kShield)) != 0;
+                }
+                f["backpack"].push_back({
+                    {"id", bpID},
+                    {"name", boundObj->GetName() ? boundObj->GetName() : "Item"},
+                    {"count", bpCount},
+                    {"type", itemType},
+                    {"slot", slotLabel},
+                    {"damage", damage},
+                    {"armor", armorVal},
+                    {"isShield", isShield},
+                    {"weight", boundObj->GetWeight()},
+                    {"value", boundObj->GetGoldValue()}
+                });
+            }
             f["assignedPrimaryRight"] = p.assignedPrimaryRight;
             f["assignedPrimaryLeft"] = p.assignedPrimaryLeft;
             f["assignedSecondaryRight"] = p.assignedSecondaryRight;

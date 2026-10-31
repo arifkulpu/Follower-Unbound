@@ -210,7 +210,7 @@ namespace FollowerUnbound
             // Savaştaki veya 3D hazır olmayan aktöre auto-equip yapma:
             // EquipObject animasyon geçişi sırasında çağrılırsa silah
             // "T-pose" gibi elde asılı takılı kalabilir.
-            if (follower->IsInCombat() || !follower->Is3DLoaded() || follower->IsOnMount()) return;
+            if (follower->IsInCombat() || !follower->Is3DLoaded() || AnimationManager::IsRidingWithPlayer(follower)) return;
 
             auto equipMgr = RE::ActorEquipManager::GetSingleton();
             if (!equipMgr) return;
@@ -226,6 +226,17 @@ namespace FollowerUnbound
             };
 
             if (auto weapon = obj->As<RE::TESObjectWEAP>()) {
+                // Oyuncu asli silah atadıysa otomatik kuşanma karışmasın (EnforceAssignedLoadout ile çakışıp
+                // silahı sürekli değiştirirdi).
+                if (profile && (profile->assignedPrimaryRight || profile->assignedPrimaryLeft)) {
+                    return;
+                }
+                // Silah sekmesinde stil seçildiyse uymayan silahı otomatik kuşanma.
+                if (profile && !ItemEvaluator::MatchesWeaponPreferences(weapon, profile->preferences)) {
+                    logger::info("AutoEquip: {} skipped {} (does not match weapon style preference).",
+                        follower->GetName(), weapon->GetName());
+                    return;
+                }
                 auto* currentForm = follower->GetEquippedObject(false);
                 auto* current = currentForm ? currentForm->As<RE::TESObjectWEAP>() : nullptr;
                 if (current && isProtected(current->GetFormID())) {
@@ -397,6 +408,7 @@ namespace FollowerUnbound
                     }
                     if (profile) {
                         profile->ProtectItem(armor->GetFormID(), true);
+                        FollowerManager::ReplaceAssignment(*profile, wornInSlot ? wornInSlot->GetFormID() : 0, armor);
                     }
                     equipMgr->EquipObject(follower, armor, nullptr, 1, nullptr, false, false, false, true);
                     if (settings->notifyAutoEquip) {
@@ -484,7 +496,7 @@ namespace FollowerUnbound
         }
 
         if (_playerLootRequests.size() >= 32) _playerLootRequests.pop_front();
-        _playerLootRequests.push_back({ containerID, startAt });
+        _playerLootRequests.push_back({ containerID, startAt, startAt });
         logger::info("LootShare: queued container {:08X} (queue size={}, delay={}ms).",
             containerID, _playerLootRequests.size(), delayMs);
     }
@@ -545,7 +557,15 @@ namespace FollowerUnbound
             // Followers were temporarily ineligible (e.g. still concluding combat); do not drop!
             std::lock_guard lock(_lootMutex);
             if (!_playerLootRequests.empty() && _playerLootRequests.front().formID == containerID) {
-                _playerLootRequests.front().availableAt = std::chrono::steady_clock::now() + std::chrono::milliseconds(1000);
+                const auto nowTs = std::chrono::steady_clock::now();
+                // Uygun takipçi yoksa (hepsi allowLoot=false / hayvan / ata binmiş) kayıt sonsuza kadar
+                // takılıp HasPendingLootWork()'ü true tutuyordu; 60 sn sonra vazgeç.
+                if (nowTs - _playerLootRequests.front().queuedAt > std::chrono::seconds(60)) {
+                    logger::info("LootShare: dropped container {:08X}; no eligible follower for 60s.", containerID);
+                    _playerLootRequests.pop_front();
+                } else {
+                    _playerLootRequests.front().availableAt = nowTs + std::chrono::milliseconds(1000);
+                }
             }
         }
     }
@@ -627,7 +647,7 @@ namespace FollowerUnbound
                 logger::info("LootShare: follower {} is dead, skipping.", follower->GetName());
                 continue;
             }
-            if (follower->IsOnMount()) {
+            if (AnimationManager::IsRidingWithPlayer(follower)) {
                 logger::info("LootShare: follower {} is mounted on a horse, skipping loot.", follower->GetName());
                 continue;
             }
@@ -938,6 +958,31 @@ namespace FollowerUnbound
             source->RemoveItem(item, transferCount, RE::ITEM_REMOVE_REASON::kRemove, nullptr, actor);
             logger::info("LootTransfer #{}: RemoveItem returned.", pt.transferID);
 
+            // Hidden Backpack Envanter Sistemi:
+            // Eğer yağmalanan eşya bir silah veya zırh ise ve takipçinin aktif kuşanılmış/atanmış
+            // eşyalarından biri değilse, Skyrim'in vanilla Outfit motorunun kafasına göre
+            // giymesini önlemek için takipçinin fiziksel envanterinden çıkarılıp sanal sırt çantasına (backpackItems) aktarılır.
+            if (!pt.isGold && (item->As<RE::TESObjectWEAP>() || item->As<RE::TESObjectARMO>())) {
+                auto profile = FollowerManager::GetSingleton()->GetProfile(actor->GetFormID());
+                if (profile) {
+                    const auto itemID = item->GetFormID();
+                    const bool isAssigned = (itemID == profile->assignedPrimaryRight ||
+                                            itemID == profile->assignedPrimaryLeft ||
+                                            itemID == profile->assignedSecondaryRight ||
+                                            itemID == profile->assignedSecondaryLeft ||
+                                            itemID == profile->assignedHead ||
+                                            itemID == profile->assignedBody ||
+                                            itemID == profile->assignedHands ||
+                                            itemID == profile->assignedFeet);
+                    if (!isAssigned) {
+                        actor->RemoveItem(item, transferCount, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                        profile->AddToBackpack(itemID, transferCount);
+                        logger::info("LootTransfer #{}: moved {} x{} to follower backpack storage.",
+                            pt.transferID, item->GetName(), transferCount);
+                    }
+                }
+            }
+
             // Underwear.dll intentionally excludes followers from its own
             // stripping hook. Restore a configured body-slot item on the NPC
             // corpse when a follower removes its final body garment.
@@ -945,7 +990,7 @@ namespace FollowerUnbound
 
             if (pt.isGold) {
                 logger::info("LootTransfer #{}: virtual gold accounting started amount={}.", pt.transferID, pt.count);
-                EconomyManager::GetSingleton()->AddGold(pt.actorFormID, pt.count);
+                EconomyManager::GetSingleton()->AddGold(pt.actorFormID, transferCount);
                 logger::info("LootTransfer #{}: virtual gold accounting returned.", pt.transferID);
             }
 
@@ -964,19 +1009,22 @@ namespace FollowerUnbound
         }
 
         // Son transfer bitti mi? Bildirim flushu sadece kuyruk tamamen boşaldığında.
+        bool queueDrained = false;
         {
             std::lock_guard lock(_transferMutex);
             logger::info("LootTransfer: transfer queue check; pending={}.", _pendingTransfers.size());
-            if (_pendingTransfers.empty()) {
-                if (settings->notifyLoot) {
-                    logger::info("LootTransfer: loot notification flush started.");
-                    notifier->FlushLootNotifications();
-                    logger::info("LootTransfer: loot notification flush returned.");
-                }
-                for (auto* f : FollowerManager::GetSingleton()->GetActiveFollowers()) {
-                    if (f) {
-                        AnimationManager::GetSingleton()->SheatheWeapon(f);
-                    }
+            queueDrained = _pendingTransfers.empty();
+        }
+        // Motor/bildirim çağrıları _transferMutex dışında (HasPendingLootWork aynı mutex'i alıyor).
+        if (queueDrained) {
+            if (settings->notifyLoot) {
+                logger::info("LootTransfer: loot notification flush started.");
+                notifier->FlushLootNotifications();
+                logger::info("LootTransfer: loot notification flush returned.");
+            }
+            for (auto* f : FollowerManager::GetSingleton()->GetActiveFollowers()) {
+                if (f) {
+                    AnimationManager::GetSingleton()->SheatheWeapon(f);
                 }
             }
         }

@@ -274,6 +274,35 @@ namespace FollowerUnbound
         RE::FormID assignedHands{ 0 };
         RE::FormID assignedFeet{ 0 };
 
+        // Hidden backpack storage: excess/unequipped looted items or player-stashed items.
+        // Stored outside the actor inventory so vanilla outfit AI cannot auto-equip them.
+        std::unordered_map<RE::FormID, int32_t> backpackItems;
+
+        void AddToBackpack(RE::FormID id, int32_t count = 1)
+        {
+            if (id == 0 || count <= 0) return;
+            backpackItems[id] += count;
+        }
+
+        bool RemoveFromBackpack(RE::FormID id, int32_t count = 1)
+        {
+            if (id == 0 || count <= 0) return false;
+            auto it = backpackItems.find(id);
+            if (it == backpackItems.end()) return false;
+            if (it->second <= count) {
+                backpackItems.erase(it);
+            } else {
+                it->second -= count;
+            }
+            return true;
+        }
+
+        int32_t GetBackpackCount(RE::FormID id) const
+        {
+            auto it = backpackItems.find(id);
+            return (it != backpackItems.end()) ? it->second : 0;
+        }
+
         FollowerProfile() = default;
         explicit FollowerProfile(RE::FormID a_formID, std::string_view a_name = "")
             : formID(a_formID), name(a_name) {}

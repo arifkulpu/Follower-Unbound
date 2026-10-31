@@ -31,6 +31,10 @@ namespace FollowerUnbound
         uint32_t menuHotkeyModifier{ 1 };
         std::string menuHotkeyText{ "Shift + I" };
 
+        // Prisma UI language.  Only the two fully supported interface locales
+        // are accepted: "en" (default) and "tr".
+        std::string uiLanguage{ "en" };
+
         // ── LOOTING ──
         bool autoLootCorpses{ true };        // Oyuncu ceset/konteyner menüsünü kapatınca kalan eşyaları takipçilere dağıt
         float lootDelaySeconds{ 10.0f };     // Savaş bittikten kaç saniye sonra cesetler yağmalanır

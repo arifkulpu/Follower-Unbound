@@ -76,7 +76,8 @@ namespace FollowerUnbound
             case RE::WEAPON_TYPE::kOneHandAxe: return "Savaş Baltası";
             case RE::WEAPON_TYPE::kOneHandMace: return "Gürz";
             case RE::WEAPON_TYPE::kTwoHandSword: return "Çift El Kılıç";
-            case RE::WEAPON_TYPE::kTwoHandAxe: return "Çift El Balta";
+            case RE::WEAPON_TYPE::kTwoHandAxe:
+                return weapon->HasKeywordString("WeapTypeWarhammer") ? "Savaş Çekici" : "Çift El Balta";
             case RE::WEAPON_TYPE::kBow: return "Yay";
             case RE::WEAPON_TYPE::kCrossbow: return "Arbalet";
             case RE::WEAPON_TYPE::kStaff: return "Asa";
@@ -154,6 +155,68 @@ namespace FollowerUnbound
             if (subType == 4) return t == RE::WEAPON_TYPE::kOneHandMace;
             if (subType == 5) return t == RE::WEAPON_TYPE::kStaff;
             return true;
+        }
+
+        // ── Silah stili tercihleri (Silah sekmesi) ──
+        // Stil: 0=Serbest, 1=Tek Elli, 2=Çift Elli, 3=Yay, 4=Arbalet, 5=Asa
+        // Sağ el: 0=Herhangi, 1=Kılıç, 2=Hançer, 3=Balta, 4=Gürz, 5=Asa
+        // Sol el: 0=Herhangi, 1=Kalkan, 2=Kılıç, 3=Hançer, 4=Balta, 5=Gürz, 6=Asa, 7=Büyü/Boş
+        // Çift el türü: 0=Herhangi, 1=Büyük Kılıç, 2=Büyük Balta, 3=Savaş Çekici
+        static int GetOneHandKind(RE::TESObjectWEAP* weapon)
+        {
+            if (!weapon) return 0;
+            switch (weapon->GetWeaponType()) {
+            case RE::WEAPON_TYPE::kOneHandSword: return 1;
+            case RE::WEAPON_TYPE::kOneHandDagger: return 2;
+            case RE::WEAPON_TYPE::kOneHandAxe: return 3;
+            case RE::WEAPON_TYPE::kOneHandMace: return 4;
+            case RE::WEAPON_TYPE::kStaff: return 5;
+            default: return 0;
+            }
+        }
+
+        static bool MatchesWeaponStyleSlot(RE::TESObjectWEAP* weapon, uint32_t style,
+            uint32_t rightHand, uint32_t leftHand, uint32_t twoHandType)
+        {
+            if (!weapon) return false;
+            const auto t = weapon->GetWeaponType();
+            switch (style) {
+            case 1: {   // Tek elli
+                const int kind = GetOneHandKind(weapon);
+                if (kind < 1 || kind > 4) return false;
+                return rightHand == 0 || static_cast<uint32_t>(kind) == rightHand ||
+                       (leftHand >= 2 && leftHand <= 5 && static_cast<uint32_t>(kind) == leftHand - 1);
+            }
+            case 2: {   // Çift elli
+                if (t != RE::WEAPON_TYPE::kTwoHandSword && t != RE::WEAPON_TYPE::kTwoHandAxe) return false;
+                if (twoHandType == 0) return true;
+                const bool hammer = weapon->HasKeywordString("WeapTypeWarhammer");
+                if (twoHandType == 1) return t == RE::WEAPON_TYPE::kTwoHandSword;
+                if (twoHandType == 2) return t == RE::WEAPON_TYPE::kTwoHandAxe && !hammer;
+                if (twoHandType == 3) return t == RE::WEAPON_TYPE::kTwoHandAxe && hammer;
+                return true;
+            }
+            case 3: return t == RE::WEAPON_TYPE::kBow;
+            case 4: return t == RE::WEAPON_TYPE::kCrossbow;
+            case 5: return t == RE::WEAPON_TYPE::kStaff;
+            default: return true;
+            }
+        }
+
+        static bool HasWeaponStylePreference(const FollowerPreferences& p)
+        {
+            return p.primaryWeaponStyle != 0 || p.secondaryWeaponStyle != 0;
+        }
+
+        // Silah, asli VEYA yardımcı stile uyuyor mu? Hiç stil seçilmediyse true.
+        static bool MatchesWeaponPreferences(RE::TESObjectWEAP* weapon, const FollowerPreferences& p)
+        {
+            if (!HasWeaponStylePreference(p)) return true;
+            if (p.primaryWeaponStyle != 0 &&
+                MatchesWeaponStyleSlot(weapon, p.primaryWeaponStyle, p.primaryRightHand, p.primaryLeftHand, p.primaryTwoHandType)) return true;
+            if (p.secondaryWeaponStyle != 0 &&
+                MatchesWeaponStyleSlot(weapon, p.secondaryWeaponStyle, p.secondaryRightHand, p.secondaryLeftHand, p.secondaryTwoHandType)) return true;
+            return false;
         }
 
     private:
