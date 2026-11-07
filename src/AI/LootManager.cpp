@@ -1,4 +1,5 @@
 #include "AI/LootManager.h"
+#include "Core/EventManager.h"
 #include "AI/ItemEvaluator.h"
 #include "AI/TradeManager.h"
 #include "AI/CorpseWalk.h"
@@ -599,6 +600,8 @@ namespace FollowerUnbound
 
     void LootManager::ProcessPlayerLootDistributions()
     {
+        // OStim sahnesi aktifken veya sahne bitişinden sonraki 15 sn boyunca yağma işlemlerini durdur
+        if (EventManager::IsOstimBusy()) return;
         // Finish one container's transfer queue before reading another closed
         // container. Mixing sources lets stale transfers from an earlier menu
         // run alongside a newly opened inventory session.
@@ -982,6 +985,8 @@ namespace FollowerUnbound
     }
     void LootManager::FlushPendingTransfers()
     {
+        // OStim sahnesi aktifken veya sahne bitişinden sonraki 15 sn boyunca transfer işlemlerini durdur
+        if (EventManager::IsOstimBusy()) return;
         // Keep each UI task to a single engine inventory mutation. Skyrim's
         // RemoveItem can trigger inventory/equipment callbacks; batching several
         // actors or sources in one task risks hanging the menu/game thread.

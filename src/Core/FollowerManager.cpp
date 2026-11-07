@@ -333,7 +333,7 @@ namespace FollowerUnbound
         if (!actor || actor->IsDead() || profile.isAnimal) return;
 
         // OStim sahnesi sırasında takipçilerin kıyafet/zırh giymesini kesinlikle engelle
-        if (EventManager::IsOstimActive()) return;
+        if (EventManager::IsOstimBusy()) return;
 
         // Varsayılan olarak savaşta müdahale yok; yalnızca EnforceCombatWeapons (allowInCombat) girer.
         if (!allowInCombat && actor->IsInCombat()) return;
@@ -1190,6 +1190,9 @@ namespace
 
     void FollowerManager::TriggerFollowerConsumption()
     {
+        // OStim sahnesi aktifken veya sahne bitiminden sonraki 15 sn boyunca takipçi eylemlerini tamamen dondur
+        if (EventManager::IsOstimBusy()) return;
+
         // Diyalog sırasında Scaleform çökmesi veya animasyon hatası olmaması için kontrol
         auto ui = RE::UI::GetSingleton();
         if (ui && ui->IsMenuOpen(RE::DialogueMenu::MENU_NAME)) return;

@@ -1,4 +1,5 @@
 #include "AI/TradeManager.h"
+#include "Core/EventManager.h"
 #include "AI/AnimationManager.h"
 #include "AI/ItemEvaluator.h"
 #include "Core/FollowerManager.h"
@@ -300,6 +301,7 @@ namespace FollowerUnbound
 
     bool TradeManager::HandleTradeTick(RE::Actor* actor, FollowerProfile& profile)
     {
+        if (EventManager::IsOstimBusy()) return true;
         if (!_config.enabled || !PluginAvailable()) return false;   // old instant path
         if (!actor || actor->IsDead() || !actor->Is3DLoaded()) return true;
         if (SlotOf(actor->GetFormID()) >= 0) return true;           // already on its way / talking

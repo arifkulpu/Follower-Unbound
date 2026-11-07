@@ -71,7 +71,7 @@ namespace FollowerUnbound
     void AnimationManager::PlayEatAnimation(RE::Actor* actor)
     {
         if (!actor || actor->IsDead() || actor->IsInCombat() || IsRidingWithPlayer(actor)) return;
-        if (!EventManager::CanPlayNeedsAnimation()) return;
+        if (EventManager::IsOstimBusy()) return;
 
         if (auto* state = actor->AsActorState()) {
             if (state->GetWeaponState() != RE::WEAPON_STATE::kSheathed) {
@@ -89,7 +89,7 @@ namespace FollowerUnbound
     void AnimationManager::PlayDrinkAnimation(RE::Actor* actor, RE::TESBoundObject* item)
     {
         if (!actor || actor->IsDead() || actor->IsInCombat() || IsRidingWithPlayer(actor)) return;
-        if (!EventManager::CanPlayNeedsAnimation()) return;
+        if (EventManager::IsOstimBusy()) return;
 
         if (auto* state = actor->AsActorState()) {
             if (state->GetWeaponState() != RE::WEAPON_STATE::kSheathed) {

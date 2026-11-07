@@ -589,6 +589,8 @@ namespace FollowerUnbound
 
     namespace
     {
+        std::atomic<bool> s_ostimInstalledChecked{ false };
+        std::atomic<bool> s_ostimInstalled{ false };
         std::atomic<bool> s_ostimActive{ false };
         std::atomic<int64_t> s_ostimCooldownUntilMs{ 0 };
 
@@ -599,15 +601,36 @@ namespace FollowerUnbound
         }
     }
 
+    bool EventManager::IsOstimInstalled()
+    {
+        if (!s_ostimInstalledChecked.load(std::memory_order_relaxed)) {
+            auto* dataHandler = RE::TESDataHandler::GetSingleton();
+            if (dataHandler) {
+                bool found = dataHandler->LookupModByName("OStim.esp") != nullptr ||
+                             dataHandler->LookupLoadedLightModByName("OStim.esp") != nullptr ||
+                             dataHandler->LookupModByName("OStim.esm") != nullptr ||
+                             dataHandler->LookupModByName("OStimStandalone.esp") != nullptr;
+                s_ostimInstalled.store(found, std::memory_order_relaxed);
+                s_ostimInstalledChecked.store(true, std::memory_order_relaxed);
+                if (found) {
+                    logger::info("EventManager: OStim detected in load order. Scene protection and 15s cooldown enabled.");
+                }
+            }
+        }
+        return s_ostimInstalled.load(std::memory_order_relaxed);
+    }
+
     bool EventManager::IsOstimActive()
     {
+        if (!IsOstimInstalled()) return false;
         return s_ostimActive.load(std::memory_order_relaxed);
     }
 
-    bool EventManager::CanPlayNeedsAnimation()
+    bool EventManager::IsOstimBusy()
     {
-        if (s_ostimActive.load(std::memory_order_relaxed)) return false;
-        return NowSteadyMs() >= s_ostimCooldownUntilMs.load(std::memory_order_relaxed);
+        if (!IsOstimInstalled()) return false;
+        if (s_ostimActive.load(std::memory_order_relaxed)) return true;
+        return NowSteadyMs() < s_ostimCooldownUntilMs.load(std::memory_order_relaxed);
     }
 
     RE::BSEventNotifyControl EventManager::ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*)
@@ -616,13 +639,15 @@ namespace FollowerUnbound
 
         std::string_view name = a_event->eventName.c_str();
         if (name == "ostim_start" || name == "ostim_thread_start" || name == "ostim_scene_start") {
+            s_ostimInstalled.store(true, std::memory_order_relaxed);
+            s_ostimInstalledChecked.store(true, std::memory_order_relaxed);
             s_ostimActive.store(true, std::memory_order_relaxed);
-            logger::info("EventManager: OStim scene started. Suspending clothing enforcement and food/drink anims.");
+            logger::info("EventManager: OStim scene started (event: {}). Suspending ALL follower actions.", name);
         } else if (name == "ostim_end" || name == "ostim_thread_end" || name == "ostim_scene_end") {
             s_ostimActive.store(false, std::memory_order_relaxed);
             const int64_t resumeAt = NowSteadyMs() + 15000;
             s_ostimCooldownUntilMs.store(resumeAt, std::memory_order_relaxed);
-            logger::info("EventManager: OStim scene ended. Clothing enforcement restored, food/drink anims delayed 15s.");
+            logger::info("EventManager: OStim scene ended (event: {}). Follower actions suspended for 15s cooldown.", name);
         }
 
         return RE::BSEventNotifyControl::kContinue;

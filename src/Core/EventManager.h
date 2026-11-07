@@ -38,8 +38,9 @@ namespace FollowerUnbound
         virtual RE::BSEventNotifyControl ProcessEvent(const RE::TESEquipEvent* a_event, RE::BSTEventSource<RE::TESEquipEvent>* a_eventSource) override;
         virtual RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>* a_eventSource) override;
 
+        static bool IsOstimInstalled();
         static bool IsOstimActive();
-        static bool CanPlayNeedsAnimation();
+        static bool IsOstimBusy(); // True during scene OR during 15s post-scene cooldown
         // virtual RE::BSEventNotifyControl ProcessEvent(RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>* a_eventSource) override;
 
     private:
