@@ -15,6 +15,7 @@ namespace FollowerUnbound
 
         void UpdateCombatConsumables(RE::Actor* follower, FollowerProfile& profile);
         void UpdateNeedsConsumption(RE::Actor* follower, FollowerProfile& profile);
+        void UpdateOutOfCombatHealing(RE::Actor* follower, FollowerProfile& profile);
         void UpdateOutOfCombatPoison(RE::Actor* follower, FollowerProfile& profile);
         void ApplyNeedsDebuffs(RE::Actor* follower, FollowerProfile& profile);
 

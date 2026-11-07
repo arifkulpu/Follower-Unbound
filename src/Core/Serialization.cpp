@@ -50,6 +50,13 @@ namespace FollowerUnbound
                 a_intfc->WriteRecordData(itemID);
             }
 
+            // Version 25: Learned spell FormIDs
+            uint32_t spellCount = static_cast<uint32_t>(profile.learnedSpells.size());
+            a_intfc->WriteRecordData(spellCount);
+            for (auto spellID : profile.learnedSpells) {
+                a_intfc->WriteRecordData(spellID);
+            }
+
             // Version 22: Assigned loadout items (Primary/Secondary weapons & Armor)
             a_intfc->WriteRecordData(profile.assignedPrimaryRight);
             a_intfc->WriteRecordData(profile.assignedPrimaryLeft);
@@ -695,6 +702,25 @@ namespace FollowerUnbound
                         }
                     }
 
+                    std::unordered_set<RE::FormID> learnedSpells;
+                    if (version >= 25) {
+                        uint32_t spellCount = 0;
+                        if (!read(spellCount) || spellCount > 4096 || bytesRead > length ||
+                            spellCount > (length - bytesRead) / sizeof(RE::FormID)) {
+                            logger::warn("Invalid learned spells count for follower {:08X}.", oldFormID);
+                            recordOK = false;
+                            break;
+                        }
+                        for (uint32_t p = 0; p < spellCount; ++p) {
+                            RE::FormID oldSpellID = 0;
+                            read(oldSpellID);
+                            RE::FormID newSpellID = 0;
+                            if (resolved && a_intfc->ResolveFormID(oldSpellID, newSpellID)) {
+                                learnedSpells.insert(newSpellID);
+                            }
+                        }
+                    }
+
                     RE::FormID aPR = 0, aPL = 0, aSR = 0, aSL = 0, aHead = 0, aBody = 0, aHands = 0, aFeet = 0;
                     if (version >= 22) {
                         auto resolveLoadoutID = [&](RE::FormID& target) {
@@ -792,6 +818,7 @@ namespace FollowerUnbound
                     profile.preferences = preferences;
                     profile.protectedEquipment = std::move(protectedItems);
                     profile.declinedEquipmentPurchases = std::move(declinedEquipmentPurchases);
+                    profile.learnedSpells = std::move(learnedSpells);
                     profile.assignedPrimaryRight = aPR;
                     profile.assignedPrimaryLeft = aPL;
                     profile.assignedSecondaryRight = aSR;

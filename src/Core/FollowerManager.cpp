@@ -820,6 +820,11 @@ namespace
         }
         // Motor çağrısı kilit dışında (kilit altında EquipObject deadlock riski taşır).
         if (auto* actor = RE::TESForm::LookupByID<RE::Actor>(targetFormID)) {
+            for (auto spellID : applied->learnedSpells) {
+                if (auto* sp = RE::TESForm::LookupByID<RE::SpellItem>(spellID)) {
+                    if (!actor->HasSpell(sp)) actor->AddSpell(sp);
+                }
+            }
             EnforceAssignedLoadout(actor, *applied);
         }
     }
@@ -1236,15 +1241,23 @@ namespace
             } else {
                 consumableAI->UpdateNeedsConsumption(actor, *profile);
 
+                // Savaş dışı iyileşme (Canı az ise iksir iç veya healing büyüsü yap)
+                if (!profile->isAnimal) {
+                    consumableAI->UpdateOutOfCombatHealing(actor, *profile);
+                }
+
                 // Hayvan olmayan takipçiler savaş dışındayken silahlarını zehirleyip savaşa hazır bekler
                 if (!profile->isAnimal) {
                     consumableAI->UpdateOutOfCombatPoison(actor, *profile);
                 }
 
+                // Büyü kitabı öğrenme: Şehir, kasaba veya oyuncu evinde her zaman güvenle okur
+                if (!profile->isAnimal) {
+                    CheckSpellTomeLearning(actor, *profile);
+                }
+
                 // Hayvan olmayan takipçiler yakında satıcı varsa düzenli satış ve alışveriş yapar
                 if (!profile->isAnimal && canTradeTick) {
-                    // 1. Önce bilmediği büyü kitaplarını oku ve öğren (satıcının eline düşmesin!)
-                    CheckSpellTomeLearning(actor, *profile);
                     // 2. Kendi malzemelerini kullanarak üretim yap
                     CheckAutonomousCrafting(actor, *profile);
                     // 3-4. Satış ve alışveriş: satıcıya yürüme açıksa TradeManager yönetir (varışta ShoppingAI çağrılır);
@@ -1493,17 +1506,17 @@ namespace
         auto now = std::chrono::steady_clock::now();
         const auto actorID = actor->GetFormID();
 
-        // Eğer şu anda kitap okuyorsa süresini kontrol et (4 saniye boyunca okur)
+        // Eğer şu anda kitap okuyorsa süresini kontrol et (Her kitap için 10 saniye okuma süresi)
         bool stillReading = false;
         bool finishedReading = false;
         {
             std::lock_guard rl(_readMutex);
             if (auto it = _readingActiveFollowers.find(actorID); it != _readingActiveFollowers.end()) {
                 float elapsed = std::chrono::duration<float>(now - it->second).count();
-                if (elapsed < 4.0f) {
-                    stillReading = true;      // Kitap okuma animasyonu hala devam ediyor
+                if (elapsed < 10.0f) {
+                    stillReading = true;      // Kitap okuma animasyonu hala devam ediyor (10 sn)
                 } else {
-                    finishedReading = true;   // Süre bitti
+                    finishedReading = true;   // 10 sn doldu
                     _readingActiveFollowers.erase(it);
                 }
             }
@@ -1519,14 +1532,17 @@ namespace
         {
             std::lock_guard rl(s_lastReadMutex);
             if (auto it = s_lastReadTime.find(actorID); it != s_lastReadTime.end()) {
-                if (std::chrono::duration<float>(now - it->second).count() < 15.0f) {
-                    return; // Kitaplar arasında makul bekleme süresi (15 sn)
+                // Kitaplar arasında 12 saniyelik doğal geçiş (10 sn okuma + 2 sn nefes alma)
+                if (std::chrono::duration<float>(now - it->second).count() < 12.0f) {
+                    return;
                 }
             }
         }
 
         auto* animMgr = AnimationManager::GetSingleton();
         auto* notifMgr = NotificationManager::GetSingleton();
+        auto* avOwner = actor->AsActorValueOwner();
+        const float maxMagicka = avOwner ? std::max(avOwner->GetPermanentActorValue(RE::ActorValue::kMagicka), avOwner->GetBaseActorValue(RE::ActorValue::kMagicka)) : 0.0f;
 
         for (const auto& [item, invData] : actor->GetInventory()) {
             if (!item || invData.first <= 0) continue;
@@ -1539,15 +1555,40 @@ namespace
             // Takipçi bu büyüyü zaten biliyor mu?
             if (actor->HasSpell(spell)) continue;
 
+            // ── MANA (MAGICKA) GEREKSİNİMİ KONTROLÜ ──
+            // Çırak (Novice/Apprentice): 125 Magicka, Kalfa (Adept): 250 Magicka, Uzman/Usta (Expert/Master): 400 Magicka
+            int32_t minSkill = 0;
+            if (auto* effect = spell->GetCostliestEffectItem()) {
+                if (effect->baseEffect) {
+                    minSkill = effect->baseEffect->data.minimumSkill;
+                }
+            }
+
+            float requiredMagicka = 125.0f; // Varsayılan çırak seviyesi
+            if (minSkill >= 75) {
+                requiredMagicka = 400.0f;   // Uzman (Expert: 75+) / Usta (Master: 100)
+            } else if (minSkill >= 50) {
+                requiredMagicka = 250.0f;   // Kalfa (Adept: 50+)
+            } else {
+                requiredMagicka = 125.0f;   // Acemi (Novice: 0+) / Çırak (Apprentice: 25+)
+            }
+
+            if (maxMagicka < requiredMagicka) {
+                logger::info("SpellTomeLearning: {} has insufficient magicka ({:.0f}/{:.0f}) for '{}' (skill level requirement {}).",
+                    actor->GetName(), maxMagicka, requiredMagicka, spell->GetName() ? spell->GetName() : "Spell", minSkill);
+                continue; // Manası yetmediği için bu kitabı henüz öğrenemez
+            }
+
             // Oturuyor mu kontrol et
             auto* actorState = actor->AsActorState();
             const bool isSitting = actorState && (actorState->GetSitSleepState() != RE::SIT_SLEEP_STATE::kNormal);
 
-            // Okuma animasyonu başlat (Immersive Interactions uyumlu)
+            // Okuma animasyonu başlat (10 saniye boyunca okur)
             animMgr->PlayReadAnimation(actor, isSitting);
 
-            // Büyüyü öğren
+            // Büyüyü öğren ve profile kaydet
             actor->AddSpell(spell);
+            profile.learnedSpells.insert(spell->GetFormID());
 
             // Kitabı envanterden tüket (1 adet)
             actor->RemoveItem(book, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
@@ -1558,20 +1599,21 @@ namespace
             }
             {
                 std::lock_guard rl(_readMutex);
-                _readingActiveFollowers[actorID] = now; // 4 saniye boyunca okumada tut
+                _readingActiveFollowers[actorID] = now; // 10 saniye boyunca okumada tut
             }
 
             const char* spellName = spell->GetName() ? spell->GetName() : "Spell";
             const char* bookName = book->GetName() ? book->GetName() : "Spell Tome";
 
             if (settings->notifySpellLearned) {
-                std::string msg = std::format("{} read {} and learned {}!", actor->GetName(), bookName, spellName);
+                std::string msg = std::format("{} read {} and learned {}! (Mana: {:.0f}/{:.0f})",
+                    actor->GetName(), bookName, spellName, maxMagicka, requiredMagicka);
                 notifMgr->ShowHUDMessage(msg);
             }
-            logger::info("SpellTomeLearning: {} read '{}' [{:08X}] and learned spell '{}' [{:08X}].",
-                actor->GetName(), bookName, book->GetFormID(), spellName, spell->GetFormID());
+            logger::info("SpellTomeLearning: {} read '{}' [{:08X}] and learned spell '{}' [{:08X}] (Required Magicka: {:.0f}).",
+                actor->GetName(), bookName, book->GetFormID(), spellName, spell->GetFormID(), requiredMagicka);
 
-            break; // Seans başına 1 kitap okur
+            break; // Seans başına 1 kitap okur, sonraki kitap 10-12 saniye sonra
         }
     }
 

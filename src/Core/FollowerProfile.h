@@ -278,6 +278,7 @@ namespace FollowerUnbound
         // Vendor gear offers declined by this follower. Saved per profile so
         // the same item is never offered again after loading the save.
         std::unordered_set<RE::FormID> declinedEquipmentPurchases;
+        std::unordered_set<RE::FormID> learnedSpells;
 
         // Oyuncu tarafindan secilen kalici loadout (Asli & Yardimci Silahlar ve Zirhlar)
         // Oyun yuklendiginde (load game) Skyrim'in vanilla ekipman secimi yerine bu esyalar oncelikli kusanilir.

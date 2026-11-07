@@ -737,5 +737,120 @@ namespace FollowerUnbound
             if (cur > 1.0f) avOwner->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage, RE::ActorValue::kStamina, -cur * 0.001f);
         }
     }
-}
 
+    void ConsumableAI::UpdateOutOfCombatHealing(RE::Actor* follower, FollowerProfile& profile)
+    {
+        if (!follower || follower->IsDead() || follower->IsInCombat() || profile.isAnimal) return;
+        if (AnimationManager::IsRidingWithPlayer(follower)) return;
+
+        auto* avOwner = follower->AsActorValueOwner();
+        if (!avOwner) return;
+
+        const float curHealth = avOwner->GetActorValue(RE::ActorValue::kHealth);
+        const float maxHealth = std::max(avOwner->GetPermanentActorValue(RE::ActorValue::kHealth), avOwner->GetBaseActorValue(RE::ActorValue::kHealth));
+        if (maxHealth <= 0.0f) return;
+
+        const float healthPct = (curHealth / maxHealth) * 100.0f;
+        // Can %95 veya üzerindeyse iyileşmeye gerek yok
+        if (healthPct >= 95.0f) return;
+
+        const auto actorID = follower->GetFormID();
+        const auto now = std::chrono::steady_clock::now();
+
+        // 3 saniyede bir kontrol et
+        if (auto it = _lastPotionTime.find(actorID); it != _lastPotionTime.end()) {
+            if (std::chrono::duration<float>(now - it->second).count() < 3.0f) {
+                return;
+            }
+        }
+
+        auto* notifMgr = NotificationManager::GetSingleton();
+        auto* animMgr  = AnimationManager::GetSingleton();
+        auto* evaluator = ItemEvaluator::GetSingleton();
+
+        // 1. Önce İyileştirme (Healing / Restore Health) Büyüsü Var mı Kontrol Et
+        RE::SpellItem* bestHealSpell = nullptr;
+        float bestHealCost = 9999.0f;
+        const float curMagicka = avOwner->GetActorValue(RE::ActorValue::kMagicka);
+
+        if (curMagicka >= 20.0f) {
+            auto checkSpell = [&](RE::SpellItem* spell) {
+                if (!spell || spell->GetFormType() != RE::FormType::Spell) return;
+                if (spell->data.spellType != RE::MagicSystem::SpellType::kSpell) return;
+
+                bool restoresHealth = false;
+                for (auto* eff : spell->effects) {
+                    if (eff && eff->baseEffect && eff->baseEffect->data.primaryAV == RE::ActorValue::kHealth) {
+                        const auto arch = eff->baseEffect->data.archetype;
+                        if (arch == RE::EffectArchetypes::ArchetypeID::kPeakValueModifier ||
+                            arch == RE::EffectArchetypes::ArchetypeID::kValueModifier ||
+                            arch == RE::EffectArchetypes::ArchetypeID::kDualValueModifier) {
+                            if (!eff->baseEffect->data.flags.all(RE::EffectSetting::EffectSettingData::Flag::kHostile)) {
+                                restoresHealth = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (restoresHealth) {
+                    float cost = spell->CalculateMagickaCost(follower);
+                    if (cost <= curMagicka && cost < bestHealCost) {
+                        bestHealSpell = spell;
+                        bestHealCost = cost;
+                    }
+                }
+            };
+
+            // Aktörün öğrendiği büyüleri kontrol et
+            for (auto spellID : profile.learnedSpells) {
+                if (auto* sp = RE::TESForm::LookupByID<RE::SpellItem>(spellID)) checkSpell(sp);
+            }
+
+            // Aktörün baz büyü listesini kontrol et
+            if (auto* base = follower->GetActorBase()) {
+                if (auto* sl = base->GetSpellList()) {
+                    if (sl->spells) {
+                        for (uint32_t sIdx = 0; sIdx < sl->numSpells; ++sIdx) {
+                            checkSpell(sl->spells[sIdx]);
+                        }
+                    }
+                }
+            }
+
+            if (bestHealSpell) {
+                if (auto* caster = follower->GetMagicCaster(RE::MagicSystem::CastingSource::kInstant)) {
+                    caster->CastSpellImmediate(bestHealSpell, false, follower, 1.0f, false, 0.0f, follower);
+                    avOwner->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage, RE::ActorValue::kMagicka, -bestHealCost);
+                    _lastPotionTime[actorID] = now;
+                    logger::info("PostCombatHealing: {} cast {} on self (HP was {:.1f}%, cost {:.0f} magicka).",
+                        follower->GetName(), bestHealSpell->GetName(), healthPct, bestHealCost);
+                    return;
+                }
+            }
+        }
+
+        // 2. Büyü Yoksa veya Mana Yetmiyorsa: Sağlık İksiri Kullan
+        auto inventory = follower->GetInventory();
+        for (const auto& [item, invData] : inventory) {
+            if (invData.first <= 0 || !item) continue;
+            if (evaluator->IsHealthPotion(item)) {
+                if (auto* potion = item->As<RE::AlchemyItem>()) {
+                    animMgr->PlayPotionAnimation(follower);
+                    follower->DrinkPotion(potion, nullptr);
+                    follower->RemoveItem(potion, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+
+                    _lastPotionTime[actorID] = now;
+                    _lastPotionType[actorID] = CombatPotionType::Health;
+
+                    std::string msg = std::format("{} drank a Health Potion to recover. (Health: {:.0f}%)",
+                        follower->GetName(), healthPct);
+                    notifMgr->ShowHUDMessage(msg);
+                    logger::info("PostCombatHealing: {} drank {} after combat (Health was {:.1f}%).",
+                        follower->GetName(), potion->GetName(), healthPct);
+                    return;
+                }
+            }
+        }
+    }
+
+}

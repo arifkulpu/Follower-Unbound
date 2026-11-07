@@ -141,6 +141,15 @@ namespace FollowerUnbound
             it = _walks.end();
         }
 
+        // Eğer mevcut yürüyüş State::Done olmuşsa ve üzerinden 3 saniye geçmişse,
+        // takipçinin ceset başındaki işi bitmiştir; yeni aramalar için sıfırla
+        if (it != _walks.end() && it->second.state == State::Done) {
+            if (Secs(it->second.doneAt, now) > 3.0f) {
+                _walks.erase(it);
+                it = _walks.end();
+            }
+        }
+
         if (it == _walks.end()) {
             Walk walk;
             walk.body = body->GetFormID();
@@ -265,7 +274,8 @@ namespace FollowerUnbound
                     continue;
                 }
                 Evaluate(follower, body, it->second);   // a walk nobody asks about any more still ends on time
-            } else if (Secs(it->second.doneAt, now) > 60.0f) {
+            } else if (Secs(it->second.doneAt, now) > 5.0f) {
+                // Done durumu 5 saniye sonra silinsin; böylece bir sonraki ceset için takipçi temiz yürüyüş başlatır
                 it = _walks.erase(it);
                 continue;
             }
