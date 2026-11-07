@@ -7,7 +7,7 @@ TÜRKÇE (TURKISH)
 
 ## Genel Bakış
 Follower Unbound v0.3.0 güncellemesi; takipçi yapay zekasını, dünyayla olan fiziksel etkileşimini ve envanter yönetimini köklü bir şekilde dönüştüren büyük bir dönüm noktası sürümüdür.
-Bu sürümle birlikte; takipçilerin tüccarlarla uzaktan sihirli bir şekilde alışveriş yapması yerine bizzat dükkânlara ve tezgâhlara yürüdüğü **Satıcıya Yürüme ve Etkileşim Sahnesi Sistemi (TradeManager & TradeVoice)**, savaş sonrası ganimet toplarken cesetlerin yanına fiziksel olarak koşup yelpaze şeklinde çevrelediği **Cesetlere Yürüme ve Arama Sistemi (CorpseWalk)**, Skyrim motorunun zırh ve kıyafet saçmalamalarını tamamen ortadan kaldıran sanal **Gizli Sırt Çantası Mimarisi (Hidden Backpack)**, çift el kılıç kınına koyma/çekme döngüsü çözümü ve PrismaUI üzerinden doğrudan sağ/sol el atama iptali (toggle) yetenekleri oyuna kazandırılmıştır.
+Bu sürümle birlikte; takipçilerin tüccarlarla uzaktan sihirli bir şekilde alışveriş yapması yerine bizzat dükkânlara ve tezgâhlara yürüdüğü **Satıcıya Yürüme ve Etkileşim Sahnesi Sistemi (TradeManager & TradeVoice)**, savaş sonrası ganimet toplarken cesetlerin yanına fiziksel olarak koşup yelpaze şeklinde çevrelediği **Cesetlere Yürüme ve Arama Sistemi (CorpseWalk)**, Skyrim motorunun zırh ve kıyafet saçmalamalarını tamamen ortadan kaldıran sanal **Gizli Sırt Çantası Mimarisi (Hidden Backpack)**, **OStim Standalone Sahne Entegrasyonu**, çift el kılıç kınına koyma/çekme döngüsü çözümü ve PrismaUI üzerinden doğrudan sağ/sol el atama iptali (toggle) yetenekleri oyuna kazandırılmıştır.
 
 ---
 
@@ -20,6 +20,8 @@ Bu sürümle birlikte; takipçilerin tüccarlarla uzaktan sihirli bir şekilde a
 - **Skyrim Orijinal Seslendirme Entegrasyonu (Vanilla Voice Lines):**
   - Takipçi ve tüccar buluştuğunda Skyrim'in orijinal seslendirme hatlarını (`Actor.Say`) kullanarak karşılıklı selamlama, konuşma ve teşekkür replikleri söyler (`DialogueGenericHello/Goodbye`, `DialogueFollowerHellos`, `DialogueCaravansHellos` vb.).
   - Harici ses dosyası kopyalamaya gerek duymadan oyunun tüm vanilya ses tipleriyle (%100 uyumlu) doğal diyalog kurulur.
+- **Her Alışverişte Ses Efekti:**
+  - Takipçiler tüccarlarla alışveriş yaptıklarında para sesi şansı %100'e çıkarıldı ve seslerin bazı takipçilerde çıkmama sorunu giderildi.
 - **Hafif ESL Eklentisi (`FollowerUnboundTrade.esp`):**
   - Görevler, sahneler, paketler ve hedef `XMarker` referanslarını yöneten ESL flagli ultra hafif eklenti.
 - **Kusursuz Geri Dönüş (Fallback):**
@@ -32,6 +34,10 @@ Bu sürümle birlikte; takipçilerin tüccarlarla uzaktan sihirli bir şekilde a
 ### 2. Cesetlere Yürüme ve Arama Sistemi (CorpseWalk Engine)
 - **Cesedin Yanına Fiziksel Olarak Gitme (`KeepOffsetFromActor`):**
   - Takipçiler artık savaş bittikten veya bir ceset kapandıktan sonra (varsayılan 10 saniye beklemenin ardından) uzaktan eşyaları çekmek yerine doğrudan ölü düşmanın yanına fiziksel olarak koşar.
+- **Geri Geri Yürüme Sorunu Giderildi:**
+  - Takipçinin cesede yaklaşırken ters dönüp geri geri yürümesi sorunu, cesedin açısına göre dinamik yüzleşme (`FaceTowards`) ve bağıl hedef açısı (`targetAngleZ`) hesaplamasıyla tamamen düzeltildi. Artık takipçiler hedefe doğru ileriye bakar adımlarla ilerler.
+- **Çoklu Cesetleri Sırayla Gezerek Yağmalama:**
+  - Savaş sonrasında birden fazla ölü NPC olduğunda sadece ilk cesede gidip diğerlerini uzaktan yağmalama hatası giderildi; her ceset için yürüme durumu sıfırlanarak takipçilerin sırayla tüm cesetlerin yanına bizzat gitmesi sağlandı.
 - **Akıllı Çevreleme Formasyonu (Intelligent Fanning Out):**
   - Birden fazla takipçi aynı cesede yöneldiğinde iç içe geçmek veya birbirini itmek yerine cesedin etrafına yelpaze gibi açılarak (-40°, 0°, +40°) yaklaşır ve cesedin yönüne döner.
 - **Doğal Arama ve Diz Çökme:**
@@ -46,10 +52,14 @@ Bu sürümle birlikte; takipçilerin tüccarlarla uzaktan sihirli bir şekilde a
 ### 3. Gizli Sırt Çantası Sistemi (Hidden Backpack - Skyrim Motoru Hatalarını Önleme)
 - **Sanal Sırt Çantası Mimarisi:**
   - Takipçiler için Skyrim oyun motorundan tamamen yalıtılmış sanal bir SKSE sırt çantası depolama sistemi geliştirildi.
+- **Tüm Yağmalanan Eşyaların Hayali Çantaya Alınması:**
+  - Ölü NPC'lerden toplanan fazla silah, zırh ve eşyaların takipçinin normal envanterini doldurması ve motor tarafından otomatik giyilmesi engellendi; kabul edilen yükseltmeler hariç tüm eşyalar doğrudan sanal sırt çantasına aktarılır.
 - **Skyrim Outfit AI Çakışması Engellendi:**
   - Vanilla Skyrim oyun motoru sadece aktörün doğrudan envanterindeki eşyaları görebildiği için, sırt çantasındaki zırh ve silahları asla kafasına göre otomatik giyemez (böylece büyücülerin kask takması veya ağır zırhlı takipçinin deri çizme giymesi gibi motor hataları tamamen çözüldü).
-- **Akıllı Yağma Yönlendirmesi:**
-  - Dünyadan veya cesetlerden toplanan fazla silah ve zırhlar otomatik olarak aktif envanter yerine bu gizli sırt çantasına aktarılır.
+- **Kuşanılmış Eşyaları Çantaya Atabilme Düzeltmesi (Worn Items Fix):**
+  - Takipçinin elinde veya üstünde takılı olan eşyaların (örneğin Demir Hançer) UI'dan "Çantaya At" dendiğinde aktörden silinememesi sorunu, aktif takılı ekstra veri listesi (`kWorn`/`kWornLeft`) parametresiyle çözüldü.
+- **Özel Biped Slotlu Kıyafet ve İç Çamaşırı Kuşanma Desteği:**
+  - Standart 4 slot (kafa/gövde/el/ayak) dışındaki modlu iç çamaşırı, kemer, pelerin ve takı gibi giysiler (örneğin Eudora Panties & Belt) arayüzden doğrudan kuşanılabilir ve kıyafet kuralları koruması altına alınır.
 - **Doğrudan Çantadan Tüccara Satış:**
   - Takipçiler dükkânlara girdiklerinde sırt çantasındaki gereksiz silah ve zırhları tüccarlara satabilir.
 - **Prisma UI Yönetimi:**
@@ -57,7 +67,17 @@ Bu sürümle birlikte; takipçilerin tüccarlarla uzaktan sihirli bir şekilde a
 
 ---
 
-### 4. Silah ve Çift El Kuşanma Düzeltmeleri (Dual-Wield & Hand Toggles)
+### 4. OStim Standalone Entegrasyonu (Mod 98163)
+- **OStim Sahne Algılama:**
+  - SKSE ModCallbackEvent altyapısıyla OStim sahne başlangıcı (`ostim_start`, `ostim_thread_start`, `ostim_scene_start`) ve sahne bitişi (`ostim_end`, `ostim_thread_end`, `ostim_scene_end`) tam senkronizasyonla takip edilir.
+- **Kıyafet Giyme Engeli:**
+  - OStim sahneleri sırasında takipçilerin kıyafet veya zırhlarını otomatik olarak giymesi durdurulur; soyunuk durum ve sahne bütünlüğü bozulmaz.
+- **Yeme/İçme Animasyonlarının Ertelenmesi:**
+  - Takipçilerin ihtiyaç tüketimi ve yemek yeme / içki içme animasyonları sahne bitene kadar ertelenir ve sahne sona erdikten **15 saniye sonra** güvenle kaldığı yerden devam ettirilir.
+
+---
+
+### 5. Silah ve Çift El Kuşanma Düzeltmeleri (Dual-Wield & Hand Toggles)
 - **Çift El Kılıç Kınına Koyma/Çekme Döngüsü Giderildi (Dual-Wield Loop Fix):**
   - Takipçiye iki tek elli silah verildiğinde, barış anında silahları sürekli çekip geri kınına sokma ve animasyon kilitlenmesi döngüsü ortadan kaldırıldı; silah motor durum makineleri ve animasyon grafları senkronize edildi.
 - **Doğrudan Ele Kuşanma ve Atama İptali (Toggle):**
@@ -65,7 +85,7 @@ Bu sürümle birlikte; takipçilerin tüccarlarla uzaktan sihirli bir şekilde a
 
 ---
 
-### 5. Geriye Dönük Kayıt Uyumluluğu
+### 6. Geriye Dönük Kayıt Uyumluluğu
 - Co-save serileştirme sürümü v24'e güncellendi.
 - Eski kayıt dosyalarındaki veriler ve kullanıcı ayarları kaybolmadan geriye dönük tam uyumluluk sağlandı.
 
@@ -77,7 +97,7 @@ ENGLISH
 
 ## Overview
 Follower Unbound v0.3.0 is a major milestone release transforming follower AI, environmental immersion, and inventory architecture.
-Highlights include the new **Follower Walk to Merchant & Trade Voice System** with 10 concurrent slots and vanilla-voiced interaction scenes, the **CorpseWalk Engine** enabling followers to physically approach and neatly fan out around fallen enemies during looting, the **Hidden Backpack Architecture** which eliminates Skyrim's native outfit bugs, dual-wield weapon draw/sheathe loop fixes, and toggleable hand equipment assignment in PrismaUI.
+Highlights include the new **Follower Walk to Merchant & Trade Voice System** with 10 concurrent slots and vanilla-voiced interaction scenes, the **CorpseWalk Engine** enabling followers to physically approach and neatly fan out around fallen enemies during looting, the **Hidden Backpack Architecture** which eliminates Skyrim's native outfit bugs, **OStim Standalone Scene Integration**, dual-wield weapon draw/sheathe loop fixes, and toggleable hand equipment assignment in PrismaUI.
 
 ---
 
@@ -90,6 +110,8 @@ Highlights include the new **Follower Walk to Merchant & Trade Voice System** wi
 - **Native Voiced Dialogue Integration (`Actor.Say`):**
   - Followers and merchants greet, banter, and thank each other using context-appropriate vanilla voiced lines (`DialogueGenericHello/Goodbye`, `DialogueFollowerHellos`, `DialogueCaravansHellos`, etc.).
   - 100% compatible with all vanilla voice types without packaging custom voice files.
+- **100% Coin Jingle Sound:**
+  - Gold exchange SFX now triggers reliably on every transaction, resolving silent merchant interactions.
 - **Lightweight ESL Plugin (`FollowerUnboundTrade.esp`):**
   - ESL-flagged plugin providing quests, scenes, packages, and persistent dynamic `XMarker` anchors.
 - **Seamless Instant Fallback:**
@@ -102,6 +124,10 @@ Highlights include the new **Follower Walk to Merchant & Trade Voice System** wi
 ### 2. CorpseWalk Engine (Physical Approach to Looting)
 - **Physical Walk to Corpses (`KeepOffsetFromActor`):**
   - Followers now physically walk up to dead bodies after combat ends or when a corpse is queued (default 10-second delay), ending instant long-range item teleportation.
+- **Backward Walking Fixed:**
+  - Fixed an issue where followers walked backward or strafed sideways towards dead NPCs. Added proper facing angle (`targetAngleZ`) and orientation (`FaceTowards`) so followers walk forward naturally.
+- **Multi-Corpse Sequential Looting:**
+  - Fixed a bug where followers walked only to the first corpse and remotely looted the rest. Followers now physically navigate to each corpse in sequence.
 - **Intelligent Formation Fanning:**
   - When multiple followers loot the same corpse, they spread out in an arc (-40°, 0°, +40°) facing the body to prevent awkward clustering or physics collisions.
 - **Immersive Search Animations:**
@@ -116,10 +142,14 @@ Highlights include the new **Follower Walk to Merchant & Trade Voice System** wi
 ### 3. Hidden Backpack System (Skyrim Outfit Glitch Prevention)
 - **Virtual SKSE Storage Architecture:**
   - Dedicated SKSE-managed virtual backpack inventory isolated from Skyrim's native outfit evaluation.
+- **Looted Items Route to Virtual Backpack:**
+  - Surplus looted weapons, armor, and gear are directly routed into the virtual backpack instead of active inventory, preventing followers from cluttering their equipment lists.
+- **Worn Item Stashing Fix:**
+  - Resolved an engine issue where currently equipped weapons (such as an Iron Dagger) could not be moved to the backpack; the specific worn extra-data list is now targeted during item transfer.
+- **Custom Biped Slot Armor Support:**
+  - Custom clothing and undergarments occupying non-standard biped slots (e.g., Eudora Panties & Belt) can now be equipped cleanly via UI and protected from automatic stripping rules.
 - **Eliminates Skyrim Outfit Bugs:**
   - Because the game engine cannot see items held in the virtual backpack, followers will never equip mismatched armors or silly helmets on their own.
-- **Automated Loot Routing:**
-  - Surplus looted weapons and armors are automatically diverted into the follower's backpack instead of their active worn inventory.
 - **Direct Merchant Sales from Backpack:**
   - Follower Shopping AI can sell surplus equipment stored in the backpack directly to appropriate vendors.
 - **PrismaUI Integration:**
@@ -127,7 +157,17 @@ Highlights include the new **Follower Walk to Merchant & Trade Voice System** wi
 
 ---
 
-### 4. Dual-Wield & Equipment Toggle Fixes
+### 4. OStim Standalone Integration (Mod 98163)
+- **OStim Scene Detection:**
+  - Subscribes to `SKSE::ModCallbackEvent` to detect OStim start (`ostim_start`, `ostim_thread_start`, `ostim_scene_start`) and completion (`ostim_end`, `ostim_thread_end`, `ostim_scene_end`).
+- **Clothing Enforcement Suspension:**
+  - Automatic clothing/armor loadout enforcement is completely suspended during OStim scenes to prevent companions from redressing mid-scene.
+- **Needs & Eating Animation Postponement:**
+  - Follower food/drink consumption and idle eating animations are paused during OStim scenes and resume **15 seconds** after the scene finishes.
+
+---
+
+### 5. Dual-Wield & Equipment Toggle Fixes
 - **Dual-Wield Sheathe/Draw Loop Fix:**
   - Resolved animation graph desynchronization where followers with dual one-handed weapons repeatedly drew and sheathed their off-hand weapon outside combat.
 - **Direct Equipment Unassign (Toggle):**
@@ -135,5 +175,5 @@ Highlights include the new **Follower Walk to Merchant & Trade Voice System** wi
 
 ---
 
-### 5. Save Game Backward Compatibility
+### 6. Save Game Backward Compatibility
 - Bumped serialization version to 24 with complete backward compatibility for existing savegames.
