@@ -265,11 +265,8 @@ namespace FollowerUnbound
                                 }
                             }
                             profile->ProtectItem(prompt.newObjID, true);
-                            if (auto* equip = RE::ActorEquipManager::GetSingleton()) {
-                                FollowerManager::ReplaceAssignment(*profile, prompt.oldObjID, item);
-                                FollowerManager::GetSingleton()->NoteOwnEquip(follower->GetFormID());
-                                equip->EquipObject(follower, item, nullptr, 1, nullptr, false, false, false, true);
-                            }
+                            FollowerManager::ReplaceAssignment(*profile, prompt.oldObjID, item);
+                            FollowerManager::GetSingleton()->EnforceAssignedLoadout(follower, *profile, true);
                             NotificationManager::GetSingleton()->ShowHUDMessage(
                                 std::format("{} bought and equipped {} for {} gold; it is now in their inventory.", prompt.followerName, prompt.newObjName, prompt.price));
                             ShoppingAI::PlayEquipmentPurchaseSound(follower);
@@ -280,15 +277,18 @@ namespace FollowerUnbound
                 } else if (prompt.oldObjID != 0 && profile->IsProtected(prompt.oldObjID) && !prompt.replacesAssigned) {
                     logger::info("EquipPrompt: '{}' kept protected equipment; skipped PrismaUI equip decision.", prompt.followerName);
                 } else {
-                    if (prompt.oldObjID != 0) profile->ProtectItem(prompt.oldObjID, false);
-                    profile->ProtectItem(prompt.newObjID, true);
-                    if (auto* equip = RE::ActorEquipManager::GetSingleton()) {
-                        FollowerManager::ReplaceAssignment(*profile, prompt.oldObjID, item);
-                        FollowerManager::GetSingleton()->NoteOwnEquip(follower->GetFormID());
-                        equip->EquipObject(follower, item, nullptr, 1, nullptr, false, false, false, true);
-                        logger::info("EquipPrompt: PrismaUI accepted {}; equipped and protected {}.",
-                            prompt.followerName, prompt.newObjName);
+                    auto* oldItem = prompt.oldObjID ? RE::TESForm::LookupByID<RE::TESBoundObject>(prompt.oldObjID) : nullptr;
+                    if (oldItem) {
+                        profile->ProtectItem(prompt.oldObjID, false);
+                        if (auto* equip = RE::ActorEquipManager::GetSingleton()) {
+                            equip->UnequipObject(follower, oldItem, nullptr, 1, nullptr, false, false, false, true);
+                        }
                     }
+                    profile->ProtectItem(prompt.newObjID, true);
+                    FollowerManager::ReplaceAssignment(*profile, prompt.oldObjID, item);
+                    FollowerManager::GetSingleton()->EnforceAssignedLoadout(follower, *profile, true);
+                    logger::info("EquipPrompt: PrismaUI accepted {}; equipped and protected {}.",
+                        prompt.followerName, prompt.newObjName);
                 }
             }
         } else if (prompt.vendorPurchase) {

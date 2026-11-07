@@ -498,6 +498,11 @@ namespace FollowerUnbound
         }
     }
 
+    void LootManager::EvaluateLootedGear(RE::Actor* follower, FollowerProfile* profile, RE::TESBoundObject* obj)
+    {
+        TryAutoEquip(follower, profile, obj);
+    }
+
     bool LootManager::IsLootableItem(RE::TESBoundObject* item)
     {
         if (!item) return false;
@@ -1079,7 +1084,7 @@ namespace FollowerUnbound
             if (pt.autoEquip) {
                 logger::info("LootTransfer #{}: auto-equip started.", pt.transferID);
                 auto profile = FollowerManager::GetSingleton()->GetProfile(actor->GetFormID());
-                if (profile) TryAutoEquip(actor, profile.get(), item);
+                if (profile) EvaluateLootedGear(actor, profile.get(), item);
                 logger::info("LootTransfer #{}: auto-equip returned; profile={}.", pt.transferID, profile ? "ok" : "null");
             }
 

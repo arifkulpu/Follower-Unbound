@@ -366,7 +366,13 @@ namespace FollowerUnbound
             if (!id) return;
             auto* a = RE::TESForm::LookupByID<RE::TESObjectARMO>(id);
             if (!a || !has(a)) return;
-            if (actor->GetWornArmor(a->GetSlotMask()) == a) return;
+            auto* currentWorn = actor->GetWornArmor(a->GetSlotMask());
+            if (currentWorn == a) return;
+            // Eğer o slotta başka bir zırh varsa, yenisini giymeden önce eskisini çıkar ve korumasını kaldır
+            if (currentWorn && currentWorn != a) {
+                profile.ProtectItem(currentWorn->GetFormID(), false);
+                equipMgr->UnequipObject(actor, currentWorn, nullptr, 1, nullptr, false, false, false, true);
+            }
             NoteOwnEquip(actor->GetFormID());
             equipMgr->EquipObject(actor, a, nullptr, 1, nullptr, false, false, false, true);
         };

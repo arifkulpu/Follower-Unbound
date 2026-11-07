@@ -733,6 +733,11 @@ namespace FollowerUnbound
             auto* object = RE::TESForm::LookupByID<RE::TESBoundObject>(itemID);
             if (!object || (ItemEvaluator::GetItemCount(actor, object) <= 0 && profile->GetBackpackCount(itemID) + profile->GetBackpackCustomCount(itemID) <= 0)) return;
 
+            // Eğer eşya çantadaysa, kuşanmadan önce hemen aktörün envanterine geri ver
+            if (ItemEvaluator::GetItemCount(actor, object) <= 0) {
+                manager->RestoreFromBackpack(actor, *profile, itemID, -1, 1);
+            }
+
             bool leftHand = false;
             if (auto* weapon = object->As<RE::TESObjectWEAP>(); weapon && !FollowerManager::IsTwoHandedWeapon(weapon)) {
                 // Tek tuşla kuşanmada önce boş asli el kullanılır; iki el doluysa

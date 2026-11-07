@@ -148,6 +148,14 @@ namespace FollowerUnbound
 
         logger::info("DroppedItemRecovery: picking up {} x{} for follower={:08X}.", item->GetName(), dropped.count, dropped.followerID);
         follower->PickUpObject(groundRef.get(), dropped.count, false, false);
+
+        // Yağmalanan/yerden toplanan silah veya zırh ise değerlendir ve doğrudan hayali çantaya sakla
+        if (auto profile = FollowerManager::GetSingleton()->GetProfile(follower->GetFormID())) {
+            if (item->As<RE::TESObjectWEAP>() || item->As<RE::TESObjectARMO>()) {
+                LootManager::EvaluateLootedGear(follower, profile.get(), item);
+                FollowerManager::GetSingleton()->StashUnassignedGear(follower, *profile);
+            }
+        }
         {
             std::lock_guard lock(_mutex);
             if (!_droppedItems.empty() && _droppedItems.front().followerID == dropped.followerID &&

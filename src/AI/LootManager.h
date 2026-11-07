@@ -28,6 +28,9 @@ namespace FollowerUnbound
         // mutations isolated to a single UI task.
         void FlushPendingTransfers();
 
+        // Evaluates whether a newly obtained weapon/armor is an upgrade and offers or auto-equips it.
+        static void EvaluateLootedGear(RE::Actor* follower, FollowerProfile* profile, RE::TESBoundObject* obj);
+
         // RenderBackgroundTick only requests work. Engine operations are performed
         // later through SKSE's UI task queue.
         void ScheduleProcessing();
