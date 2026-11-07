@@ -1,5 +1,7 @@
 #include "AI/LootManager.h"
 #include "AI/ItemEvaluator.h"
+#include "AI/TradeManager.h"
+#include "AI/CorpseWalk.h"
 #include "AI/AnimationManager.h"
 #include "AI/DroppedItemRecovery.h"
 #include "Economy/EconomyManager.h"
@@ -196,6 +198,75 @@ namespace FollowerUnbound
             }
         }
 
+        // Oyuncunun SEÇTİĞİ (atanmış) silah/kalkan/zırhtan daha iyi bir eşya bulunduysa yükseltme önerisi gösterir.
+        // Seçili eşya korunduğu için normal akış hiç öneri üretmiyordu. Karşılaştırma yalnızca AYNI türde yapılır
+        // (kılıç↔kılıç, yay↔yay, aynı slot zırhı, kalkan↔kalkan). Kabul edilirse atama yeni eşyaya geçer.
+        void OfferAssignedUpgrade(RE::Actor* follower, FollowerProfile* profile, RE::TESBoundObject* obj)
+        {
+            auto* settings = Settings::GetSingleton();
+            if (!follower || !profile || !obj || !settings->promptOnBetterEquipment) return;
+            if (profile->IsProtected(obj->GetFormID())) return;
+            if (EquipPrompt::IsOfferPending(follower->GetFormID(), obj->GetFormID())) return;
+
+            RE::TESBoundObject* oldObj = nullptr;
+            std::string reason;
+
+            if (auto* weapon = obj->As<RE::TESObjectWEAP>()) {
+                if (!ItemEvaluator::MatchesWeaponPreferences(weapon, profile->preferences)) return;
+                const RE::FormID slots[] = { profile->assignedPrimaryRight, profile->assignedPrimaryLeft,
+                                             profile->assignedSecondaryRight, profile->assignedSecondaryLeft };
+                for (auto id : slots) {
+                    auto* old = RE::TESForm::LookupByID<RE::TESObjectWEAP>(id);
+                    if (!old || old->GetFormID() == weapon->GetFormID()) continue;
+                    if (old->GetWeaponType() != weapon->GetWeaponType()) continue;
+                    if (weapon->HasKeywordString("WeapTypeWarhammer") != old->HasKeywordString("WeapTypeWarhammer")) continue;
+                    const float oldDmg = static_cast<float>(old->GetAttackDamage());
+                    const float newDmg = static_cast<float>(weapon->GetAttackDamage());
+                    const bool better = newDmg > oldDmg || (weapon->formEnchanting && !old->formEnchanting);
+                    if (!better) return;
+                    oldObj = old;
+                    reason = std::format("Hasar: {:.0f} (Seçili: {:.0f}){}", newDmg, oldDmg,
+                        weapon->formEnchanting ? ", Büyülü" : "");
+                    break;
+                }
+            } else if (auto* armor = obj->As<RE::TESObjectARMO>()) {
+                using Slot = RE::BIPED_MODEL::BipedObjectSlot;
+                constexpr uint32_t kMain = static_cast<uint32_t>(Slot::kHead) | static_cast<uint32_t>(Slot::kBody) |
+                                           static_cast<uint32_t>(Slot::kHands) | static_cast<uint32_t>(Slot::kFeet);
+                constexpr uint32_t kShield = static_cast<uint32_t>(Slot::kShield);
+                if (!ItemEvaluator::MatchesPreferredArmor(armor, profile->preferences.preferredArmorType)) return;
+                const auto newMask = static_cast<uint32_t>(armor->GetSlotMask());
+                const bool newShield = (newMask & kShield) != 0;
+                const RE::FormID slots[] = { profile->assignedHead, profile->assignedBody, profile->assignedHands,
+                                             profile->assignedFeet, profile->assignedPrimaryLeft,
+                                             profile->assignedSecondaryLeft };
+                for (auto id : slots) {
+                    auto* old = RE::TESForm::LookupByID<RE::TESObjectARMO>(id);
+                    if (!old || old->GetFormID() == armor->GetFormID()) continue;
+                    const auto oldMask = static_cast<uint32_t>(old->GetSlotMask());
+                    if (((oldMask & kShield) != 0) != newShield) continue;
+                    if (!newShield && (oldMask & newMask & kMain) == 0) continue;
+                    const float oldRating = old->GetArmorRating();
+                    const float newRating = armor->GetArmorRating();
+                    const bool better = newRating > oldRating || (armor->formEnchanting && !old->formEnchanting);
+                    if (!better) return;
+                    oldObj = old;
+                    reason = std::format("Zırh: {:.0f} (Seçili: {:.0f}){}", newRating, oldRating,
+                        armor->formEnchanting ? ", Büyülü" : "");
+                    break;
+                }
+            }
+            if (!oldObj) return;
+
+            if (settings->equipmentUpgradeChance < 100) {
+                thread_local std::mt19937 rng{ std::random_device{}() };
+                std::uniform_int_distribution<uint32_t> dist(1, 100);
+                if (dist(rng) > settings->equipmentUpgradeChance) return;
+            }
+            EquipPrompt::ShowPrompt(follower, profile, obj, oldObj, reason,
+                GetFollowerGearStats(follower, oldObj), GetFollowerGearStats(follower, obj), true);
+        }
+
         // ── OTOMATİK KUŞANIM ──
         // Yağmalanan eşya takipçinin üzerindekilerden daha iyiyse hemen kuşanılır.
         // Silah: saldırı hasarı karşılaştırılır. Zırh: aynı vücut slotundaki
@@ -228,7 +299,10 @@ namespace FollowerUnbound
             if (auto weapon = obj->As<RE::TESObjectWEAP>()) {
                 // Oyuncu asli silah atadıysa otomatik kuşanma karışmasın (EnforceAssignedLoadout ile çakışıp
                 // silahı sürekli değiştirirdi).
-                if (profile && (profile->assignedPrimaryRight || profile->assignedPrimaryLeft)) {
+                if (profile && (profile->assignedPrimaryRight || profile->assignedPrimaryLeft ||
+                                profile->assignedSecondaryRight || profile->assignedSecondaryLeft)) {
+                    // Seçili silahtan DAHA İYİSİ bulunduysa oyuncuya öner (kabul edilirse atama yeni silaha geçer).
+                    OfferAssignedUpgrade(follower, profile, obj);
                     return;
                 }
                 // Silah sekmesinde stil seçildiyse uymayan silahı otomatik kuşanma.
@@ -319,6 +393,8 @@ namespace FollowerUnbound
                     if (!protectedArmor || inv.first <= 0 || !isProtected(protectedArmor->GetFormID())) continue;
                     const auto protectedMask = static_cast<uint32_t>(protectedArmor->GetSlotMask());
                     if ((protectedMask & newMask) != 0) {
+                        // Aynı slottaki korunan zırh oyuncunun SEÇTİĞİ ise daha iyisi için öneri sun.
+                        OfferAssignedUpgrade(follower, profile, obj);
                         logger::info("AutoEquip: {} refused {} because protected armor {} occupies the same slot ({} / {}).",
                             follower->GetName(), armor->GetName(), protectedArmor->GetName(), protectedMask, newMask);
                         return;
@@ -480,6 +556,11 @@ namespace FollowerUnbound
                 logger::info("LootShare: refused to queue living actor / follower {:08X} ({}) for looting.", containerID, actor->GetName());
                 return;
             }
+        }
+
+        // Followers walk up to a dead body (CorpseWalk): they set off only after its wait (default 10 s)
+        if (CorpseWalk::GetSingleton()->WantsWalk(targetRef)) {
+            delayMs = (std::max)(delayMs, CorpseWalk::GetSingleton()->DelayMs());
         }
 
         EquipPrompt::LootWorkStarted();
@@ -900,17 +981,40 @@ namespace FollowerUnbound
         // RemoveItem can trigger inventory/equipment callbacks; batching several
         // actors or sources in one task risks hanging the menu/game thread.
         std::vector<PendingTransfer> batch;
+        const auto now = std::chrono::steady_clock::now();
+
+        // 1) which transfers are due (the mutex is held only to read the list)
+        struct Due { uint64_t id; RE::FormID actor; RE::FormID source; };
+        std::vector<Due> due;
         {
             std::lock_guard lock(_transferMutex);
             if (_pendingTransfers.empty()) return;
-            const auto now = std::chrono::steady_clock::now();
-            for (auto it = _pendingTransfers.begin(); it != _pendingTransfers.end() &&
-                 batch.size() < static_cast<size_t>(kMaxTransfersPerTick);) {
-                if (it->readyAt <= now) {
+            for (const auto& t : _pendingTransfers) {
+                if (t.readyAt <= now) due.push_back({ t.transferID, t.actorFormID, t.sourceFormID });
+            }
+        }
+        if (due.empty()) return;
+
+        // 2) a follower looting a dead body walks up to it first (CorpseWalk); no walk possible: the old remote transfer
+        std::vector<uint64_t> release;
+        for (const auto& d : due) {
+            if (release.size() >= static_cast<size_t>(kMaxTransfersPerTick)) break;
+            auto* a = RE::TESForm::LookupByID<RE::Actor>(d.actor);
+            auto* s = RE::TESForm::LookupByID<RE::TESObjectREFR>(d.source);
+            if (a && s && CorpseWalk::GetSingleton()->Check(a, s) == CorpseWalk::Gate::Wait) continue;
+            release.push_back(d.id);
+        }
+        if (release.empty()) return;
+
+        // 3) take the released transfers out of the queue
+        {
+            std::lock_guard lock(_transferMutex);
+            for (const auto id : release) {
+                const auto it = std::find_if(_pendingTransfers.begin(), _pendingTransfers.end(),
+                    [id](const PendingTransfer& t) { return t.transferID == id; });
+                if (it != _pendingTransfers.end()) {
                     batch.push_back(std::move(*it));
-                    it = _pendingTransfers.erase(it);
-                } else {
-                    ++it;
+                    _pendingTransfers.erase(it);
                 }
             }
             if (batch.empty()) return;
@@ -958,30 +1062,8 @@ namespace FollowerUnbound
             source->RemoveItem(item, transferCount, RE::ITEM_REMOVE_REASON::kRemove, nullptr, actor);
             logger::info("LootTransfer #{}: RemoveItem returned.", pt.transferID);
 
-            // Hidden Backpack Envanter Sistemi:
-            // Eğer yağmalanan eşya bir silah veya zırh ise ve takipçinin aktif kuşanılmış/atanmış
-            // eşyalarından biri değilse, Skyrim'in vanilla Outfit motorunun kafasına göre
-            // giymesini önlemek için takipçinin fiziksel envanterinden çıkarılıp sanal sırt çantasına (backpackItems) aktarılır.
-            if (!pt.isGold && (item->As<RE::TESObjectWEAP>() || item->As<RE::TESObjectARMO>())) {
-                auto profile = FollowerManager::GetSingleton()->GetProfile(actor->GetFormID());
-                if (profile) {
-                    const auto itemID = item->GetFormID();
-                    const bool isAssigned = (itemID == profile->assignedPrimaryRight ||
-                                            itemID == profile->assignedPrimaryLeft ||
-                                            itemID == profile->assignedSecondaryRight ||
-                                            itemID == profile->assignedSecondaryLeft ||
-                                            itemID == profile->assignedHead ||
-                                            itemID == profile->assignedBody ||
-                                            itemID == profile->assignedHands ||
-                                            itemID == profile->assignedFeet);
-                    if (!isAssigned) {
-                        actor->RemoveItem(item, transferCount, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
-                        profile->AddToBackpack(itemID, transferCount);
-                        logger::info("LootTransfer #{}: moved {} x{} to follower backpack storage.",
-                            pt.transferID, item->GetName(), transferCount);
-                    }
-                }
-            }
+            // (Hayali çantaya taşıma artık aşağıda, otomatik kuşanma/yükseltme teklifi DEĞERLENDİRİLDİKTEN SONRA
+            //  FollowerManager::StashUnassignedGear ile yapılır; böylece daha iyi eşya envanterde bulunabilir.)
 
             // Underwear.dll intentionally excludes followers from its own
             // stripping hook. Restore a configured body-slot item on the NPC
@@ -1001,6 +1083,13 @@ namespace FollowerUnbound
                 logger::info("LootTransfer #{}: auto-equip returned; profile={}.", pt.transferID, profile ? "ok" : "null");
             }
 
+            // Hayali çanta: seçilmeyen silah/zırh AI'dan gizlenir (bekleyen teklifler hariç).
+            if (!pt.isGold && (item->As<RE::TESObjectWEAP>() || item->As<RE::TESObjectARMO>())) {
+                if (auto bpProfile = FollowerManager::GetSingleton()->GetProfile(actor->GetFormID())) {
+                    FollowerManager::GetSingleton()->StashUnassignedGear(actor, *bpProfile);
+                }
+            }
+
             if (settings->notifyLoot && !pt.followerName.empty() && !pt.itemName.empty()) {
                 logger::info("LootTransfer #{}: notification enqueue started.", pt.transferID);
                 notifier->QueueLootNotification(pt.followerName, pt.itemName, static_cast<uint32_t>(pt.count));
@@ -1017,6 +1106,7 @@ namespace FollowerUnbound
         }
         // Motor/bildirim çağrıları _transferMutex dışında (HasPendingLootWork aynı mutex'i alıyor).
         if (queueDrained) {
+            CorpseWalk::GetSingleton()->Reset();   // the walks of this loot round end
             if (settings->notifyLoot) {
                 logger::info("LootTransfer: loot notification flush started.");
                 notifier->FlushLootNotifications();
@@ -1033,6 +1123,8 @@ namespace FollowerUnbound
 
     void LootManager::ScheduleProcessing()
     {
+        // Satıcıya yürüyen takipçilerin ilerlemesi de aynı arka plan tick'inden yürür (kendi içinde ~400 ms'ye kısıtlı)
+        TradeManager::GetSingleton()->ScheduleUpdate();
 
         bool expected = false;
         if (!_processingScheduled.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
@@ -1050,6 +1142,7 @@ namespace FollowerUnbound
         // task queue so these engine mutations are serialized with game/UI work.
         taskInterface->AddUITask([this]() {
             logger::info("LootTask: UI task started.");
+            CorpseWalk::GetSingleton()->Update();
             ProcessPlayerLootDistributions();
             FlushPendingTransfers();
             if (!HasPendingLootWork()) {

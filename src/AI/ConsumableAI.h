@@ -18,7 +18,8 @@ namespace FollowerUnbound
         void UpdateOutOfCombatPoison(RE::Actor* follower, FollowerProfile& profile);
         void ApplyNeedsDebuffs(RE::Actor* follower, FollowerProfile& profile);
 
-        // Savaş bitişini kaydet: yeme/içme activity'i birkaç saniye geciktirir
+        // Savaş durumlarını kaydet
+        void NotifyCombatStarted(RE::Actor* follower);
         void NotifyCombatEnded(RE::FormID actorID);
 
         // Oyun yüklendiğinde en az 10 saniye boyunca zehir veya sarf tüketimini beklet

@@ -8,6 +8,8 @@
 #include "Economy/EconomyManager.h"
 #include "Economy/ShoppingAI.h"
 #include "AI/ItemEvaluator.h"
+#include "AI/TradeManager.h"
+#include "AI/CorpseWalk.h"
 #include "AI/AnimationManager.h"
 #include "Core/TNGCompatibility.h"
 #include <cctype>
@@ -521,6 +523,54 @@ namespace FollowerUnbound
         logger::info("EquipmentPurchase: opened PrismaUI offer for {} / {} ({}) at {} gold.", followerName, itemName, slotLabel, price);
     }
 
+    // Settings of the walk-to-merchant system (TradeManager keeps them in its own json file).
+    // UI units: distances in game units, times in seconds, cooldowns in game HOURS.
+    static void ApplyTradeSetting(const std::string& key, const nlohmann::json& v)
+    {
+        auto* trade = TradeManager::GetSingleton();
+        auto& c = trade->GetConfig();
+        if (key == "tradeWalk") {
+            const bool on = v.get<bool>();
+            if (c.enabled && !on) {
+                // turned off: walks in progress end now (on the UI task queue, like the other engine work)
+                if (auto* tasks = SKSE::GetTaskInterface()) tasks->AddUITask([]() { TradeManager::GetSingleton()->AbortAll("switched off"); });
+            }
+            c.enabled = on;
+        } else if (key == "tradeHold") {
+            c.holdWhileWalking = v.get<bool>();
+        } else if (key == "tradeVoice") {
+            c.voiceEnabled = v.get<bool>();
+        } else if (key == "tradeNoticeDistance") {
+            c.noticeDistance = std::clamp(v.get<float>(), 300.0f, 1500.0f);
+        } else if (key == "tradeStaySeconds") {
+            c.nearbyStaySeconds = std::clamp(v.get<float>(), 2.0f, 20.0f);
+        } else if (key == "tradeLingerSeconds") {
+            c.lingerSeconds = std::clamp(v.get<float>(), 1.0f, 10.0f);
+        } else if (key == "tradeCooldownHours") {
+            c.cooldownGameDays = std::clamp(v.get<float>(), 1.0f, 72.0f) / 24.0f;
+        } else if (key == "tradeNoDealCooldownHours") {
+            c.noDealCooldownGameDays = std::clamp(v.get<float>(), 1.0f, 24.0f) / 24.0f;
+        } else {
+            return;
+        }
+        trade->SaveConfig();
+    }
+
+    // Settings of the walk-to-corpse looting (CorpseWalk keeps them in its own json file).
+    static void ApplyLootWalkSetting(const std::string& key, const nlohmann::json& v)
+    {
+        auto* walk = CorpseWalk::GetSingleton();
+        auto& c = walk->GetConfig();
+        if (key == "lootWalk") {
+            c.enabled = v.get<bool>();
+        } else if (key == "lootWalkDelay") {
+            c.delaySeconds = std::clamp(v.get<float>(), 2.0f, 30.0f);
+        } else {
+            return;
+        }
+        walk->SaveConfig();
+    }
+
     void PrismaUIManager::OnAction(const char* data)
     {
         if (!data) return;
@@ -591,6 +641,12 @@ namespace FollowerUnbound
                 s->notifyCombatMagickaPotion = val;
                 s->notifyCombatStaminaPotion = val;
                 s->notifyPoisonApplied = val;
+            } else
+            if (key.rfind("lootWalk", 0) == 0) {
+                ApplyLootWalkSetting(key, v);
+            } else
+            if (key.rfind("trade", 0) == 0) {
+                ApplyTradeSetting(key, v);
             } else
 #define FU_SET_BOOL(name, field) if (key == name) s->field = v.get<bool>(); else
             FU_SET_BOOL("autoLoot", autoLootCorpses) FU_SET_BOOL("autoEquip", enableAutoEquip)
@@ -675,7 +731,7 @@ namespace FollowerUnbound
         if (kind == "equipItem") {
             const auto itemID = a.value("item", uint32_t{ 0 });
             auto* object = RE::TESForm::LookupByID<RE::TESBoundObject>(itemID);
-            if (!object || ItemEvaluator::GetItemCount(actor, object) <= 0) return;
+            if (!object || (ItemEvaluator::GetItemCount(actor, object) <= 0 && profile->GetBackpackCount(itemID) + profile->GetBackpackCustomCount(itemID) <= 0)) return;
 
             bool leftHand = false;
             if (auto* weapon = object->As<RE::TESObjectWEAP>(); weapon && !FollowerManager::IsTwoHandedWeapon(weapon)) {
@@ -757,27 +813,30 @@ namespace FollowerUnbound
         } else if (kind == "transferBackpack") {
             const auto itemID = a.value("item", uint32_t{ 0 });
             const bool toBackpack = a.value("toBackpack", true);
+            const std::string key = a.value("key", std::string{});   // özel (büyülü/temperli/adlı) kayıt: "c<index>"
             auto* object = RE::TESForm::LookupByID<RE::TESBoundObject>(itemID);
             if (!object) return;
 
             if (toBackpack) {
-                // Oyuncu aktif envanterden çantaya koyuyor
-                int32_t currentCount = ItemEvaluator::GetItemCount(actor, object);
-                if (currentCount > 0) {
+                // Oyuncu aktif envanterden çantaya koyuyor (ekstra veri korunur)
+                if (ItemEvaluator::GetItemCount(actor, object) > 0) {
                     FollowerManager::ClearAssignment(*profile, itemID);
                     if (auto* equip = RE::ActorEquipManager::GetSingleton()) {
                         manager->NoteOwnEquip(actor->GetFormID());
                         equip->UnequipObject(actor, object, nullptr, 1, nullptr, false, false, false, false);
                     }
-                    actor->RemoveItem(object, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
-                    profile->AddToBackpack(itemID, 1);
-                    logger::info("Backpack: {} moved {} to backpack.", actor->GetName(), object->GetName());
+                    if (manager->StashItem(actor, *profile, object, 1, true) > 0) {
+                        logger::info("Backpack: {} moved {} to backpack.", actor->GetName(), object->GetName());
+                    }
                 }
             } else {
                 // Oyuncu çantadan aktif envantere çıkarıyor
-                if (profile->GetBackpackCount(itemID) > 0) {
-                    profile->RemoveFromBackpack(itemID, 1);
-                    actor->AddObjectToContainer(object, nullptr, 1, nullptr);
+                int32_t customIndex = -1;
+                if (key.size() > 1 && key[0] == 'c') {
+                    try { customIndex = std::stoi(key.substr(1)); } catch (...) { customIndex = -1; }
+                }
+                if (manager->RestoreFromBackpack(actor, *profile, itemID, customIndex, 1) > 0) {
+                    manager->NoteBackpackRetrieval(actor->GetFormID(), itemID);   // atanana kadar yeniden çantaya konmasın
                     logger::info("Backpack: {} retrieved {} from backpack.", actor->GetName(), object->GetName());
                 }
             }
@@ -787,7 +846,7 @@ namespace FollowerUnbound
             const bool isLeft = a.value("leftHand", false);
             const bool isSecondary = a.value("secondary", false);
             auto* bound = RE::TESForm::LookupByID<RE::TESBoundObject>(itemID);
-            if (!bound || ItemEvaluator::GetItemCount(actor, bound) <= 0) return;
+            if (!bound || (ItemEvaluator::GetItemCount(actor, bound) <= 0 && profile->GetBackpackCount(itemID) + profile->GetBackpackCustomCount(itemID) <= 0)) return;
 
             auto& targetSlot = isSecondary 
                 ? (isLeft ? profile->assignedSecondaryLeft : profile->assignedSecondaryRight)
@@ -818,6 +877,9 @@ namespace FollowerUnbound
         if (!_api || !_view || !_api->IsValid(_view) || !_viewReady) return;
         nlohmann::json state;
         auto* settings = Settings::GetSingleton();
+        auto* trade = TradeManager::GetSingleton();
+        const auto& tc = trade->GetConfig();
+        const auto& cw = CorpseWalk::GetSingleton()->GetConfig();
         state["settings"] = {
             {"autoLoot",settings->autoLootCorpses},{"autoEquip",settings->enableAutoEquip},
             {"selling",settings->enableSellingSystem},{"shopping",settings->enableShoppingSystem},
@@ -840,7 +902,12 @@ namespace FollowerUnbound
             {"notificationMode",settings->notificationMode},
             {"lootDelay",settings->lootDelaySeconds},{"equipmentUpgradeChance",settings->equipmentUpgradeChance},
             {"menuHotkey",settings->menuHotkey},{"menuHotkeyModifier",settings->menuHotkeyModifier},
-            {"menuHotkeyText",settings->menuHotkeyText},{"uiLanguage",settings->uiLanguage}
+            {"menuHotkeyText",settings->menuHotkeyText},{"uiLanguage",settings->uiLanguage},
+            {"lootWalk",cw.enabled},{"lootWalkDelay",cw.delaySeconds},{"tradeWalk",tc.enabled},{"tradeHold",tc.holdWhileWalking},{"tradeVoice",tc.voiceEnabled},
+            {"tradeNoticeDistance",tc.noticeDistance},{"tradeStaySeconds",tc.nearbyStaySeconds},
+            {"tradeLingerSeconds",tc.lingerSeconds},
+            {"tradeCooldownHours",tc.cooldownGameDays * 24.0f},{"tradeNoDealCooldownHours",tc.noDealCooldownGameDays * 24.0f},
+            {"tradePluginFound",trade->PluginAvailable()}
         };
         state["followers"] = nlohmann::json::array();
         auto gold = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0000000F);
@@ -918,6 +985,44 @@ namespace FollowerUnbound
                     {"id", bpID},
                     {"name", boundObj->GetName() ? boundObj->GetName() : "Item"},
                     {"count", bpCount},
+                    {"type", itemType},
+                    {"slot", slotLabel},
+                    {"damage", damage},
+                    {"armor", armorVal},
+                    {"isShield", isShield},
+                    {"weight", boundObj->GetWeight()},
+                    {"value", boundObj->GetGoldValue()}
+                });
+            }
+            // Özel (büyülü/temperli/şarjlı/adlı) çanta eşyaları: her kayıt ayrı satır, "key" ile seçilir
+            for (size_t ci = 0; ci < p.backpackCustom.size(); ++ci) {
+                const auto& c = p.backpackCustom[ci];
+                auto* boundObj = RE::TESForm::LookupByID<RE::TESBoundObject>(c.itemID);
+                if (!boundObj || c.count <= 0) continue;
+                std::string itemType = "misc";
+                std::string slotLabel = "Çanta";
+                int damage = 0;
+                float armorVal = 0.0f;
+                bool isShield = false;
+                if (auto* weap = boundObj->As<RE::TESObjectWEAP>()) {
+                    itemType = "weapon";
+                    slotLabel = ItemEvaluator::GetWeaponTypeLabel(weap);
+                    damage = weap->GetAttackDamage();
+                } else if (auto* armo = boundObj->As<RE::TESObjectARMO>()) {
+                    itemType = "apparel";
+                    slotLabel = ItemEvaluator::GetArmorSlotLabel(armo);
+                    armorVal = armo->GetArmorRating();
+                    isShield = (static_cast<uint32_t>(armo->GetSlotMask()) & static_cast<uint32_t>(RE::BIPED_MODEL::BipedObjectSlot::kShield)) != 0;
+                }
+                std::string label = !c.name.empty() ? c.name : std::string(boundObj->GetName() ? boundObj->GetName() : "Item");
+                if (c.hasEnchant) label += " \u2726";    // ✦ büyülü
+                if (c.hasHealth) label += " \u2692";     // ⚒ temperli
+                f["backpack"].push_back({
+                    {"id", c.itemID},
+                    {"key", "c" + std::to_string(ci)},
+                    {"custom", true},
+                    {"name", label},
+                    {"count", c.count},
                     {"type", itemType},
                     {"slot", slotLabel},
                     {"damage", damage},

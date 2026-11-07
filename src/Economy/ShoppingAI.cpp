@@ -1,6 +1,7 @@
 #include "Economy/ShoppingAI.h"
 #include "Economy/EconomyManager.h"
 #include "AI/ItemEvaluator.h"
+#include "AI/TradeManager.h"
 #include "AI/ConsumableAI.h"
 #include "UI/NotificationManager.h"
 #include "UI/EquipPrompt.h"
@@ -113,10 +114,11 @@ namespace FollowerUnbound
                 "sound\\fx\\followerunbound\\coin-payout-2.wav"
             };
             const auto now = std::chrono::steady_clock::now();
-            if (now - lastPlayed < std::chrono::seconds(8)) return;
-
-            std::uniform_int_distribution<int> chance(1, 2);
-            if (chance(rng) != 1) return;
+            // Her alisveris yapan takipcide %100 sansla calar (takipci basina kisa 1 sn cooldown)
+            static std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> lastFollowerPlayed;
+            if (auto fit = lastFollowerPlayed.find(follower->GetFormID()); fit != lastFollowerPlayed.end()) {
+                if (now - fit->second < std::chrono::milliseconds(1000)) return;
+            }
 
             auto* audioManager = RE::BSAudioManager::GetSingleton();
             if (!audioManager) return;
@@ -148,7 +150,7 @@ namespace FollowerUnbound
             handle.SetPosition(player ? player->GetPosition() : follower->GetPosition());
             handle.SetVolume(1.0f);
             if (handle.Play()) {
-                lastPlayed = now;
+                lastPlayed = now; lastFollowerPlayed[follower->GetFormID()] = now;
                 logger::info("Shopping sound variant {} played for {}.", soundIt->second + 1, follower->GetName());
             } else {
                 logger::warn("Shopping sound variant {} could not be played for {}.", soundIt->second + 1, follower->GetName());
@@ -349,6 +351,8 @@ namespace FollowerUnbound
                 auto* candidate = actorPtr ? actorPtr.get() : nullptr;
                 if (!candidate || candidate->IsDead() || candidate == follower || candidate->IsPlayerRef()) continue;
                 if (shoppingInterior && candidate->GetParentCell() != shoppingInterior) continue;
+                // TradeManager: the follower walked to one particular merchant and trades with that one only
+                if (const auto onlyVendor = TradeVendorFilter::Get(); onlyVendor != 0 && candidate->GetFormID() != onlyVendor) continue;
                 const float distance = follower->GetPosition().GetDistance(candidate->GetPosition());
                 if (distance > maxDistance) continue;
                 if (std::any_of(vendors.begin(), vendors.end(), [candidate](const CandidateVendor& existing) {
@@ -843,6 +847,8 @@ namespace FollowerUnbound
     void ShoppingAI::ProcessShopping(RE::Actor* follower, FollowerProfile& profile)
     {
         if (!follower || follower->IsDead() || follower->IsInCombat()) return;
+        // Followers walk to merchants now: no more trading from a distance (TradeManager sets the filter when it is time).
+        if (TradeVendorFilter::Get() == 0 && TradeManager::GetSingleton()->WalkModeOn()) return;
 
         auto player = RE::PlayerCharacter::GetSingleton();
         if (player && player->IsInCombat()) return;
@@ -1350,6 +1356,8 @@ namespace FollowerUnbound
     void ShoppingAI::ProcessSelling(RE::Actor* follower, FollowerProfile& profile)
     {
         if (!follower || follower->IsDead() || follower->IsInCombat()) return;
+        // Followers walk to merchants now: no more trading from a distance (TradeManager sets the filter when it is time).
+        if (TradeVendorFilter::Get() == 0 && TradeManager::GetSingleton()->WalkModeOn()) return;
 
         auto settings = Settings::GetSingleton();
         RestoreProtectedArmor(follower, profile);
@@ -1401,7 +1409,7 @@ namespace FollowerUnbound
 
         // Envanterdeki satılabilir fazlalıkları tara
         auto inventory = follower->GetInventory();
-        if (inventory.empty()) return;
+        if (inventory.empty() && profile.backpackItems.empty()) return;   // çantadaki eşyalar da satılabilir
 
         // Takipçinin şu an elinde/üzerinde kuşanmış olduğu eşyaları tespit et
         std::unordered_set<RE::TESBoundObject*> equippedObjects;
@@ -1665,9 +1673,11 @@ namespace FollowerUnbound
                 // Büyü kitabı kontrolü (Spell Tome):
                 // Eğer kitap bir büyü öğretiyorsa ve takipçi bu büyüyü HENÜZ BİLMİYORSA asla satamaz!
                 // Sadece büyüyü zaten öğrenmişse/biliyorsa satışa izin verilir.
-                if (auto* spell = book->data.teaches.spell) {
-                    if (!follower->HasSpell(spell)) {
-                        continue; // Henüz öğrenmediği büyü kitabını asla satamaz, koru!
+                if (book->data.flags.all(RE::OBJ_BOOK::Flag::kTeachesSpell)) {
+                    if (auto* spell = book->data.teaches.spell) {
+                        if (spell->GetFormType() == RE::FormType::Spell && !follower->HasSpell(spell)) {
+                            continue; // Henüz öğrenmediği büyü kitabını asla satamaz, koru!
+                        }
                     }
                 }
                 if (book->IsNoteScroll()) {
@@ -1761,6 +1771,7 @@ namespace FollowerUnbound
                 }
                 notifier->ShowHUDMessage(msg);
             }
+            MaybePlayShoppingSound(follower);
             logger::info("Selling: {} sold {}x {} to {} for {} gold.",
                 follower->GetName(), sellCount, boundObj->GetName(), chosenVendor->actor->GetName(), earnedGold);
 
@@ -1837,6 +1848,80 @@ namespace FollowerUnbound
                 if (!overEncumbered || salesThisCall >= kMaxSalesPerCall) break;
             }
             for (auto id : toErase) profile.backpackItems.erase(id);
+        }
+
+        // Özel (büyülü/temperli/şarjlı/adlı) çanta eşyaları: taban değer üzerinden, aynı kurallarla satılır.
+        if (salesThisCall < kMaxSalesPerCall && !profile.backpackCustom.empty()) {
+            for (size_t ci = 0; ci < profile.backpackCustom.size();) {
+                const auto custom = profile.backpackCustom[ci];
+                auto* boundObj = RE::TESForm::LookupByID<RE::TESBoundObject>(custom.itemID);
+                if (!boundObj || custom.count <= 0) {
+                    profile.backpackCustom.erase(profile.backpackCustom.begin() + ci);
+                    continue;
+                }
+                if (profile.IsProtected(custom.itemID)) { ++ci; continue; }
+                const int32_t baseVal = boundObj->GetGoldValue();
+                if (baseVal <= 0) { ++ci; continue; }
+
+                const auto& pref = profile.preferences;
+                bool isWeapon = settings->sellWeapons && pref.allowSellWeapons && (boundObj->As<RE::TESObjectWEAP>() != nullptr);
+                bool isArmor = false, isClothing = false, isJewelry = false;
+                if (auto* armo = boundObj->As<RE::TESObjectARMO>()) {
+                    using Slot = RE::BIPED_MODEL::BipedObjectSlot;
+                    auto mask = static_cast<uint32_t>(armo->GetSlotMask());
+                    if (mask & (static_cast<uint32_t>(Slot::kAmulet) | static_cast<uint32_t>(Slot::kRing))) {
+                        if (pref.allowSellJewelry) isJewelry = true;
+                    } else if (armo->GetArmorType() == RE::BGSBipedObjectForm::ArmorType::kClothing) {
+                        if (pref.allowSellClothing) isClothing = true;
+                    } else {
+                        if (settings->sellArmor && pref.allowSellArmor) isArmor = true;
+                    }
+                }
+                if (!isWeapon && !isArmor && !isClothing && !isJewelry) { ++ci; continue; }
+
+                const CandidateVendor* chosenVendor = nullptr;
+                uint32_t requiredMask = (isWeapon || isArmor) ? (kVendSmith | kVendGeneral) : (kVendSmith | kVendApothecary | kVendInn | kVendGeneral | kVendWizard);
+                for (const auto& cand : nearbyVendors) {
+                    if (requiredMask & (cand.vendorMask & ~kVendHealer)) {
+                        chosenVendor = &cand;
+                        break;
+                    }
+                }
+                if (!chosenVendor || !chosenVendor->actor) { ++ci; continue; }
+
+                const uint32_t unitPrice = CalculateGameSellPrice(priceActor, baseVal);
+                const uint32_t earnedGold = unitPrice * static_cast<uint32_t>(custom.count);
+                profile.backpackCustom.erase(profile.backpackCustom.begin() + ci);
+
+                follower->AddObjectToContainer(goldItem, nullptr, static_cast<int32_t>(earnedGold), nullptr);
+                econ->AddGold(formID, static_cast<int32_t>(earnedGold));
+                _lastSellTime[formID] = now;
+                salesThisCall++;
+
+                if (settings->notifySelling) {
+                    notifier->ShowHUDMessage(std::format("{} sold {}x {} (from backpack) to {}. (+{} Gold)",
+                        follower->GetName(), custom.count, boundObj->GetName(), chosenVendor->actor->GetName(), earnedGold));
+                }
+                logger::info("Selling: {} sold custom {}x {} from backpack to {} for {} gold.",
+                    follower->GetName(), custom.count, boundObj->GetName(), chosenVendor->actor->GetName(), earnedGold);
+                if (!overEncumbered || salesThisCall >= kMaxSalesPerCall) break;
+            }
+        }
+    }
+
+    namespace TradeVendorFilter
+    {
+        std::vector<RE::Actor*> Nearby(RE::Actor* follower, float maxDistance)
+        {
+            std::vector<RE::Actor*> out;
+            // FindNearbyVendors is the same scan ShoppingAI trades with; a filter set by an outer call must not narrow it
+            const auto saved = Get();
+            Set(0);
+            for (const auto& vendor : FindNearbyVendors(follower, RE::ProcessLists::GetSingleton(), maxDistance)) {
+                if (vendor.actor) out.push_back(vendor.actor);
+            }
+            Set(saved);
+            return out;
         }
     }
 }

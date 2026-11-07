@@ -16,7 +16,8 @@ namespace FollowerUnbound
             RE::TESBoundObject* oldObj,
             std::string_view reason,
             std::string_view currentStats,
-            std::string_view candidateStats);
+            std::string_view candidateStats,
+            bool replacesAssigned = false);   // true: oyuncunun SEÇTİĞİ (korunan) eşyanın yükseltme önerisi
         static bool ShowPurchasePrompt(
             RE::Actor* follower,
             RE::TESObjectREFR* stockContainer,
@@ -27,6 +28,8 @@ namespace FollowerUnbound
             std::string_view currentStats,
             std::string_view candidateStats);
         static bool IsPurchasePending(RE::FormID followerID, RE::FormID itemID);
+        // Bu eşya için (satın alma dahil) bekleyen/aktif herhangi bir ekipman teklifi var mı?
+        static bool IsOfferPending(RE::FormID followerID, RE::FormID itemID);
         static uint32_t GetReservedGold(RE::FormID followerID);
 
         static void StartAfterLootDistribution();

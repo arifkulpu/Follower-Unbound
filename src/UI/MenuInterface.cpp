@@ -1558,7 +1558,11 @@ namespace FollowerUnbound
         //    + savaş bitmiş ölüleri otomatik yağlama kuyruğunu işle
         if (std::chrono::duration<float>(now - lastConsumptionTime).count() >= 1.0f) {
             lastConsumptionTime = now;
-            FollowerManager::GetSingleton()->TriggerFollowerConsumption();
+            if (auto* tasks = SKSE::GetTaskInterface()) {
+                tasks->AddUITask([]() {
+                    FollowerManager::GetSingleton()->TriggerFollowerConsumption();
+                });
+            }
             LootManager::GetSingleton()->ScheduleProcessing();
             DroppedItemRecovery::GetSingleton()->ScheduleProcessing();
 

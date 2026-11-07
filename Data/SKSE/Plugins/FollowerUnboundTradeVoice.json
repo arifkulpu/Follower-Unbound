@@ -1,0 +1,24 @@
+{
+  "gapSeconds": 2.6,
+  "tailSeconds": 2.4,
+
+  "followerGreet": [
+    { "plugin": "Skyrim.esm", "id": "0x0284F6", "edid": "DialogueFollowerHellos" },
+    { "plugin": "Skyrim.esm", "id": "0x0142B5", "edid": "DialogueGenericHello" }
+  ],
+  "merchantGreet": [
+    { "plugin": "Skyrim.esm", "id": "0x0142B5", "edid": "DialogueGenericHello" },
+    { "plugin": "Skyrim.esm", "id": "0x072BC2", "edid": "DialogueCaravansHellos" }
+  ],
+  "merchantPays": [
+    { "plugin": "Skyrim.esm", "id": "0x0140FE", "edid": "DialogueGenericGoodbye" },
+    { "plugin": "Skyrim.esm", "id": "0x0D83E0", "edid": "CaravanGoodbyes" }
+  ],
+  "merchantSells": [
+    { "plugin": "Skyrim.esm", "id": "0x0140FE", "edid": "DialogueGenericGoodbye" },
+    { "plugin": "Skyrim.esm", "id": "0x0D83E0", "edid": "CaravanGoodbyes" }
+  ],
+  "followerThanks": [
+    { "plugin": "Skyrim.esm", "id": "0x0140FE", "edid": "DialogueGenericGoodbye" }
+  ]
+}

@@ -241,6 +241,22 @@ namespace FollowerUnbound
         uint32_t secondaryTwoHandType{ 0 };
     };
 
+    // Hayali çantada ekstra verisi (büyü, temperleme, şarj, özel ad) olan eşya örnekleri.
+    // Ekstra veri kaybolmasın diye taban FormID + adet yerine ayrı kayıt olarak saklanır.
+    struct BackpackCustomItem
+    {
+        RE::FormID itemID{ 0 };
+        int32_t count{ 1 };
+        bool hasEnchant{ false };
+        RE::FormID enchantID{ 0 };
+        uint16_t enchantCharge{ 0 };
+        bool hasHealth{ false };   // temperleme (ExtraHealth)
+        float health{ 1.0f };
+        bool hasCharge{ false };   // büyü şarjı (ExtraCharge)
+        float charge{ 0.0f };
+        std::string name;          // özel ad (ExtraTextDisplayData), boşsa yok
+    };
+
     class FollowerProfile
     {
     public:
@@ -277,6 +293,14 @@ namespace FollowerUnbound
         // Hidden backpack storage: excess/unequipped looted items or player-stashed items.
         // Stored outside the actor inventory so vanilla outfit AI cannot auto-equip them.
         std::unordered_map<RE::FormID, int32_t> backpackItems;
+        std::vector<BackpackCustomItem> backpackCustom;
+
+        int32_t GetBackpackCustomCount(RE::FormID id) const
+        {
+            int32_t n = 0;
+            for (const auto& c : backpackCustom) if (c.itemID == id) n += c.count;
+            return n;
+        }
 
         void AddToBackpack(RE::FormID id, int32_t count = 1)
         {

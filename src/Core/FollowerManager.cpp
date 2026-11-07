@@ -5,8 +5,10 @@
 #include "AI/AnimationManager.h"
 #include "AI/ConsumableAI.h"
 #include "AI/ItemEvaluator.h"
+#include "AI/TradeManager.h"
 #include "Economy/ShoppingAI.h"
 #include "UI/NotificationManager.h"
+#include "UI/EquipPrompt.h"
 
 namespace FollowerUnbound
 {
@@ -201,6 +203,7 @@ namespace FollowerUnbound
             // Daha önce takipçi olmuş: atanmış loadout, tercihler ve tasarruf korunur.
             storedProfile = d->second;
             _dormantProfiles.erase(d);
+            _dormantMeta.erase(formID);
             storedProfile->isAnimal = profile.isAnimal;
             storedProfile->role = profile.role;
             storedProfile->classBoundDisplayName = profile.classBoundDisplayName;
@@ -346,9 +349,16 @@ namespace FollowerUnbound
         if (!equipMgr) return;
 
         auto inv = actor->GetInventory();
+        // Yalnızca ATANMIŞ eşyalar için kullanılır: envanterde yoksa ama hayali çantadaysa geri verilir.
         auto has = [&](RE::TESBoundObject* b) {
+            if (!b) return false;
             auto it = inv.find(b);
-            return b && it != inv.end() && it->second.first > 0;
+            if (it != inv.end() && it->second.first > 0) return true;
+            if (RestoreFromBackpack(actor, profile, b->GetFormID(), -1, 1) > 0) {
+                logger::info("Backpack: {} retrieved assigned item {} from backpack.", actor->GetName(), b->GetName());
+                return true;
+            }
+            return false;
         };
 
         // ── ZIRH: zaten giyiliyse tekrar kuşandırma (takıp-çıkarma döngüsünün ana sebebi buydu) ──
@@ -411,9 +421,12 @@ namespace FollowerUnbound
         auto* actorState = actor->AsActorState();
         const bool isSheathed = actorState && actorState->GetWeaponState() == RE::WEAPON_STATE::kSheathed;
         const bool inCombat = actor->IsInCombat() || allowInCombat;
+        // Kullanıcı eylemi (UI ataması) ve savaş sonu çağrısı kınındaki takipçide de uygulanmalı;
+        // aksi halde barışta yapılan atama hiçbir zaman kuşandırılmazdı.
+        const bool force = ignoreCooldown || allowInCombat;
 
         if (rightObj && has(rightObj) && actor->GetEquippedObject(false) != rightObj) {
-            if (inCombat || !isSheathed || actor->GetEquippedObject(false) == nullptr) {
+            if (force || inCombat || !isSheathed || actor->GetEquippedObject(false) == nullptr) {
                 NoteOwnEquip(actor->GetFormID());
                 equipMgr->EquipObject(actor, rightObj, nullptr, 1, rightTwoHanded ? nullptr : rightSlot,
                     false, false, false, false);
@@ -425,10 +438,291 @@ namespace FollowerUnbound
             const bool isShield = leftObj->As<RE::TESObjectARMO>() != nullptr;
             // Kalkanlar barış anında da taşınabilir; ancak tek el silahlar barış anında kınındayken
             // sürekli EquipObject ile çağrılmamalı (döngüyü önler).
-            if (isShield || inCombat || !isSheathed) {
+            if (isShield || force || inCombat || !isSheathed) {
                 NoteOwnEquip(actor->GetFormID());
                 equipMgr->EquipObject(actor, leftObj, nullptr, 1, isShield ? nullptr : leftSlot,
                     false, false, false, false);
+            }
+        }
+
+        // Atama uygulandıktan sonra, seçilmeyen silah/zırhları hayali çantaya al (yalnızca barışta).
+        if (!allowInCombat && !actor->IsInCombat()) {
+            StashUnassignedGear(actor, profile);
+        }
+    }
+
+    void FollowerManager::NoteBackpackRetrieval(RE::FormID actorID, RE::FormID itemID)
+    {
+        std::lock_guard lk(_equipStateMutex);
+        _backpackGrace[(static_cast<uint64_t>(actorID) << 32) | itemID] = std::chrono::steady_clock::now();
+    }
+
+namespace
+    {
+        // Çantadaki özel kayıttan ekstra veri listesi kurar (motor AddObjectToContainer ile sahiplenir).
+        RE::ExtraDataList* BuildExtraList(const BackpackCustomItem& c)
+        {
+            auto* xl = new RE::ExtraDataList();
+            if (c.hasEnchant) {
+                if (auto* ench = RE::TESForm::LookupByID<RE::EnchantmentItem>(c.enchantID)) {
+                    auto* e = RE::BSExtraData::Create<RE::ExtraEnchantment>();
+                    e->enchantment = ench;
+                    e->charge = c.enchantCharge;
+                    xl->Add(e);
+                }
+            }
+            if (c.hasHealth) {
+                auto* h = RE::BSExtraData::Create<RE::ExtraHealth>();
+                h->health = c.health;
+                xl->Add(h);
+            }
+            if (c.hasCharge) {
+                auto* ch = RE::BSExtraData::Create<RE::ExtraCharge>();
+                ch->charge = c.charge;
+                xl->Add(ch);
+            }
+            if (!c.name.empty()) {
+                auto* t = RE::BSExtraData::Create<RE::ExtraTextDisplayData>();
+                t->SetName(c.name.c_str());
+                xl->Add(t);
+            }
+            return xl;
+        }
+    }
+
+    int32_t FollowerManager::StashItem(RE::Actor* actor, FollowerProfile& profile, RE::TESBoundObject* obj,
+        int32_t wanted, bool allowWorn)
+    {
+        if (!actor || !obj) return 0;
+        auto inv = actor->GetInventory();
+        auto it = inv.find(obj);
+        if (it == inv.end() || it->second.first <= 0 || !it->second.second) return 0;
+
+        const int32_t total = it->second.first;
+        const RE::FormID id = obj->GetFormID();
+        auto* entry = it->second.second.get();
+
+        struct Custom { RE::ExtraDataList* xl; BackpackCustomItem c; };
+        std::vector<Custom> customs;
+        int32_t customTotal = 0;
+        if (entry->extraLists) {
+            for (auto* x : *entry->extraLists) {
+                if (!x) continue;
+                if (!allowWorn && (x->HasType(RE::ExtraDataType::kWorn) || x->HasType(RE::ExtraDataType::kWornLeft))) return 0;
+                // Görev eşyası / zehirli silah: ekstra veri çantada saklanamaz, dokunma.
+                if (x->HasType(RE::ExtraDataType::kAliasInstanceArray) || x->HasType(RE::ExtraDataType::kPoison)) return 0;
+
+                Custom cu;
+                cu.xl = x;
+                cu.c.itemID = id;
+                cu.c.count = std::max<int32_t>(1, static_cast<int32_t>(x->GetCount()));
+                if (x->HasType(RE::ExtraDataType::kEnchantment)) {
+                    if (auto* e = x->GetByType<RE::ExtraEnchantment>(); e && e->enchantment) {
+                        cu.c.hasEnchant = true;
+                        cu.c.enchantID = e->enchantment->GetFormID();
+                        cu.c.enchantCharge = e->charge;
+                    }
+                }
+                if (x->HasType(RE::ExtraDataType::kHealth)) {
+                    if (auto* h = x->GetByType<RE::ExtraHealth>()) { cu.c.hasHealth = true; cu.c.health = h->health; }
+                }
+                if (x->HasType(RE::ExtraDataType::kCharge)) {
+                    if (auto* ch = x->GetByType<RE::ExtraCharge>()) { cu.c.hasCharge = true; cu.c.charge = ch->charge; }
+                }
+                if (x->HasType(RE::ExtraDataType::kTextDisplayData)) {
+                    if (auto* t = x->GetByType<RE::ExtraTextDisplayData>(); t && t->displayName.c_str() && t->displayName.c_str()[0]) {
+                        cu.c.name = t->displayName.c_str();
+                    }
+                }
+                if (!cu.c.hasEnchant && !cu.c.hasHealth && !cu.c.hasCharge && cu.c.name.empty()) continue;   // sade örnek
+                customTotal += cu.c.count;
+                customs.push_back(std::move(cu));
+            }
+        }
+
+        const int32_t plainAvail = std::max<int32_t>(0, total - customTotal);
+        int32_t moved = 0;
+        if (wanted < 0) {
+            for (auto& cu : customs) {
+                actor->RemoveItem(obj, cu.c.count, RE::ITEM_REMOVE_REASON::kRemove, cu.xl, nullptr);
+                profile.backpackCustom.push_back(cu.c);
+                moved += cu.c.count;
+            }
+            if (plainAvail > 0) {
+                actor->RemoveItem(obj, plainAvail, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                profile.AddToBackpack(id, plainAvail);
+                moved += plainAvail;
+            }
+        } else if (plainAvail > 0) {
+            const int32_t n = std::min(wanted, plainAvail);
+            actor->RemoveItem(obj, n, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+            profile.AddToBackpack(id, n);
+            moved = n;
+        } else if (!customs.empty()) {
+            auto& cu = customs.front();
+            const int32_t n = std::min(wanted, cu.c.count);
+            cu.c.count = n;
+            actor->RemoveItem(obj, n, RE::ITEM_REMOVE_REASON::kRemove, cu.xl, nullptr);
+            profile.backpackCustom.push_back(cu.c);
+            moved = n;
+        }
+        return moved;
+    }
+
+    int32_t FollowerManager::RestoreFromBackpack(RE::TESObjectREFR* dest, FollowerProfile& profile,
+        RE::FormID itemID, int32_t customIndex, int32_t count)
+    {
+        auto* obj = RE::TESForm::LookupByID<RE::TESBoundObject>(itemID);
+        if (!dest || !obj || count <= 0) return 0;
+
+        if (customIndex >= 0) {
+            if (customIndex >= static_cast<int32_t>(profile.backpackCustom.size())) return 0;
+            auto& c = profile.backpackCustom[static_cast<size_t>(customIndex)];
+            if (c.itemID != itemID || c.count <= 0) return 0;
+            const int32_t n = std::min(count, c.count);
+            auto* xl = BuildExtraList(c);
+            dest->AddObjectToContainer(obj, xl, n, nullptr);
+            c.count -= n;
+            if (c.count <= 0) profile.backpackCustom.erase(profile.backpackCustom.begin() + customIndex);
+            return n;
+        }
+
+        if (const int32_t have = profile.GetBackpackCount(itemID); have > 0) {
+            const int32_t n = std::min(count, have);
+            profile.RemoveFromBackpack(itemID, n);
+            dest->AddObjectToContainer(obj, nullptr, n, nullptr);
+            return n;
+        }
+        for (size_t i = 0; i < profile.backpackCustom.size(); ++i) {
+            if (profile.backpackCustom[i].itemID == itemID) {
+                return RestoreFromBackpack(dest, profile, itemID, static_cast<int32_t>(i), count);
+            }
+        }
+        return 0;
+    }
+
+    void FollowerManager::ReturnBackpackToPlayer(FollowerProfile& profile)
+    {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) return;
+        uint32_t total = 0;
+        for (const auto& [id, count] : profile.backpackItems) {
+            auto* obj = RE::TESForm::LookupByID<RE::TESBoundObject>(id);
+            if (!obj || count <= 0) continue;
+            player->AddObjectToContainer(obj, nullptr, count, nullptr);
+            total += static_cast<uint32_t>(count);
+        }
+        profile.backpackItems.clear();
+        for (const auto& c : profile.backpackCustom) {
+            auto* obj = RE::TESForm::LookupByID<RE::TESBoundObject>(c.itemID);
+            if (!obj || c.count <= 0) continue;
+            player->AddObjectToContainer(obj, BuildExtraList(c), c.count, nullptr);
+            total += static_cast<uint32_t>(c.count);
+        }
+        profile.backpackCustom.clear();
+        if (total > 0) {
+            NotificationManager::GetSingleton()->ShowHUDMessage(
+                std::format("{}'s backpack ({} items) was returned to you.", profile.name, total));
+            logger::info("Backpack: returned {} items of dormant follower {} to the player.", total, profile.name);
+        }
+    }
+
+    void FollowerManager::ProcessDormantBackpacks()
+    {
+        auto* calendar = RE::Calendar::GetSingleton();
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!calendar || !player || player->IsInCombat()) return;
+        const float nowDays = calendar->GetDaysPassed();
+
+        std::vector<std::shared_ptr<FollowerProfile>> due;
+        {
+            std::shared_lock lock(_mutex);
+            for (const auto& [fid, prof] : _dormantProfiles) {
+                if (!prof || (prof->backpackItems.empty() && prof->backpackCustom.empty())) continue;
+                auto m = _dormantMeta.find(fid);
+                if (m == _dormantMeta.end() || m->second.dead) continue;      // ölenin (diriltilebilir) çantası korunur
+                if (nowDays - m->second.sinceDays < 1.0f) continue;           // 1 oyun günü bekle
+                due.push_back(prof);
+            }
+        }
+        for (auto& prof : due) ReturnBackpackToPlayer(*prof);
+    }
+
+    void FollowerManager::StashUnassignedGear(RE::Actor* actor, FollowerProfile& profile)
+    {
+        if (!actor || actor->IsDead() || profile.isAnimal) return;
+        if (actor->IsInCombat() || !actor->Is3DLoaded() || AnimationManager::IsRidingWithPlayer(actor)) return;
+
+        const bool weaponLoadout = profile.assignedPrimaryRight || profile.assignedPrimaryLeft ||
+                                   profile.assignedSecondaryRight || profile.assignedSecondaryLeft;
+        const bool armorLoadout = profile.assignedHead || profile.assignedBody ||
+                                  profile.assignedHands || profile.assignedFeet;
+        // Oyuncu hiçbir şey seçmediyse takipçinin envanterine dokunma.
+        if (!weaponLoadout && !armorLoadout) return;
+
+        using Slot = RE::BIPED_MODEL::BipedObjectSlot;
+        constexpr uint32_t kMainArmorSlots = static_cast<uint32_t>(Slot::kHead) | static_cast<uint32_t>(Slot::kBody) |
+                                             static_cast<uint32_t>(Slot::kHands) | static_cast<uint32_t>(Slot::kFeet);
+        constexpr uint32_t kShieldSlot = static_cast<uint32_t>(Slot::kShield);
+
+        uint32_t assignedArmorMask = 0;
+        for (auto id : { profile.assignedHead, profile.assignedBody, profile.assignedHands, profile.assignedFeet }) {
+            if (auto* a = RE::TESForm::LookupByID<RE::TESObjectARMO>(id)) {
+                assignedArmorMask |= static_cast<uint32_t>(a->GetSlotMask()) & kMainArmorSlots;
+            }
+        }
+
+        const RE::FormID assignedIDs[] = { profile.assignedPrimaryRight, profile.assignedPrimaryLeft,
+            profile.assignedSecondaryRight, profile.assignedSecondaryLeft,
+            profile.assignedHead, profile.assignedBody, profile.assignedHands, profile.assignedFeet };
+        const bool styleSet = ItemEvaluator::HasWeaponStylePreference(profile.preferences);
+
+        const auto now = std::chrono::steady_clock::now();
+        auto inv = actor->GetInventory();
+        int stashed = 0;
+        for (const auto& [obj, data] : inv) {
+            if (stashed >= 8) break;     // takılma olmasın: tur başına en fazla 8 kalem
+            if (!obj || data.first <= 0 || !data.second) continue;
+            const RE::FormID id = obj->GetFormID();
+            if (IsTngHiddenBodyItem(obj)) continue;
+            bool isAssigned = false;
+            for (auto a : assignedIDs) if (a && a == id) { isAssigned = true; break; }
+            if (isAssigned) continue;
+
+            bool shouldStash = false;
+            if (auto* weapon = obj->As<RE::TESObjectWEAP>()) {
+                // Seçilen silah stiline uyan silahlar (örn. yardımcı stil: Yay) AI'ya açık kalır.
+                shouldStash = weaponLoadout &&
+                    !(styleSet && ItemEvaluator::MatchesWeaponPreferences(weapon, profile.preferences));
+            } else if (auto* armor = obj->As<RE::TESObjectARMO>()) {
+                const auto mask = static_cast<uint32_t>(armor->GetSlotMask());
+                if (mask & kShieldSlot) {
+                    shouldStash = weaponLoadout;
+                } else if (armorLoadout && (mask & kMainArmorSlots & assignedArmorMask)) {
+                    shouldStash = true;
+                }
+            }
+            if (!shouldStash) continue;
+
+            // Bekleyen yükseltme teklifi: oyuncu karar verene kadar eşya envanterde kalsın.
+            if (EquipPrompt::IsOfferPending(actor->GetFormID(), id)) continue;
+
+            // Oyuncu çantadan yeni aldıysa (atamak için) 2 dakika yeniden çantaya konmaz.
+            {
+                std::lock_guard lk(_equipStateMutex);
+                auto it = _backpackGrace.find((static_cast<uint64_t>(actor->GetFormID()) << 32) | id);
+                if (it != _backpackGrace.end()) {
+                    if (now - it->second < std::chrono::seconds(120)) continue;
+                    _backpackGrace.erase(it);
+                }
+            }
+
+            // Kuşanılı / zehirli / görev eşyaları StashItem içinde atlanır; büyülü-temperli-adlı eşyalar
+            // ekstra verileriyle birlikte çantaya alınır.
+            const int32_t moved = StashItem(actor, profile, obj, -1, false);
+            if (moved > 0) {
+                ++stashed;
+                logger::info("Backpack: {} stashed unassigned {} x{}.", actor->GetName(), obj->GetName(), moved);
             }
         }
     }
@@ -497,6 +791,7 @@ namespace FollowerUnbound
         {
             std::unique_lock lock(_mutex);
             _dormantProfiles.erase(targetFormID);
+            _dormantMeta.erase(targetFormID);
             auto it = _profiles.find(targetFormID);
             if (it != _profiles.end() && it->second) {
                 if (profile.classBoundDisplayName.empty()) profile.classBoundDisplayName = it->second->classBoundDisplayName;
@@ -562,11 +857,21 @@ namespace FollowerUnbound
 
     void FollowerManager::UnregisterFollower(RE::FormID formID)
     {
+        bool dead = false;
+        if (auto* a = RE::TESForm::LookupByID<RE::Actor>(formID)) dead = a->IsDead();
+        float days = 0.0f;
+        if (auto* cal = RE::Calendar::GetSingleton()) days = cal->GetDaysPassed();
+
         std::unique_lock lock(_mutex);
         if (auto it = _profiles.find(formID); it != _profiles.end()) {
             logger::info("Unregistered follower: {} [FormID: {:08X}] (profile kept dormant)", it->second->name, formID);
             // Profili silme: oyuncu takipçiyi tekrar alırsa ayarlar (loadout, tercih, tasarruf) kaybolmasın.
-            if (it->second && !it->second->isAnimal) _dormantProfiles[formID] = it->second;
+            // Ölen takipçinin (LifeAgain diriltmesi) çantası korunur; bırakılan takipçinin çantası 1 oyun günü
+            // sonra oyuncuya geri verilir (ProcessDormantBackpacks).
+            if (it->second && !it->second->isAnimal) {
+                _dormantProfiles[formID] = it->second;
+                _dormantMeta[formID] = DormantMeta{ days, dead };
+            }
             _profiles.erase(it);
         }
     }
@@ -722,6 +1027,7 @@ namespace FollowerUnbound
         for (auto fid : toRemove) {
             UnregisterFollower(fid);
         }
+        ProcessDormantBackpacks();
 
         // Refresh roles for all remaining tracked followers
         RefreshFollowerRoles();
@@ -766,6 +1072,8 @@ namespace FollowerUnbound
         if (!calendar) return;
         _lastGameTimeDays = calendar->GetDaysPassed();
         logger::info("InitGameTime: zaman başlatıldı ({:.4f} oyun günü)", _lastGameTimeDays);
+        // Oyun yüklendi: kayıtta açık kalmış bir ticaret sahnesi/quest'i varsa kapat
+        TradeManager::GetSingleton()->AbortAll("load");
     }
 
     void FollowerManager::UpdateGameTimeNeeds()
@@ -852,8 +1160,11 @@ namespace FollowerUnbound
             // Hayvanlar alışveriş yapmaz veya eşya satmaz
             if (!profile->isAnimal) {
                 CheckAutonomousCrafting(actor, *profile);
-                shoppingAI->ProcessSelling(actor, *profile);
-                shoppingAI->ProcessShopping(actor, *profile);
+                // Satıcıya yürüme açıksa TradeManager yönetir; kapalıysa (veya eklenti yoksa) eski anlık yol
+                if (!TradeManager::GetSingleton()->HandleTradeTick(actor, *profile)) {
+                    shoppingAI->ProcessSelling(actor, *profile);
+                    shoppingAI->ProcessShopping(actor, *profile);
+                }
             }
         }
     }
@@ -922,10 +1233,14 @@ namespace FollowerUnbound
                     CheckSpellTomeLearning(actor, *profile);
                     // 2. Kendi malzemelerini kullanarak üretim yap
                     CheckAutonomousCrafting(actor, *profile);
-                    // 3. Fazla eşyaları ve zaten bildiği kopya büyü kitaplarını sat
-                    shoppingAI->ProcessSelling(actor, *profile);
-                    // 4. İhtiyaçlarını satın al
-                    shoppingAI->ProcessShopping(actor, *profile);
+                    // 3-4. Satış ve alışveriş: satıcıya yürüme açıksa TradeManager yönetir (varışta ShoppingAI çağrılır);
+                    //      kapalıysa (veya eklenti yoksa) eski anlık yol
+                    if (!TradeManager::GetSingleton()->HandleTradeTick(actor, *profile)) {
+                        // 3. Fazla eşyaları ve zaten bildiği kopya büyü kitaplarını sat
+                        shoppingAI->ProcessSelling(actor, *profile);
+                        // 4. İhtiyaçlarını satın al
+                        shoppingAI->ProcessShopping(actor, *profile);
+                    }
                 }
             }
         }
@@ -1202,11 +1517,10 @@ namespace FollowerUnbound
         for (const auto& [item, invData] : actor->GetInventory()) {
             if (!item || invData.first <= 0) continue;
             auto* book = item->As<RE::TESObjectBOOK>();
-            if (!book) continue;
+            if (!book || !book->data.flags.all(RE::OBJ_BOOK::Flag::kTeachesSpell)) continue;
 
-            // Büyü kitabı mı (Spell Tome)? Büyü öğretmeli
             auto* spell = book->data.teaches.spell;
-            if (!spell) continue;
+            if (!spell || spell->GetFormType() != RE::FormType::Spell) continue;
 
             // Takipçi bu büyüyü zaten biliyor mu?
             if (actor->HasSpell(spell)) continue;
@@ -1252,5 +1566,6 @@ namespace FollowerUnbound
         std::unique_lock lock(_mutex);
         _profiles.clear();
         _dormantProfiles.clear();
+        _dormantMeta.clear();
     }
 }

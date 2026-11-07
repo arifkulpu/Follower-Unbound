@@ -42,12 +42,16 @@ namespace FollowerUnbound
             }
         }
 
-        // Savas sirasinda actor stagger/hasar anindayken IdleForceDefaultState cagirmak Havok grafigini kilitler!
+        // Savas sirasinda veya silah kınında değilken graph reset (IdleForceDefaultState) cagirmak
+        // grafiği silah geçişinin ortasında sıfırlar ve durum makinesini bozar!
         if (actor->IsInCombat()) {
             return false;
         }
+        if (auto* state = actor->AsActorState(); !state || state->GetWeaponState() != RE::WEAPON_STATE::kSheathed) {
+            return false;
+        }
 
-        // Savas disinda graph reset + tek tekrar
+        // Savas disinda ve yalnizca silah tam kınındayken graph reset + tek tekrar
         if (AnimationManager::SendAnimEvent(actor, "IdleForceDefaultState")) {
             for (const char* eventName : events) {
                 if (AnimationManager::SendAnimEvent(actor, eventName)) {
@@ -67,9 +71,11 @@ namespace FollowerUnbound
     {
         if (!actor || actor->IsDead() || actor->IsInCombat() || IsRidingWithPlayer(actor)) return;
 
-        // Eğer takipçinin elinde silah çekiliyse, önce kınına almasını sağla
-        if (auto* state = actor->AsActorState(); state && state->IsWeaponDrawn()) {
-            SheatheWeapon(actor);
+        if (auto* state = actor->AsActorState()) {
+            if (state->GetWeaponState() != RE::WEAPON_STATE::kSheathed) {
+                SheatheWeapon(actor);
+                return;
+            }
         }
 
         // "IdleEat" — Eating Animations and Sounds SE (mod 42602) ve EAS-SunHelm
@@ -82,9 +88,11 @@ namespace FollowerUnbound
     {
         if (!actor || actor->IsDead() || actor->IsInCombat() || IsRidingWithPlayer(actor)) return;
 
-        // Eğer takipçinin elinde silah çekiliyse, önce kınına almasını sağla
-        if (auto* state = actor->AsActorState(); state && state->IsWeaponDrawn()) {
-            SheatheWeapon(actor);
+        if (auto* state = actor->AsActorState()) {
+            if (state->GetWeaponState() != RE::WEAPON_STATE::kSheathed) {
+                SheatheWeapon(actor);
+                return;
+            }
         }
 
         // SunHelm içecek kontrolü (Matara / Şişe)
@@ -237,50 +245,32 @@ namespace FollowerUnbound
         // Savaştaki veya 3D yüklü olmayan aktörlerde kın alma güvenli değil.
         if (!actor || actor->IsDead() || actor->IsInCombat() || !actor->Is3DLoaded() || IsRidingWithPlayer(actor)) return;
 
+        auto* actorState = actor->AsActorState();
+        if (!actorState) return;
+
+        const auto ws = actorState->GetWeaponState();
+        // Zaten kınında veya kınına girme aşamasındaysa dokunma (durum makinesini bozmayı önler)
+        if (ws == RE::WEAPON_STATE::kSheathed || ws == RE::WEAPON_STATE::kSheathing ||
+            ws == RE::WEAPON_STATE::kWantToSheathe) return;
+
         RE::FormID actorID = actor->GetFormID();
         auto now = std::chrono::steady_clock::now();
-        auto* actorState = actor->AsActorState();
-        const bool alreadySheathed = actorState &&
-            actorState->GetWeaponState() == RE::WEAPON_STATE::kSheathed;
 
-        // Hide spell hands immediately; the physical weapon is sheathed through
-        // the weapon-state machine and behavior-graph event below.
-        actor->DrawWeaponMagicHands(false);
-        if (alreadySheathed) return;
-
-        // A recent request must not suppress this state repair. The old early
-        // return could leave a newly equipped weapon visible when EquipObject
-        // happened within the two-second cooldown.
-        if (actorState) {
-            actorState->actorState2.weaponState = RE::WEAPON_STATE::kWantToSheathe;
-        }
-
-        bool sendGraphEvent = true;
         {
             std::lock_guard<std::mutex> lock(_sheatheMutex);
             if (auto it = _lastSheatheTime.find(actorID); it != _lastSheatheTime.end()) {
-                sendGraphEvent = std::chrono::duration<float>(now - it->second).count() >= 0.5f;
-            }
-            if (sendGraphEvent) _lastSheatheTime[actorID] = now;
-        }
-
-        bool graphAccepted = false;
-        const char* acceptedEvent = "none";
-        if (sendGraphEvent) {
-            // These are alternatives. Sending all three in one frame can cause
-            // competing state transitions in custom behavior graphs.
-            for (const char* eventName : { "weaponSheathe", "BeginWeaponSheathe", "WeaponSheathe" }) {
-                if (actor->NotifyAnimationGraph(eventName)) {
-                    graphAccepted = true;
-                    acceptedEvent = eventName;
-                    break;
+                if (std::chrono::duration<float>(now - it->second).count() < 1.0f) {
+                    return;
                 }
             }
+            _lastSheatheTime[actorID] = now;
         }
 
-        const auto finalState = actorState ? actorState->GetWeaponState() : RE::WEAPON_STATE::kSheathed;
-        logger::info("SheatheWeapon: {} state={} graphEvent={} accepted={}", actor->GetName(),
-            static_cast<int>(finalState), acceptedEvent, graphAccepted);
+        // Motorun kendi doğal kına koyma çağrısı (DrawWeaponMagicHands(false))
+        actor->DrawWeaponMagicHands(false);
+
+        logger::info("SheatheWeapon: {} DrawWeaponMagicHands(false) called (initial state={})",
+            actor->GetName(), static_cast<int>(ws));
     }
 
     void AnimationManager::PlayPoisonWeaponAnimation(RE::Actor* follower, bool isRanged)

@@ -1,0 +1,139 @@
+# Follower Unbound - Güncelleme Günlüğü v0.3.0 / Changelog v0.3.0
+Tarih / Date: 07.11.2026
+
+================================================================================
+TÜRKÇE (TURKISH)
+================================================================================
+
+## Genel Bakış
+Follower Unbound v0.3.0 güncellemesi; takipçi yapay zekasını, dünyayla olan fiziksel etkileşimini ve envanter yönetimini köklü bir şekilde dönüştüren büyük bir dönüm noktası sürümüdür.
+Bu sürümle birlikte; takipçilerin tüccarlarla uzaktan sihirli bir şekilde alışveriş yapması yerine bizzat dükkânlara ve tezgâhlara yürüdüğü **Satıcıya Yürüme ve Etkileşim Sahnesi Sistemi (TradeManager & TradeVoice)**, savaş sonrası ganimet toplarken cesetlerin yanına fiziksel olarak koşup yelpaze şeklinde çevrelediği **Cesetlere Yürüme ve Arama Sistemi (CorpseWalk)**, Skyrim motorunun zırh ve kıyafet saçmalamalarını tamamen ortadan kaldıran sanal **Gizli Sırt Çantası Mimarisi (Hidden Backpack)**, çift el kılıç kınına koyma/çekme döngüsü çözümü ve PrismaUI üzerinden doğrudan sağ/sol el atama iptali (toggle) yetenekleri oyuna kazandırılmıştır.
+
+---
+
+## 🌟 Yeni Özellikler & Büyük Geliştirmeler
+
+### 1. Satıcıya Yürüme ve Etkileşim Sahnesi Sistemi (Follower Walk to Merchant & Trade Voice)
+- **Fiziksel Yürüme ve Alışveriş Sahnesi (10 Eşzamanlı Slot):** 
+  - Takipçiler artık dükkan veya pazar yerlerinde uzaktan anında ticaret yapmak yerine en yakındaki uygun tüccara bizzat yürür, tezgâhın veya tüccarın karşısına geçer, yüz yüze döner ve alışveriş sahnesi içinde durur.
+  - Eşzamanlı 10 slot desteği sayesinde gruptaki 10 takipçi aynı anda farklı tüccarlara yürüyüp paralel olarak ticaret yapabilir.
+- **Skyrim Orijinal Seslendirme Entegrasyonu (Vanilla Voice Lines):**
+  - Takipçi ve tüccar buluştuğunda Skyrim'in orijinal seslendirme hatlarını (`Actor.Say`) kullanarak karşılıklı selamlama, konuşma ve teşekkür replikleri söyler (`DialogueGenericHello/Goodbye`, `DialogueFollowerHellos`, `DialogueCaravansHellos` vb.).
+  - Harici ses dosyası kopyalamaya gerek duymadan oyunun tüm vanilya ses tipleriyle (%100 uyumlu) doğal diyalog kurulur.
+- **Hafif ESL Eklentisi (`FollowerUnboundTrade.esp`):**
+  - Görevler, sahneler, paketler ve hedef `XMarker` referanslarını yöneten ESL flagli ultra hafif eklenti.
+- **Kusursuz Geri Dönüş (Fallback):**
+  - Ayarlardan kapatıldığında veya eklenti yüklenmediğinde hiçbir kilitlenme veya bekleme olmadan eski hızlı/uzaktan ticaret sistemine otomatik geri döner.
+- **PrismaUI Sistem Ayarları:**
+  - PrismaUI Systems sekmesine **"SATICILARA YÜRÜME / WALK TO MERCHANTS"** ayar paneli eklendi; fark etme mesafesi, yakında kalma süresi, sahnede durma süresi, oyun saati bazında bekleme süreleri ve seslendirme doğrudan arayüzden açılıp kapatılabilir.
+
+---
+
+### 2. Cesetlere Yürüme ve Arama Sistemi (CorpseWalk Engine)
+- **Cesedin Yanına Fiziksel Olarak Gitme (`KeepOffsetFromActor`):**
+  - Takipçiler artık savaş bittikten veya bir ceset kapandıktan sonra (varsayılan 10 saniye beklemenin ardından) uzaktan eşyaları çekmek yerine doğrudan ölü düşmanın yanına fiziksel olarak koşar.
+- **Akıllı Çevreleme Formasyonu (Intelligent Fanning Out):**
+  - Birden fazla takipçi aynı cesede yöneldiğinde iç içe geçmek veya birbirini itmek yerine cesedin etrafına yelpaze gibi açılarak (-40°, 0°, +40°) yaklaşır ve cesedin yönüne döner.
+- **Doğal Arama ve Diz Çökme:**
+  - Takipçi cesedin yanına ulaştığında arama/diz çökme animasyonu eşliğinde eşyaları yağmalar.
+- **Güvenli Zaman Aşımı ve Fallback:**
+  - Yol kapalıysa veya takipçi 8 saniye içinde cesede varamazsa, takılıp kalmayı önlemek için otomatik zaman aşımı devreye girer ve eşyaları uzaktan aktarır. Sandıklar ve kutular ise eskisi gibi menzilden güvenle toplanır.
+- **PrismaUI Sistem Ayarları:**
+  - Systems sekmesine **"CESETLERE YÜRÜME / WALK TO CORPSES"** kartı eklendi; özellik açma/kapama ve yürüme öncesi bekleme gecikmesi (2-30 sn) ayarlanabilir.
+
+---
+
+### 3. Gizli Sırt Çantası Sistemi (Hidden Backpack - Skyrim Motoru Hatalarını Önleme)
+- **Sanal Sırt Çantası Mimarisi:**
+  - Takipçiler için Skyrim oyun motorundan tamamen yalıtılmış sanal bir SKSE sırt çantası depolama sistemi geliştirildi.
+- **Skyrim Outfit AI Çakışması Engellendi:**
+  - Vanilla Skyrim oyun motoru sadece aktörün doğrudan envanterindeki eşyaları görebildiği için, sırt çantasındaki zırh ve silahları asla kafasına göre otomatik giyemez (böylece büyücülerin kask takması veya ağır zırhlı takipçinin deri çizme giymesi gibi motor hataları tamamen çözüldü).
+- **Akıllı Yağma Yönlendirmesi:**
+  - Dünyadan veya cesetlerden toplanan fazla silah ve zırhlar otomatik olarak aktif envanter yerine bu gizli sırt çantasına aktarılır.
+- **Doğrudan Çantadan Tüccara Satış:**
+  - Takipçiler dükkânlara girdiklerinde sırt çantasındaki gereksiz silah ve zırhları tüccarlara satabilir.
+- **Prisma UI Yönetimi:**
+  - Prisma UI üzerinde **"🎒 Sırt Çantası"** sekmesi eklendi; tek tıkla çantadaki eşyaları aktif envantere alma veya envanterdekileri çantaya aktarma imkanı sağlandı.
+
+---
+
+### 4. Silah ve Çift El Kuşanma Düzeltmeleri (Dual-Wield & Hand Toggles)
+- **Çift El Kılıç Kınına Koyma/Çekme Döngüsü Giderildi (Dual-Wield Loop Fix):**
+  - Takipçiye iki tek elli silah verildiğinde, barış anında silahları sürekli çekip geri kınına sokma ve animasyon kilitlenmesi döngüsü ortadan kaldırıldı; silah motor durum makineleri ve animasyon grafları senkronize edildi.
+- **Doğrudan Ele Kuşanma ve Atama İptali (Toggle):**
+  - Prisma UI silah listesinde zaten kuşanılmış olan bir ele tekrar tıklandığında (`[Asli Sağ]`, `[Asli Sol]` vb.) silah elden çıkartılır ve atama anında temizlenir. Takılı kalma sorunu giderildi.
+
+---
+
+### 5. Geriye Dönük Kayıt Uyumluluğu
+- Co-save serileştirme sürümü v24'e güncellendi.
+- Eski kayıt dosyalarındaki veriler ve kullanıcı ayarları kaybolmadan geriye dönük tam uyumluluk sağlandı.
+
+---
+
+================================================================================
+ENGLISH
+================================================================================
+
+## Overview
+Follower Unbound v0.3.0 is a major milestone release transforming follower AI, environmental immersion, and inventory architecture.
+Highlights include the new **Follower Walk to Merchant & Trade Voice System** with 10 concurrent slots and vanilla-voiced interaction scenes, the **CorpseWalk Engine** enabling followers to physically approach and neatly fan out around fallen enemies during looting, the **Hidden Backpack Architecture** which eliminates Skyrim's native outfit bugs, dual-wield weapon draw/sheathe loop fixes, and toggleable hand equipment assignment in PrismaUI.
+
+---
+
+## 🌟 Key Features & Improvements
+
+### 1. Follower Walk to Merchant & Trade Voice System
+- **Physical Walk to Vendor & Interactive Trade Scene (10 Concurrent Slots):**
+  - Instead of instant remote transactions across cells, followers physically walk up to nearby vendors, stand face-to-face in front of the counter, and conduct trade within an interactive scene.
+  - Expanded to 10 independent slots allowing up to 10 companions to visit different merchants simultaneously.
+- **Native Voiced Dialogue Integration (`Actor.Say`):**
+  - Followers and merchants greet, banter, and thank each other using context-appropriate vanilla voiced lines (`DialogueGenericHello/Goodbye`, `DialogueFollowerHellos`, `DialogueCaravansHellos`, etc.).
+  - 100% compatible with all vanilla voice types without packaging custom voice files.
+- **Lightweight ESL Plugin (`FollowerUnboundTrade.esp`):**
+  - ESL-flagged plugin providing quests, scenes, packages, and persistent dynamic `XMarker` anchors.
+- **Seamless Instant Fallback:**
+  - If disabled in settings or if the plugin is not present, trading instantly and cleanly falls back to remote mode without any gameplay hitches.
+- **PrismaUI System Card:**
+  - Dedicated "WALK TO MERCHANTS" settings panel in PrismaUI Systems tab controlling notice distances, stay-near times, linger times, game hour cooldowns, and voice options.
+
+---
+
+### 2. CorpseWalk Engine (Physical Approach to Looting)
+- **Physical Walk to Corpses (`KeepOffsetFromActor`):**
+  - Followers now physically walk up to dead bodies after combat ends or when a corpse is queued (default 10-second delay), ending instant long-range item teleportation.
+- **Intelligent Formation Fanning:**
+  - When multiple followers loot the same corpse, they spread out in an arc (-40°, 0°, +40°) facing the body to prevent awkward clustering or physics collisions.
+- **Immersive Search Animations:**
+  - Followers kneel/search at the body while transferring loot.
+- **Robust Safety Fallback:**
+  - If blocked by obstacles or unable to reach the body within 8 seconds, the engine cleanly falls back to remote transfer. Static chests and containers continue to loot smoothly at range.
+- **PrismaUI System Card:**
+  - Added dedicated "WALK TO CORPSES" controls in PrismaUI Systems tab to adjust toggles and pre-walk delay (2–30s).
+
+---
+
+### 3. Hidden Backpack System (Skyrim Outfit Glitch Prevention)
+- **Virtual SKSE Storage Architecture:**
+  - Dedicated SKSE-managed virtual backpack inventory isolated from Skyrim's native outfit evaluation.
+- **Eliminates Skyrim Outfit Bugs:**
+  - Because the game engine cannot see items held in the virtual backpack, followers will never equip mismatched armors or silly helmets on their own.
+- **Automated Loot Routing:**
+  - Surplus looted weapons and armors are automatically diverted into the follower's backpack instead of their active worn inventory.
+- **Direct Merchant Sales from Backpack:**
+  - Follower Shopping AI can sell surplus equipment stored in the backpack directly to appropriate vendors.
+- **PrismaUI Integration:**
+  - Dedicated "🎒 Backpack" tab with one-click stash and retrieve buttons.
+
+---
+
+### 4. Dual-Wield & Equipment Toggle Fixes
+- **Dual-Wield Sheathe/Draw Loop Fix:**
+  - Resolved animation graph desynchronization where followers with dual one-handed weapons repeatedly drew and sheathed their off-hand weapon outside combat.
+- **Direct Equipment Unassign (Toggle):**
+  - Clicking an already-assigned hand button (`[Primary Right]`, `[Primary Left]`, etc.) immediately unequips the weapon and clears the assignment.
+
+---
+
+### 5. Save Game Backward Compatibility
+- Bumped serialization version to 24 with complete backward compatibility for existing savegames.

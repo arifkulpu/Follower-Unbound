@@ -67,6 +67,23 @@ namespace FollowerUnbound
                 a_intfc->WriteRecordData(bpID);
                 a_intfc->WriteRecordData(bpNum);
             }
+
+            // Version 25: özel (büyülü/temperli/şarjlı/adlı) çanta eşyaları
+            uint32_t customCount = static_cast<uint32_t>(profile.backpackCustom.size());
+            a_intfc->WriteRecordData(customCount);
+            for (const auto& c : profile.backpackCustom) {
+                a_intfc->WriteRecordData(c.itemID);
+                a_intfc->WriteRecordData(c.count);
+                const uint8_t flags = static_cast<uint8_t>((c.hasEnchant ? 1 : 0) | (c.hasHealth ? 2 : 0) | (c.hasCharge ? 4 : 0));
+                a_intfc->WriteRecordData(flags);
+                a_intfc->WriteRecordData(c.enchantID);
+                a_intfc->WriteRecordData(c.enchantCharge);
+                a_intfc->WriteRecordData(c.health);
+                a_intfc->WriteRecordData(c.charge);
+                const uint32_t nameLen = static_cast<uint32_t>(std::min<size_t>(c.name.size(), 255));
+                a_intfc->WriteRecordData(nameLen);
+                if (nameLen > 0) a_intfc->WriteRecordData(c.name.data(), nameLen);
+            }
         }
 
         logger::info("Saved {} follower profiles to co-save.", count);
@@ -699,20 +716,67 @@ namespace FollowerUnbound
                     }
 
                     std::unordered_map<RE::FormID, int32_t> backpackItems;
+                    std::vector<BackpackCustomItem> backpackCustom;
                     if (version >= 24) {
                         uint32_t bpCount = 0;
-                        if (read(bpCount) && bpCount <= 4096) {
-                            for (uint32_t b = 0; b < bpCount; ++b) {
-                                RE::FormID oldBpID = 0;
-                                int32_t bpNum = 0;
-                                read(oldBpID);
-                                read(bpNum);
-                                RE::FormID newBpID = 0;
-                                if (resolved && a_intfc->ResolveFormID(oldBpID, newBpID) && bpNum > 0) {
-                                    backpackItems[newBpID] += bpNum;
-                                }
+                        if (!read(bpCount) || bpCount > 4096 || bytesRead > length ||
+                            bpCount > (length - bytesRead) / (sizeof(RE::FormID) + sizeof(int32_t))) {
+                            logger::warn("Invalid backpack item count for follower {:08X}.", oldFormID);
+                            recordOK = false;
+                            break;
+                        }
+                        for (uint32_t b = 0; b < bpCount; ++b) {
+                            RE::FormID oldBpID = 0;
+                            int32_t bpNum = 0;
+                            read(oldBpID);
+                            read(bpNum);
+                            RE::FormID newBpID = 0;
+                            if (resolved && a_intfc->ResolveFormID(oldBpID, newBpID) && bpNum > 0) {
+                                backpackItems[newBpID] += bpNum;
                             }
                         }
+                    }
+                    if (version >= 25) {
+                        uint32_t customCount = 0;
+                        if (!read(customCount) || customCount > 4096) {
+                            logger::warn("Invalid custom backpack count for follower {:08X}.", oldFormID);
+                            recordOK = false;
+                            break;
+                        }
+                        for (uint32_t b = 0; b < customCount; ++b) {
+                            BackpackCustomItem c;
+                            RE::FormID oldItem = 0, oldEnch = 0;
+                            uint8_t flags = 0;
+                            uint32_t nameLen = 0;
+                            read(oldItem);
+                            read(c.count);
+                            read(flags);
+                            read(oldEnch);
+                            read(c.enchantCharge);
+                            read(c.health);
+                            read(c.charge);
+                            read(nameLen);
+                            if (nameLen > 255) { recordOK = false; break; }
+                            std::string name(nameLen, '\0');
+                            if (nameLen > 0) {
+                                const auto got = a_intfc->ReadRecordData(name.data(), nameLen);
+                                bytesRead += got;
+                                if (got != nameLen) { recordOK = false; break; }
+                            }
+                            c.name = std::move(name);
+                            c.hasEnchant = (flags & 1) != 0;
+                            c.hasHealth = (flags & 2) != 0;
+                            c.hasCharge = (flags & 4) != 0;
+                            RE::FormID newItem = 0, newEnch = 0;
+                            if (!resolved || c.count <= 0 || !a_intfc->ResolveFormID(oldItem, newItem)) continue;
+                            c.itemID = newItem;
+                            if (c.hasEnchant) {
+                                if (a_intfc->ResolveFormID(oldEnch, newEnch)) c.enchantID = newEnch;
+                                else c.hasEnchant = false;
+                            }
+                            backpackCustom.push_back(std::move(c));
+                        }
+                        if (!recordOK) break;
                     }
 
                     if (!resolved) {
@@ -737,6 +801,7 @@ namespace FollowerUnbound
                     profile.assignedHands = aHands;
                     profile.assignedFeet = aFeet;
                     profile.backpackItems = std::move(backpackItems);
+                    profile.backpackCustom = std::move(backpackCustom);
 
                     // Co-save callbacks run while the game is restoring its
                     // world. Defer actor lookup, follower checks, and inventory

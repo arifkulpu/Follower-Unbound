@@ -45,6 +45,25 @@ namespace FollowerUnbound
         // oldItemID atanmışsa yerine newItem'ı atar (yoksa hiçbir şey yapmaz).
         static void ReplaceAssignment(FollowerProfile& profile, RE::FormID oldItemID, RE::TESBoundObject* newItem);
 
+        // ── Hayali çanta ──
+        // Atanmamış silah/zırh/kalkanları takipçinin gerçek envanterinden hayali çantaya (profile.backpackItems)
+        // taşır; böylece savaş/outfit AI'sı yalnızca oyuncunun seçtiği ekipmanı görür. Savaşta, ata binerken,
+        // bekleyen yükseltme teklifi olan, kuşanılı, büyülü/temperli (ekstra veri) eşyalara dokunmaz.
+        void StashUnassignedGear(RE::Actor* actor, FollowerProfile& profile);
+        // Oyuncu çantadan bir eşyayı geri aldığında: eşya kısa süre yeniden çantaya konmaz.
+        void NoteBackpackRetrieval(RE::FormID actorID, RE::FormID itemID);
+
+        // Çantaya alma / geri verme: büyülü, temperli, şarjlı ve özel adlı eşyaların ekstra verisini korur.
+        // wanted = -1: tüm yığın (kuşanılı/zehirli/görev eşyası ise 0 döner). allowWorn: UI'dan elle taşıma.
+        int32_t StashItem(RE::Actor* actor, FollowerProfile& profile, RE::TESBoundObject* obj,
+            int32_t wanted = -1, bool allowWorn = false);
+        // customIndex >= 0: o özel kaydı geri ver; -1: önce sade, yoksa ilk özel kayıt.
+        int32_t RestoreFromBackpack(RE::TESObjectREFR* dest, FollowerProfile& profile, RE::FormID itemID,
+            int32_t customIndex = -1, int32_t count = 1);
+        // Takipçi bırakıldığında (ölüm hariç) çanta içeriğini oyuncuya geri verir.
+        void ReturnBackpackToPlayer(FollowerProfile& profile);
+        void ProcessDormantBackpacks();
+
         // Protect-Equipped-Clothing: captures everything the actor is currently
         // wearing/holding (right hand, left hand, worn armor/clothes) into the
         // profile's personal protectedEquipment set. Those items are never sold.
@@ -77,6 +96,9 @@ namespace FollowerUnbound
         std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _ownEquipTime;
         struct CombatFixState { std::chrono::steady_clock::time_point windowStart{}; int count{ 0 }; };
         std::unordered_map<RE::FormID, CombatFixState> _combatFix;
+        std::unordered_map<uint64_t, std::chrono::steady_clock::time_point> _backpackGrace;
+        struct DormantMeta { float sinceDays{ 0.0f }; bool dead{ false }; };
+        std::unordered_map<RE::FormID, DormantMeta> _dormantMeta;   // pasif profilin ne zaman/neden pasifleştiği   // (actor<<32|item) -> geri alma zamanı
         float _timeSinceLastScan{ 0.0f };
         float _lastGameTimeDays{ 0.0f };
         mutable std::mutex _readMutex;

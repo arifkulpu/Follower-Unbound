@@ -81,8 +81,29 @@ Prisma UI **Equipment** bölümü baştan aşağı yenilendi ve 3 özel sekmeye 
 - Çakışma yaratan BSInputDeviceManager kancaları temizlendi; SKSEMenuFramework ile senkronize, takılmayan ve anında tepki veren tuş dinleyicisi entegre edildi.
 - Tek tuş (I, U, O, K, F1..F12) ve kombinasyonlar (Shift, Ctrl, Alt) kusursuz çalışır.
 
-### 9. Geriye Dönük Kayıt Uyumluluğu
-- Kayıt sistemi versiyonu 22'ye güncellendi. Eski kayıt dosyaları (co-save) bozulmadan ve ayarlar korunarak sorunsuzca yüklenir.
+### 9. Gizli Sırt Çantası Sistemi (Skyrim Motoru Zırh/Kıyafet Hatası Önleme)
+- Takipçiler için SKSE seviyesinde yönetilen sanal bir sırt çantası envanteri eklendi.
+- Yağmalanan silah ve zırhlar otomatik olarak aktif envanter yerine bu gizli çantaya aktarılır.
+- Skyrim'in kendi kıyafet yapay zekasının (outfit AI) takipçilere kafasına göre alakasız zırhlar giydirmesi tamamen engellendi.
+- Takipçi dükkana girdiğinde çantasındaki gereksiz zırh ve silahları satabilir.
+- Prisma UI üzerinde özel "🎒 Sırt Çantası" sekmesi ve tek tıkla çantaya atma / envantere alma seçenekleri eklendi.
+
+### 10. Satıcıya Yürüme ve Etkileşim Sahnesi Sistemi (Follower Walk to Merchant & Trade Voice System)
+- **Fiziksel Yürüme ve Alışveriş Sahnesi (10 Eşzamanlı Slot):** Takipçiler artık dükkan veya pazar yerlerinde uzaktan anında ticaret yapmak yerine en yakındaki uygun tüccara bizzat yürür, tezgâhın veya tüccarın karşısına geçer ve yüz yüze etkileşime girer. Eşzamanlı slot sayısı 3'ten 10'a çıkarıldı; böylece 10 takipçi aynı anda farklı tüccarlara yürüyüp ticaret yapabilir.
+- **Diyalog & Selamlaşma Sesleri (Vanilla Voice Integration):** Takipçi ve tüccar etkileşime girdiğinde Skyrim'in orijinal seslendirme hatlarını (`Actor.Say`) kullanarak doğal selamlama ve teşekkür replikleri söyler; özel harici ses dosyasına gerek kalmadan vanilya ses aktörleriyle tam uyumlu çalışır.
+- **Gelişmiş Hareket & Sahne Çözümü (ESL Eklentisi):** Hafif `FollowerUnboundTrade.esp` (ESL flagli) ile 10 bağımsız etkileşim yuvası ve XMarker tabanlı güvenli rota yönetimi eklendi.
+- **Kusursuz Geri Dönüş (Fallback):** Eklenti devre dışı bırakıldığında veya bulunmadığında sistem otomatik ve anında eski ticaret motoruna geri döner; oyunda hiçbir aksama veya kilitlenme yaşanmaz.
+- **PrismaUI Sistem Ayarları:** PrismaUI Systems sekmesine "SATICILARA YÜRÜME / WALK TO MERCHANTS" ayar paneli eklendi; yürüme hızı, mesafe kısıtları, bekleme süreleri ve sesler doğrudan arayüzden yönetilebilir.
+
+### 11. Cesetlere Yürüme ve Yağmalama Sistemi (CorpseWalk Engine)
+- **Cesede Bizzat Yürüme (KeepOffsetFromActor):** Takipçiler artık savaş bittikten veya bir ceset kapandıktan sonra (varsayılan 10 saniye beklemenin ardından) uzaktan ışınlar gibi ganimet toplamak yerine fiziksel olarak cesedin yanına yürür.
+- **Akıllı Çevreleme (Fanning Out):** Birden fazla takipçi aynı cesede yöneldiğinde iç içe geçmek yerine cesedin etrafına yelpaze gibi dağılarak (-40°, 0°, +40°) yaklaşır ve cesedin yönüne döner.
+- **Doğal Yağma Animasyonu:** Takipçi cesedin yanına vardığında arama ve diz çökme animasyonu oynatılır ve eşyalar aktarılır.
+- **Güvenli Fallback:** Takipçi cesede ulaşamazsa (örneğin yol tıkalıysa veya aşırı uzaktaysa) 8 saniye sonra otomatik zaman aşımı ile eşyaları uzaktan aktararak takılmaları önler. Sandıklar ve kutular ise eskisi gibi menzilden güvenle toplanır.
+- **PrismaUI Ayarları:** Systems sekmesine "CESETLERE YÜRÜME / WALK TO CORPSES" ayar kartı eklendi; yürüme özelliği ve yürüme gecikme süresi (2-30 sn) arayüzden kontrol edilebilir.
+
+### 12. Geriye Dönük Kayıt Uyumluluğu
+- Kayıt sistemi versiyonu 24'e güncellendi. Eski kayıt dosyaları (co-save) bozulmadan ve ayarlar korunarak sorunsuzca yüklenir.
 
 ---
 
@@ -161,5 +182,19 @@ The Prisma UI **Equipment** interface has been completely redesigned with 3 dist
 - Follower Shopping AI can sell surplus equipment directly from their backpack to appropriate vendors.
 - Dedicated "🎒 Sırt Çantası (Backpack)" tab in Prisma UI with one-click stash and retrieve options.
 
-### 10. Save Game Backward Compatibility
+### 10. Follower Walk to Merchant & Trade Voice System
+- **Physical Walk to Vendor & Interactive Trade Scene (10 Concurrent Slots):** Instead of instant remote trades across the cell, followers physically walk up to nearby shopkeepers/vendors, stand at the counter facing them, and conduct trade face-to-face. Expanded to 10 independent slots for large follower parties.
+- **Native Voiced Greetings and Gratitude:** During trading encounters, followers and merchants exchange context-appropriate vanilla voiced dialogue lines (`Actor.Say`), providing an immersive experience without requiring external audio files.
+- **Robust ESL Scene Framework:** Lightweight `FollowerUnboundTrade.esp` provides 10 concurrent interaction slots and dynamic XMarker positioning.
+- **Clean Fallback:** If the plugin is disabled or missing, trading cleanly falls back to instant mode with zero hitches or stalls.
+- **PrismaUI System Card:** Added dedicated "SATICILARA YÜRÜME / WALK TO MERCHANTS" configuration card in PrismaUI Systems tab for fine-tuning speeds, distances, and voice options.
+
+### 11. Follower Walk to Dead Bodies for Looting (CorpseWalk Engine)
+- **Physical Approach to Corpses (KeepOffsetFromActor):** After combat ends or a container is queued, followers physically walk up to fallen enemies after a configurable delay (default 10s) instead of instant remote teleport-looting.
+- **Intelligent Formation Fanning:** When multiple followers loot the same corpse, they fan out neatly around the body (-40°, 0°, +40°) to prevent clipping into each other.
+- **On-Site Looting Animations:** Upon arrival, followers face the body and play search/kneel animations while transferring items.
+- **Robust Safety Fallback:** If a follower is blocked by collision or pathing for more than 8 seconds, the engine cleanly falls back to remote transfer to prevent stalls. Containers and chests continue to loot smoothly at range.
+- **PrismaUI System Card:** Added dedicated "CESETLERE YÜRÜME / WALK TO CORPSES" controls in PrismaUI Systems tab to adjust toggle and walk delay.
+
+### 12. Save Game Backward Compatibility
 - Bumped serialization version to 24 with seamless backward compatibility for existing game saves.

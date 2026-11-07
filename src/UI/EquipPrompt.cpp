@@ -27,6 +27,7 @@ namespace FollowerUnbound
             std::string vendorName;
             std::string currentStats;
             std::string candidateStats;
+            bool replacesAssigned{ false };
         };
 
         std::deque<PromptRequest> g_promptQueue;
@@ -80,7 +81,8 @@ namespace FollowerUnbound
         RE::TESBoundObject* oldObj,
         std::string_view reason,
         std::string_view currentStats,
-        std::string_view candidateStats)
+        std::string_view candidateStats,
+        bool replacesAssigned)
     {
         if (!follower || !newObj) return;
         const auto slotLabel = ItemEvaluator::GetItemCategoryLabel(newObj);
@@ -88,6 +90,7 @@ namespace FollowerUnbound
             follower->GetFormID(), newObj->GetFormID(), oldObj ? oldObj->GetFormID() : 0,
             follower->GetName(), newObj->GetName(), slotLabel, std::string(reason), false, 0, 0, {},
             std::string(currentStats), std::string(candidateStats) });
+        g_promptQueue.back().replacesAssigned = replacesAssigned;
         logger::info("EquipPrompt: queued PrismaUI decision for {} / {} ({}); waiting for loot distribution completion.",
             follower->GetName(), newObj->GetName(), slotLabel);
     }
@@ -139,6 +142,14 @@ namespace FollowerUnbound
     {
         const auto matches = [followerID, itemID](const PromptRequest& request) {
             return request.vendorPurchase && request.followerID == followerID && request.newObjID == itemID;
+        };
+        return (g_activePrompt && matches(*g_activePrompt)) || std::ranges::any_of(g_promptQueue, matches);
+    }
+
+    bool EquipPrompt::IsOfferPending(RE::FormID followerID, RE::FormID itemID)
+    {
+        const auto matches = [followerID, itemID](const PromptRequest& request) {
+            return request.followerID == followerID && request.newObjID == itemID;
         };
         return (g_activePrompt && matches(*g_activePrompt)) || std::ranges::any_of(g_promptQueue, matches);
     }
@@ -266,7 +277,7 @@ namespace FollowerUnbound
                                 prompt.followerName, prompt.newObjName, prompt.price);
                         }
                     }
-                } else if (prompt.oldObjID != 0 && profile->IsProtected(prompt.oldObjID)) {
+                } else if (prompt.oldObjID != 0 && profile->IsProtected(prompt.oldObjID) && !prompt.replacesAssigned) {
                     logger::info("EquipPrompt: '{}' kept protected equipment; skipped PrismaUI equip decision.", prompt.followerName);
                 } else {
                     if (prompt.oldObjID != 0) profile->ProtectItem(prompt.oldObjID, false);
@@ -288,6 +299,14 @@ namespace FollowerUnbound
                 prompt.followerName, prompt.newObjName);
         } else {
             logger::info("EquipPrompt: PrismaUI declined {}; item remains in follower inventory.", prompt.newObjName);
+        }
+        // Teklif sonuçlandı (kabul/ret): atanmamış eşyalar artık hayali çantaya taşınabilir.
+        {
+            auto* stashFollower = RE::TESForm::LookupByID<RE::Actor>(prompt.followerID);
+            auto stashProfile = FollowerManager::GetSingleton()->GetProfile(prompt.followerID);
+            if (stashFollower && stashProfile) {
+                FollowerManager::GetSingleton()->StashUnassignedGear(stashFollower, *stashProfile);
+            }
         }
         if (!g_promptQueue.empty()) {
             g_waitingForLootCompletion = true;

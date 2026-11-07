@@ -212,7 +212,18 @@ namespace FollowerUnbound
             if (profile) {
                 if (a_event->newState == RE::ACTOR_COMBAT_STATE::kCombat) {
                     profile->currentState = FollowerState::Combat;
-                    ConsumableAI::GetSingleton()->UpdateCombatConsumables(actor, *profile);
+                    ConsumableAI::GetSingleton()->NotifyCombatStarted(actor);
+                    if (auto* tasks = SKSE::GetTaskInterface()) {
+                        const auto fid = actor->GetFormID();
+                        tasks->AddTask([fid]() {
+                            auto* fm = FollowerManager::GetSingleton();
+                            auto* a = RE::TESForm::LookupByID<RE::Actor>(fid);
+                            auto p = fm->GetProfile(fid);
+                            if (a && p && a->IsInCombat() && !p->isAnimal) {
+                                ConsumableAI::GetSingleton()->UpdateCombatConsumables(a, *p);
+                            }
+                        });
+                    }
                 } else if (a_event->newState == RE::ACTOR_COMBAT_STATE::kNone) {
                     profile->currentState = FollowerState::PostCombat;
                     // Savaş bittiğinde oyuncunun atadığı Asli silaha dönmesini sağla

@@ -375,6 +375,14 @@ namespace FollowerUnbound
         _gameLoadedTime = std::chrono::steady_clock::now();
     }
 
+    void ConsumableAI::NotifyCombatStarted(RE::Actor* follower)
+    {
+        if (!follower) return;
+        const auto actorID = follower->GetFormID();
+        _lastPoisonAnimTime.erase(actorID);
+        AnimationManager::GetSingleton()->StopPoisonWeaponAnimation(follower);
+    }
+
     void ConsumableAI::NotifyCombatEnded(RE::FormID actorID)
     {
         _lastCombatEndTime[actorID] = std::chrono::steady_clock::now();
@@ -507,16 +515,13 @@ namespace FollowerUnbound
             return;
         }
 
-        // SADECE ve SADECE yemek yiyecek veya içecek olan BU takipçinin elinde silah varsa:
-        // Silahı zorla kınına al ve animasyon durumunu hemen güncelle.
-        // Diğer takipçilerin silahına asla dokunulmaz.
-        if (auto* state = follower->AsActorState(); state && state->IsWeaponDrawn()) {
-            // Engine'e kın alma komutunu gönder
-            follower->DrawWeaponMagicHands(false);
-            follower->NotifyAnimationGraph("weaponSheathe");
-            follower->NotifyAnimationGraph("BeginWeaponSheathe");
-            follower->NotifyAnimationGraph("WeaponSheathe");
-            // Devam et — silah animasyonu arka planda tamamlanır, yeme/içme başlayabilir
+        // Yeme/içme başlamadan önce silah tam kınında olmalıdır (kSheathed).
+        // Silah çekiliyse veya kınına giriyorsa, kına koymayı tetikle ve bu tick'te bekle (sonraki tick'te dener).
+        if (auto* state = follower->AsActorState()) {
+            if (state->GetWeaponState() != RE::WEAPON_STATE::kSheathed) {
+                AnimationManager::GetSingleton()->SheatheWeapon(follower);
+                return;
+            }
         }
 
         auto animMgr   = AnimationManager::GetSingleton();
@@ -683,20 +688,29 @@ namespace FollowerUnbound
         // damage modifier (RestoreActorValue) kullanılır.
 
         // ── AÇLIK (HUNGER) ──
+        static std::unordered_set<RE::FormID> s_carryDebuffedFollowers;
+        const auto actorID = follower->GetFormID();
         if (hunger < 15.0f) {
             float cur = avOwner->GetActorValue(RE::ActorValue::kStamina);
             if (cur > 1.0f) avOwner->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage, RE::ActorValue::kStamina, -cur * 0.005f);
-            // Taşıma kapasitesi: geçici -20 (kalıcı yazım yok)
-            float baseCarry = avOwner->GetBaseActorValue(RE::ActorValue::kCarryWeight);
-            float curCarry  = avOwner->GetActorValue(RE::ActorValue::kCarryWeight);
-            if (curCarry > baseCarry - 20.0f)
+            // Taşıma kapasitesi: yalnızca bir kez geçici -20 ceza uygula
+            if (!s_carryDebuffedFollowers.contains(actorID)) {
                 avOwner->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage, RE::ActorValue::kCarryWeight, -20.0f);
+                s_carryDebuffedFollowers.insert(actorID);
+            }
         } else if (hunger < 30.0f) {
             float cur = avOwner->GetActorValue(RE::ActorValue::kStamina);
             if (cur > 1.0f) avOwner->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage, RE::ActorValue::kStamina, -cur * 0.002f);
+            if (s_carryDebuffedFollowers.contains(actorID)) {
+                avOwner->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage, RE::ActorValue::kCarryWeight, 20.0f);
+                s_carryDebuffedFollowers.erase(actorID);
+            }
         } else {
-            // Açlık cezası kalktı: geçici taşıma cezasını geri yükle
-            avOwner->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage, RE::ActorValue::kCarryWeight, 20.0f);
+            // Açlık cezası kalktı: eğer ceza uygulanmışsa yalnızca bir kez geri ver
+            if (s_carryDebuffedFollowers.contains(actorID)) {
+                avOwner->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage, RE::ActorValue::kCarryWeight, 20.0f);
+                s_carryDebuffedFollowers.erase(actorID);
+            }
         }
 
         // ── SUSUZLUK (THIRST) ──
