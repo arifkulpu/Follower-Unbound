@@ -194,9 +194,33 @@ namespace FollowerUnbound
         }
         const auto  d = point - body->GetPosition();
         const float heading = body->GetAngleZ();
+        // Skyrim standard transform to local actor frame (X right, Y forward):
         const float x = d.x * std::cos(heading) - d.y * std::sin(heading);
         const float y = d.x * std::sin(heading) + d.y * std::cos(heading);
-        auto* args = RE::MakeFunctionArguments(static_cast<RE::Actor*>(body), static_cast<float>(x), static_cast<float>(y), 0.0f, 0.0f, 0.0f, 0.0f, 400.0f, 20.0f);
+
+        // Turn follower towards corpse when walking so they move forward and face it
+        FaceTowards(follower, body);
+
+        // Calculate relative facing angle towards the corpse (in degrees)
+        float targetAngleZ = 0.0f;
+        const float distToPoint = std::sqrt(x * x + y * y);
+        if (distToPoint > 1.0f) {
+            // Local vector from offset spot back to body is (-x, -y)
+            const float rad = std::atan2(-x, -y);
+            targetAngleZ = rad * (180.0f / 3.14159265f);
+        }
+
+        auto* args = RE::MakeFunctionArguments(
+            static_cast<RE::Actor*>(body),
+            static_cast<float>(x),
+            static_cast<float>(y),
+            0.0f,
+            0.0f,
+            0.0f,
+            static_cast<float>(targetAngleZ),
+            400.0f,
+            20.0f
+        );
         if (!CallOnActor(follower, "KeepOffsetFromActor", args)) return false;
         logger::info("CorpseWalk: {} walks up to {} ({:.0f} from its body)", Name(follower), Name(body), ReachDistance(follower, body));
         return true;

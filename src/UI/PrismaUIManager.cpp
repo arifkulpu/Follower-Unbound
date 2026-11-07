@@ -746,6 +746,12 @@ namespace FollowerUnbound
             }
             FollowerManager::AssignLoadoutItem(*profile, object, leftHand, false);
             manager->EnforceAssignedLoadout(actor, *profile, true);
+            if (auto* armor = object->As<RE::TESObjectARMO>()) {
+                if (auto* equipMgr = RE::ActorEquipManager::GetSingleton()) {
+                    manager->NoteOwnEquip(actor->GetFormID());
+                    equipMgr->EquipObject(actor, armor, nullptr, 1, nullptr, false, false, false, true);
+                }
+            }
             logger::info("Equipment: {} assigned {} through quick equip (left={}).", actor->GetName(), object->GetName(), leftHand);
             return;
         }

@@ -1,4 +1,5 @@
 #include "AI/ConsumableAI.h"
+#include "Core/EventManager.h"
 #include "AI/ItemEvaluator.h"
 #include "AI/AnimationManager.h"
 #include "UI/NotificationManager.h"
@@ -415,8 +416,8 @@ namespace FollowerUnbound
     void ConsumableAI::UpdateNeedsConsumption(RE::Actor* follower, FollowerProfile& profile)
     {
         if (follower && !follower->IsDead() && TryCurePoison(follower)) return;
-        // 1. Savaş sırasında ve AT SIRTIINDAYKEN yemek yeme ve içme davranışı YAPILMAMALI
-        if (!follower || follower->IsDead() || follower->IsInCombat() || AnimationManager::IsRidingWithPlayer(follower)) return;
+        // 1. Savaş sırasında, AT SIRTIINDAYKEN veya OStim sahnesi aktifken/bitiş beklemesindeyken yemek yeme ve içme davranışı YAPILMAMALI
+        if (!follower || follower->IsDead() || follower->IsInCombat() || AnimationManager::IsRidingWithPlayer(follower) || !EventManager::CanPlayNeedsAnimation()) return;
 
         // System toggle
         if (!Settings::GetSingleton()->enableNeedsSystem) return;

@@ -13,7 +13,8 @@ namespace FollowerUnbound
         public RE::BSTEventSink<RE::TESFastTravelEndEvent>,
         public RE::BSTEventSink<RE::TESCellFullyLoadedEvent>,
         public RE::BSTEventSink<RE::TESDeathEvent>,
-        public RE::BSTEventSink<RE::TESEquipEvent>
+        public RE::BSTEventSink<RE::TESEquipEvent>,
+        public RE::BSTEventSink<SKSE::ModCallbackEvent>
     {
     public:
         static EventManager* GetSingleton()
@@ -35,6 +36,10 @@ namespace FollowerUnbound
         virtual RE::BSEventNotifyControl ProcessEvent(const RE::TESCellFullyLoadedEvent* a_event, RE::BSTEventSource<RE::TESCellFullyLoadedEvent>* a_eventSource) override;
         virtual RE::BSEventNotifyControl ProcessEvent(const RE::TESDeathEvent* a_event, RE::BSTEventSource<RE::TESDeathEvent>* a_eventSource) override;
         virtual RE::BSEventNotifyControl ProcessEvent(const RE::TESEquipEvent* a_event, RE::BSTEventSource<RE::TESEquipEvent>* a_eventSource) override;
+        virtual RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>* a_eventSource) override;
+
+        static bool IsOstimActive();
+        static bool CanPlayNeedsAnimation();
         // virtual RE::BSEventNotifyControl ProcessEvent(RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>* a_eventSource) override;
 
     private:

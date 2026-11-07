@@ -114,6 +114,12 @@ namespace FollowerUnbound
             logger::info("Registered TESEquipEvent sink.");
         }
 
+        auto modCallbackSource = SKSE::GetModCallbackEventSource();
+        if (modCallbackSource) {
+            modCallbackSource->AddEventSink(this);
+            logger::info("Registered ModCallbackEvent sink for OStim integration.");
+        }
+
         // InputEvent is handled exclusively via SKSEMenuFramework in PrismaUIManager (matching ClassBound)
     }
 
@@ -580,4 +586,45 @@ namespace FollowerUnbound
         return RE::BSEventNotifyControl::kContinue;
     }
 
+
+    namespace
+    {
+        std::atomic<bool> s_ostimActive{ false };
+        std::atomic<int64_t> s_ostimCooldownUntilMs{ 0 };
+
+        int64_t NowSteadyMs()
+        {
+            return std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+        }
+    }
+
+    bool EventManager::IsOstimActive()
+    {
+        return s_ostimActive.load(std::memory_order_relaxed);
+    }
+
+    bool EventManager::CanPlayNeedsAnimation()
+    {
+        if (s_ostimActive.load(std::memory_order_relaxed)) return false;
+        return NowSteadyMs() >= s_ostimCooldownUntilMs.load(std::memory_order_relaxed);
+    }
+
+    RE::BSEventNotifyControl EventManager::ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*)
+    {
+        if (!a_event) return RE::BSEventNotifyControl::kContinue;
+
+        std::string_view name = a_event->eventName.c_str();
+        if (name == "ostim_start" || name == "ostim_thread_start" || name == "ostim_scene_start") {
+            s_ostimActive.store(true, std::memory_order_relaxed);
+            logger::info("EventManager: OStim scene started. Suspending clothing enforcement and food/drink anims.");
+        } else if (name == "ostim_end" || name == "ostim_thread_end" || name == "ostim_scene_end") {
+            s_ostimActive.store(false, std::memory_order_relaxed);
+            const int64_t resumeAt = NowSteadyMs() + 15000;
+            s_ostimCooldownUntilMs.store(resumeAt, std::memory_order_relaxed);
+            logger::info("EventManager: OStim scene ended. Clothing enforcement restored, food/drink anims delayed 15s.");
+        }
+
+        return RE::BSEventNotifyControl::kContinue;
+    }
 }

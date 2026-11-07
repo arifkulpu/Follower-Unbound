@@ -1,4 +1,5 @@
 #include "Core/FollowerManager.h"
+#include "Core/EventManager.h"
 #include "Core/ClassInterface.h"
 #include "Core/Settings.h"
 #include "Core/TNGCompatibility.h"
@@ -331,6 +332,9 @@ namespace FollowerUnbound
     {
         if (!actor || actor->IsDead() || profile.isAnimal) return;
 
+        // OStim sahnesi sırasında takipçilerin kıyafet/zırh giymesini kesinlikle engelle
+        if (EventManager::IsOstimActive()) return;
+
         // Varsayılan olarak savaşta müdahale yok; yalnızca EnforceCombatWeapons (allowInCombat) girer.
         if (!allowInCombat && actor->IsInCombat()) return;
         if (!actor->Is3DLoaded() || AnimationManager::IsRidingWithPlayer(actor)) return;
@@ -401,7 +405,8 @@ namespace FollowerUnbound
 
                 const auto armorID = armor->GetFormID();
                 if (armorID == profile.assignedHead || armorID == profile.assignedBody ||
-                    armorID == profile.assignedHands || armorID == profile.assignedFeet) {
+                    armorID == profile.assignedHands || armorID == profile.assignedFeet ||
+                    profile.IsProtected(armorID)) {
                     continue;
                 }
                 if (!ItemEvaluator::MatchesPreferredArmor(armor, profile.preferences.preferredArmorType)) {
@@ -511,10 +516,13 @@ namespace
         struct Custom { RE::ExtraDataList* xl; BackpackCustomItem c; };
         std::vector<Custom> customs;
         int32_t customTotal = 0;
+        std::vector<RE::ExtraDataList*> wornLists;
         if (entry->extraLists) {
             for (auto* x : *entry->extraLists) {
                 if (!x) continue;
-                if (!allowWorn && (x->HasType(RE::ExtraDataType::kWorn) || x->HasType(RE::ExtraDataType::kWornLeft))) return 0;
+                const bool isWorn = x->HasType(RE::ExtraDataType::kWorn) || x->HasType(RE::ExtraDataType::kWornLeft);
+                if (!allowWorn && isWorn) return 0;
+                if (isWorn) wornLists.push_back(x);
                 // Görev eşyası / zehirli silah: ekstra veri çantada saklanamaz, dokunma.
                 if (x->HasType(RE::ExtraDataType::kAliasInstanceArray) || x->HasType(RE::ExtraDataType::kPoison)) return 0;
 
@@ -555,13 +563,15 @@ namespace
                 moved += cu.c.count;
             }
             if (plainAvail > 0) {
-                actor->RemoveItem(obj, plainAvail, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                RE::ExtraDataList* targetXl = (allowWorn && !wornLists.empty()) ? wornLists.front() : nullptr;
+                actor->RemoveItem(obj, plainAvail, RE::ITEM_REMOVE_REASON::kRemove, targetXl, nullptr);
                 profile.AddToBackpack(id, plainAvail);
                 moved += plainAvail;
             }
         } else if (plainAvail > 0) {
             const int32_t n = std::min(wanted, plainAvail);
-            actor->RemoveItem(obj, n, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+            RE::ExtraDataList* targetXl = (allowWorn && !wornLists.empty()) ? wornLists.front() : nullptr;
+            actor->RemoveItem(obj, n, RE::ITEM_REMOVE_REASON::kRemove, targetXl, nullptr);
             profile.AddToBackpack(id, n);
             moved = n;
         } else if (!customs.empty()) {
@@ -663,8 +673,6 @@ namespace
                                    profile.assignedSecondaryRight || profile.assignedSecondaryLeft;
         const bool armorLoadout = profile.assignedHead || profile.assignedBody ||
                                   profile.assignedHands || profile.assignedFeet;
-        // Oyuncu hiçbir şey seçmediyse takipçinin envanterine dokunma.
-        if (!weaponLoadout && !armorLoadout) return;
 
         using Slot = RE::BIPED_MODEL::BipedObjectSlot;
         constexpr uint32_t kMainArmorSlots = static_cast<uint32_t>(Slot::kHead) | static_cast<uint32_t>(Slot::kBody) |
@@ -681,6 +689,7 @@ namespace
         const RE::FormID assignedIDs[] = { profile.assignedPrimaryRight, profile.assignedPrimaryLeft,
             profile.assignedSecondaryRight, profile.assignedSecondaryLeft,
             profile.assignedHead, profile.assignedBody, profile.assignedHands, profile.assignedFeet };
+        std::unordered_set<RE::FormID> protectedSet(profile.protectedEquipment.begin(), profile.protectedEquipment.end());
         const bool styleSet = ItemEvaluator::HasWeaponStylePreference(profile.preferences);
 
         const auto now = std::chrono::steady_clock::now();
@@ -693,18 +702,17 @@ namespace
             if (IsTngHiddenBodyItem(obj)) continue;
             bool isAssigned = false;
             for (auto a : assignedIDs) if (a && a == id) { isAssigned = true; break; }
-            if (isAssigned) continue;
+            if (isAssigned || protectedSet.contains(id)) continue;
 
             bool shouldStash = false;
             if (auto* weapon = obj->As<RE::TESObjectWEAP>()) {
-                // Seçilen silah stiline uyan silahlar (örn. yardımcı stil: Yay) AI'ya açık kalır.
-                shouldStash = weaponLoadout &&
-                    !(styleSet && ItemEvaluator::MatchesWeaponPreferences(weapon, profile.preferences));
+                // Seçilen silah stiline uyan ve kuşanılmış/atanmış silahlar AI'da kalır; fazlalıklar hayali çantaya.
+                shouldStash = !(styleSet && ItemEvaluator::MatchesWeaponPreferences(weapon, profile.preferences));
             } else if (auto* armor = obj->As<RE::TESObjectARMO>()) {
                 const auto mask = static_cast<uint32_t>(armor->GetSlotMask());
                 if (mask & kShieldSlot) {
-                    shouldStash = weaponLoadout;
-                } else if (armorLoadout && (mask & kMainArmorSlots & assignedArmorMask)) {
+                    shouldStash = true;
+                } else if (mask & kMainArmorSlots) {
                     shouldStash = true;
                 }
             }
