@@ -37,8 +37,8 @@ namespace FollowerUnbound
         constexpr RE::FormID kIdleStop = 0x10D9EE;
         constexpr RE::FormID kGold = 0x00000F;
 
-        constexpr auto kStagger = 3000ms;      // between two pairs setting off
-        constexpr auto kQuestCalm = 1500ms;    // a slot is not reused right after its quest stopped
+        constexpr auto kStagger = 300ms;       // between two pairs setting off
+        constexpr auto kQuestCalm = 800ms;     // a slot is not reused right after its quest stopped
         constexpr float kGestureDelay = 1.4f;  // seconds into the talk: the money changes hands
 
         float Secs(Clock::time_point from, Clock::time_point to)
@@ -558,6 +558,19 @@ namespace FollowerUnbound
         logger::info("TradeManager: slot {} over ({})", slot + 1, why ? why : "");
         s = Slot{};
         s.calmUntil = now + kQuestCalm;
+
+        // İşlem bittiğinde takipçinin hala satacak veya harcayacak şeyi varsa sıradaki tüccara gidebilmesi için bekleme süresini sıfırla
+        if (follower) {
+            auto profile = FollowerManager::GetSingleton()->GetProfile(follower->GetFormID());
+            if (profile && DefaultBusiness(follower, *profile)) {
+                // Diğer satıcılara hemen gidebilmesi için near kayıtlarını güncelle
+                for (auto& [pk, nd] : _nearSince) {
+                    if (pk.first == follower->GetFormID()) {
+                        nd.since = now;
+                    }
+                }
+            }
+        }
     }
 
     void TradeManager::AbortAll(const char* why)

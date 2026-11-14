@@ -38,7 +38,7 @@ namespace FollowerUnbound
             bool  holdWhileWalking{ false };
             bool  voiceEnabled{ true };        // greet/thank with the game's own voice lines (topics: FollowerUnboundTradeVoice.json)
             float noticeDistance{ 1000.0f };   // a merchant this near is "about"
-            float nearbyStaySeconds{ 3.5f };   // stays this long near a merchant before it goes over (starts within ~5 seconds)
+            float nearbyStaySeconds{ 1.5f };   // stays this long near a merchant before it goes over (starts within 2-3 seconds)
             float reach{ 220.0f };             // close enough to trade (across a counter)
             float reachArrived{ 350.0f };      // ...or as close as the path went
             float floorHeight{ 150.0f };       // more height apart = another floor
@@ -49,9 +49,9 @@ namespace FollowerUnbound
             float walkTimeoutSeconds{ 25.0f };
             float stuckSeconds{ 7.0f };        // no nearer for this long
             float stallSeconds{ 4.0f };        // near but no nearer for this long: trades from there
-            float lingerSeconds{ 3.5f };       // the "talk" after the trade
-            float retrySeconds{ 120.0f };      // after a failed walk, per follower+merchant
-            float merchantRestSeconds{ 5.0f };
+            float lingerSeconds{ 2.5f };       // the "talk" after the trade
+            float retrySeconds{ 60.0f };       // after a failed walk, per follower+merchant
+            float merchantRestSeconds{ 1.0f };
             float cooldownGameDays{ 0.0416f }; // after a real sale/purchase: not again with the same merchant for 1 game hour (~0.0416 days)
             float noDealCooldownGameDays{ 0.0416f }; // arrived but nothing changed hands: 1 game hour (~0.0416 days)
         };

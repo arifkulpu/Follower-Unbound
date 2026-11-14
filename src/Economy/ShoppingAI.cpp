@@ -1882,6 +1882,11 @@ namespace FollowerUnbound
                         break;
                     }
                 }
+                // Eğer TradeVendorFilter aktifse (yani takipçi tek bir satıcının yanına gitmişse) ve o satıcı genel/demirci değilse bile
+                // ya da maske tam oturmadıysa, satıcının parası varsa satış yapabilsin
+                if (!chosenVendor && !nearbyVendors.empty() && TradeVendorFilter::Get() != 0) {
+                    chosenVendor = &nearbyVendors.front();
+                }
                 if (!chosenVendor || !chosenVendor->actor) continue;
 
                 auto [vendorGold, vendorChest] = GetVendorGoldAndChest(chosenVendor->actor);
@@ -1972,6 +1977,9 @@ namespace FollowerUnbound
                         chosenVendor = &cand;
                         break;
                     }
+                }
+                if (!chosenVendor && !nearbyVendors.empty() && TradeVendorFilter::Get() != 0) {
+                    chosenVendor = &nearbyVendors.front();
                 }
                 if (!chosenVendor || !chosenVendor->actor) { ++ci; continue; }
 

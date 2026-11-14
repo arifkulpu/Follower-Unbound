@@ -707,7 +707,7 @@ namespace
         auto inv = actor->GetInventory();
         int stashed = 0;
         for (const auto& [obj, data] : inv) {
-            if (stashed >= 8) break;     // takılma olmasın: tur başına en fazla 8 kalem
+            if (stashed >= 50) break;
             if (!obj || data.first <= 0 || !data.second) continue;
             const RE::FormID id = obj->GetFormID();
             if (IsTngHiddenBodyItem(obj)) continue;
@@ -715,17 +715,31 @@ namespace
             for (auto a : assignedIDs) if (a && a == id) { isAssigned = true; break; }
             if (isAssigned || protectedSet.contains(id)) continue;
 
+            // Kuşanılmış silah ve zırhlar asla hayali çantaya atılmaz (üzerlerinde kalır).
+            bool isEquippedOrWorn = false;
+            if (data.second->IsWorn()) {
+                isEquippedOrWorn = true;
+            }
+            if (data.second->extraLists) {
+                for (auto* xl : *data.second->extraLists) {
+                    if (xl && (xl->HasType(RE::ExtraDataType::kWorn) || xl->HasType(RE::ExtraDataType::kWornLeft))) {
+                        isEquippedOrWorn = true;
+                        break;
+                    }
+                }
+            }
+            if (actor->GetEquippedObject(false) == obj || actor->GetEquippedObject(true) == obj) {
+                isEquippedOrWorn = true;
+            }
+            if (isEquippedOrWorn) continue;
+
             bool shouldStash = false;
             if (auto* weapon = obj->As<RE::TESObjectWEAP>()) {
-                // Seçilen silah stiline uyan ve kuşanılmış/atanmış silahlar AI'da kalır; fazlalıklar hayali çantaya.
-                shouldStash = !(styleSet && ItemEvaluator::MatchesWeaponPreferences(weapon, profile.preferences));
+                // Kuşanılmamış ve atanmamış TÜM silahlar doğrudan hayali çantaya aktarılır.
+                shouldStash = true;
             } else if (auto* armor = obj->As<RE::TESObjectARMO>()) {
-                const auto mask = static_cast<uint32_t>(armor->GetSlotMask());
-                if (mask & kShieldSlot) {
-                    shouldStash = true;
-                } else if (mask & kMainArmorSlots) {
-                    shouldStash = true;
-                }
+                // Kuşanılmamış ve atanmamış TÜM zırhlar/kıyafetler doğrudan hayali çantaya aktarılır.
+                shouldStash = true;
             }
             if (!shouldStash) continue;
 
@@ -1262,6 +1276,8 @@ namespace
                 // Savaş dışı iyileşme (Canı az ise iksir iç veya healing büyüsü yap)
                 if (!profile->isAnimal) {
                     consumableAI->UpdateOutOfCombatHealing(actor, *profile);
+                    // Hayali çanta temizliği: Envanterde kalan kuşanılmamış/atanmamış tüm silah & zırhlar çantaya çekilir
+                    StashUnassignedGear(actor, *profile);
                 }
 
                 // Hayvan olmayan takipçiler savaş dışındayken silahlarını zehirleyip savaşa hazır bekler
