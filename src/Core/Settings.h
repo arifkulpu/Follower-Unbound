@@ -72,6 +72,10 @@ namespace FollowerUnbound
         bool protectSoulGems{ true };        // NEVER sell soul gems (SoulKeeper compatibility)
         uint32_t transactionBatchMultiplier{ 5 }; // Sale batch multiplier (1x, 3x, 5x, 10x); purchases fill stock deficits
 
+        // ── VIRTUAL BACKPACK LIMIT ──
+        bool enableBackpackWeightLimit{ true }; // Hayali çanta ağırlık sınırı sistemi
+        float backpackWeightLimit{ 150.0f };    // Hayali çanta maksimum taşıma kapasitesi (0 = sınırsız)
+
         // ── NOTIFICATION TOGGLES ──
         // Subsystem runs normally; only the HUD notification is suppressed when false.
         bool enableNotifications{ true };         // Master toggle for all notifications

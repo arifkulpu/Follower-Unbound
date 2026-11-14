@@ -665,6 +665,10 @@ namespace FollowerUnbound
             FU_SET_BOOL("lootArrows", lootArrows) FU_SET_BOOL("lootPotions", lootPotions)
             FU_SET_BOOL("lootFood", lootFood) FU_SET_BOOL("lootIngredients", lootIngredients)
             FU_SET_BOOL("lootSoulGems", lootSoulGems) FU_SET_BOOL("lootMisc", lootMisc)
+            FU_SET_BOOL("backpackWeightLimitEnabled", enableBackpackWeightLimit)
+            if (key == "backpackWeightLimit") {
+                if (v.is_number()) s->backpackWeightLimit = std::max(0.0f, v.get<float>());
+            }
             if (key == "uiLanguage" && v.is_string()) {
                 s->uiLanguage = v.get<std::string>() == "tr" ? "tr" : "en";
             }
@@ -910,6 +914,8 @@ namespace FollowerUnbound
             {"lootArrows",settings->lootArrows},{"lootPotions",settings->lootPotions},
             {"lootFood",settings->lootFood},{"lootIngredients",settings->lootIngredients},
             {"lootSoulGems",settings->lootSoulGems},{"lootMisc",settings->lootMisc},
+            {"backpackWeightLimitEnabled",settings->enableBackpackWeightLimit},
+            {"backpackWeightLimit",settings->backpackWeightLimit},
             {"notificationMode",settings->notificationMode},
             {"lootDelay",settings->lootDelaySeconds},{"equipmentUpgradeChance",settings->equipmentUpgradeChance},
             {"menuHotkey",settings->menuHotkey},{"menuHotkeyModifier",settings->menuHotkeyModifier},
@@ -937,7 +943,8 @@ namespace FollowerUnbound
                 {"gold",totalGold},
                 {"savedGold",savedGold},
                 {"spendableGold",spendableGold},
-                {"carry",actor->GetWeightInContainer()},{"capacity",actor->GetTotalCarryWeight()}
+                {"carry",actor->GetWeightInContainer()},{"capacity",actor->GetTotalCarryWeight()},
+                {"backpackWeight",p.GetBackpackWeight()}
             };
             AddPreferences(f["prefs"], p.preferences);
             const auto stock = ShoppingAI::GetSupplyCounts(actor);

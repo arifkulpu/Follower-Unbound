@@ -505,6 +505,17 @@ namespace
         int32_t wanted, bool allowWorn)
     {
         if (!actor || !obj) return 0;
+
+        // Hayali çanta ağırlık sınırı kontrolü
+        auto* settings = Settings::GetSingleton();
+        if (settings && settings->enableBackpackWeightLimit && settings->backpackWeightLimit > 0.0f) {
+            const float currentBpWeight = profile.GetBackpackWeight();
+            const float itemWeight = obj->GetWeight();
+            if (currentBpWeight + (itemWeight > 0.0f ? itemWeight : 0.0f) > settings->backpackWeightLimit) {
+                return 0; // Kapasite dolu; eşyayı çantaya atma, normal envanterde kalsın
+            }
+        }
+
         auto inv = actor->GetInventory();
         auto it = inv.find(obj);
         if (it == inv.end() || it->second.first <= 0 || !it->second.second) return 0;

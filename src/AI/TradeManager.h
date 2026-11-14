@@ -38,7 +38,7 @@ namespace FollowerUnbound
             bool  holdWhileWalking{ false };
             bool  voiceEnabled{ true };        // greet/thank with the game's own voice lines (topics: FollowerUnboundTradeVoice.json)
             float noticeDistance{ 1000.0f };   // a merchant this near is "about"
-            float nearbyStaySeconds{ 6.0f };   // stays this long near a merchant before it goes over
+            float nearbyStaySeconds{ 3.5f };   // stays this long near a merchant before it goes over (starts within ~5 seconds)
             float reach{ 220.0f };             // close enough to trade (across a counter)
             float reachArrived{ 350.0f };      // ...or as close as the path went
             float floorHeight{ 150.0f };       // more height apart = another floor
@@ -52,8 +52,8 @@ namespace FollowerUnbound
             float lingerSeconds{ 3.5f };       // the "talk" after the trade
             float retrySeconds{ 120.0f };      // after a failed walk, per follower+merchant
             float merchantRestSeconds{ 5.0f };
-            float cooldownGameDays{ 0.25f };   // after a real sale/purchase: not again with the same merchant for this long (6 game hours)
-            float noDealCooldownGameDays{ 0.25f };   // arrived but nothing changed hands (6 game hours)
+            float cooldownGameDays{ 0.0416f }; // after a real sale/purchase: not again with the same merchant for 1 game hour (~0.0416 days)
+            float noDealCooldownGameDays{ 0.0416f }; // arrived but nothing changed hands: 1 game hour (~0.0416 days)
         };
         Config& GetConfig() { return _config; }
         // Settings file: Data/SKSE/Plugins/FollowerUnboundTrade.json (loaded on first use; PrismaUI calls SaveConfig()).

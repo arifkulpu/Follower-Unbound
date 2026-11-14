@@ -328,6 +328,24 @@ namespace FollowerUnbound
             return (it != backpackItems.end()) ? it->second : 0;
         }
 
+        float GetBackpackWeight() const
+        {
+            float total = 0.0f;
+            for (const auto& [id, count] : backpackItems) {
+                if (count <= 0) continue;
+                if (auto* obj = RE::TESForm::LookupByID<RE::TESBoundObject>(id)) {
+                    total += obj->GetWeight() * static_cast<float>(count);
+                }
+            }
+            for (const auto& c : backpackCustom) {
+                if (c.count <= 0) continue;
+                if (auto* obj = RE::TESForm::LookupByID<RE::TESBoundObject>(c.itemID)) {
+                    total += obj->GetWeight() * static_cast<float>(c.count);
+                }
+            }
+            return total;
+        }
+
         FollowerProfile() = default;
         explicit FollowerProfile(RE::FormID a_formID, std::string_view a_name = "")
             : formID(a_formID), name(a_name) {}

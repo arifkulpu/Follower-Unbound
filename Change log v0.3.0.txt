@@ -124,6 +124,24 @@ Bu sürümle birlikte; takipçilerin tüccarlarla uzaktan sihirli bir şekilde a
   - Takipçi Şifa büyülerini biliyorsa ve yeterli manası varsa kendini büyüyle iyileştirir; manası yoksa veya büyü bilmiyorsa envanterindeki can iksirlerini kullanarak canını tamamen doldurur.
 
 ---
+
+### 9. Çoklu Toplu Alım-Satım, Tüccar Bütçesi ve Hayali Çanta Kapasitesi
+- **Çoklu / Toplu Satış (Bulk Item Selling):**
+  - Takipçiler satıcılarla karşılaştığında eşyaları tek tek satmak yerine satıcının mevcut altın bütçesine (`merchantContainer` ve aktör altını) göre toplu ve çoklu halde satar.
+  - Satıcının parası bittiğinde veya yetmediğinde aşırı satış engellenir ve satıcıdan/sandıktan ödenen altın gerçekçi olarak düşülür.
+  - Tek etkileşimde envanterdeki ve hayali çantadaki satılabilir fazlalıkların tamamı (50 adede kadar) hızla elden çıkarılır; çantada gereksiz eşya birikmesi sorunu tamamen çözüldü.
+- **Aynı Ziyarette Hem Satış Hem Alışveriş (Simultaneous Buy & Sell):**
+  - Takipçiler bir satıcıyla konuştuğunda önce satılacak tüm fazla ganimeti ve çanta eşyalarını satar, ardından aynı konuşma içinde eksik olan iksir, ok ve erzak gibi ihtiyaçlarını tek seferde topluca satın alır.
+- **Satıcılarla 1 Oyun Saatinde Bir Tekrar İşlem Yapabilme:**
+  - Tüccar bekleme süresi 6 oyun saatinden 1 oyun saatine (`0.0416f` oyun günü) indirildi. Takipçiler her saat başı satıcılarla yeniden ticaret yapabilir.
+- **Yeni Bölgede 5 Saniye İçinde Ticaret Başlatma:**
+  - Takipçilerin yeni bir bölgeye girdiklerinde satıcıları fark edip yanlarına gitme bekleme süresi 6 saniyeden 3.5 saniyeye düşürüldü. Takipçiler bölgeye varıştan itibaren 5 saniye içinde satıcılarla diyaloğa geçer.
+- **Hayali Çanta Ağırlık / Kapasite Sınırı:**
+  - Hayali sırt çantasına (Hidden Backpack) ağırlık ve kapasite sistemi getirildi (`backpackWeightLimit`, varsayılan 150 kg).
+  - Takipçinin çantası dolduğunda yeni eşyalar çantaya aktarılmaz, normal envanterde kalarak Skyrim taşıma kapasitesi kurallarına tabi olur.
+  - PrismaUI Ayarlar menüsünden (Systems sekmesi) hayali çanta ağırlık sınırı açılıp kapatılabilir ve maksimum kapasite istenen değere ayarlanabilir (0 = sınırsız). Ayrıca sırt çantası sekmesinde anlık çanta ağırlığı ve kapasite canlı olarak gösterilir.
+
+---
 ---
 
 ================================================================================

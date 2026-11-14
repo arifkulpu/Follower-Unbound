@@ -722,6 +722,36 @@ namespace FollowerUnbound
         }
     }
 
+    // Satıcının (veya merchant sandığının) toplam mevcut altını ve ana satıcı sandığı
+    static std::pair<int32_t, RE::TESObjectREFR*> GetVendorGoldAndChest(RE::Actor* vendor)
+    {
+        if (!vendor) return { 0, nullptr };
+        auto* goldItem = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0000000F);
+        if (!goldItem) return { 0, nullptr };
+
+        RE::TESObjectREFR* chest = nullptr;
+        if (auto* faction = vendor->GetVendorFaction()) {
+            chest = faction->vendorData.merchantContainer;
+        }
+        if (!chest) {
+            if (auto* base = vendor->GetActorBase()) {
+                for (const auto& factionInfo : base->factions) {
+                    if (factionInfo.faction && factionInfo.faction->vendorData.merchantContainer) {
+                        chest = factionInfo.faction->vendorData.merchantContainer;
+                        break;
+                    }
+                }
+            }
+        }
+
+        int32_t totalGold = 0;
+        if (chest && !chest->As<RE::Actor>()) {
+            totalGold += ItemEvaluator::GetItemCount(chest, goldItem);
+        }
+        totalGold += ItemEvaluator::GetItemCount(vendor, goldItem);
+        return { totalGold, chest };
+    }
+
     struct UpgradeComparison
     {
         RE::TESBoundObject* current{ nullptr };
@@ -1179,11 +1209,11 @@ namespace FollowerUnbound
             }
         }
 
-        // ── ADIM 4: ÖNCELİK SIRASIYLA SATIN AL (tur başına en fazla 3 işlem) ──
+        // ── ADIM 4: ÖNCELİK SIRASIYLA SATIN AL (çoklu toplu alım) ──
         auto econ = EconomyManager::GetSingleton();
         auto notifier = NotificationManager::GetSingleton();
         int purchasesThisRound = 0;
-        constexpr int kMaxPurchasesPerRound = 3;
+        constexpr int kMaxPurchasesPerRound = 20; // Tek seferde tüm eksik stokları tamamlayabilecek yüksek sınır
         std::unordered_set<SupplyCat> attemptedCategories;
         struct StockShortageNotice
         {
@@ -1426,7 +1456,7 @@ namespace FollowerUnbound
 
         uint32_t batchMult = settings->transactionBatchMultiplier;
         int salesThisCall = 0;
-        constexpr int kMaxSalesPerCall = 3; // acil (aşırı yüklü) durumda tek seferde 3 yığın
+        constexpr int kMaxSalesPerCall = 50; // Çoklu / toplu satış için yüksek limit (satıcının parası yettikçe satar)
         constexpr float kPurchaseHoldSeconds = 120.0f; // yeni alınan eşya bu süre satılmaz
 
         // ── KATEGORİ SINIFLANDIRICI VE TOPLAMLARI ──
@@ -1726,6 +1756,13 @@ namespace FollowerUnbound
 
             if (!chosenVendor || !chosenVendor->actor) continue;
 
+            // Satıcının mevcut altınını kontrol et
+            auto [vendorGold, vendorChest] = GetVendorGoldAndChest(chosenVendor->actor);
+            if (vendorGold <= 0) {
+                // Satıcının hiç parası kalmamış; başka eşya satılamaz
+                continue;
+            }
+
             // Satılacak miktar: aşırı yüklüyse TAM yığın, değilse batch çarpanı kadar
             int32_t sellCount = 0;
             if (isWeapon || isArmor || isClothing || isJewelry) {
@@ -1747,7 +1784,33 @@ namespace FollowerUnbound
             if (sellCount <= 0) continue;
 
             uint32_t unitPrice = CalculateGameSellPrice(priceActor, baseVal);
+            if (unitPrice == 0) unitPrice = 1;
+
+            // Satıcının karşılayabileceği maksimum adet sınırı
+            uint32_t maxCanAfford = static_cast<uint32_t>(vendorGold) / unitPrice;
+            if (maxCanAfford == 0) {
+                // Satıcının bu eşyayı almaya bile parası yetmiyor
+                continue;
+            }
+            sellCount = std::min(sellCount, static_cast<int32_t>(maxCanAfford));
+            if (sellCount <= 0) continue;
+
             uint32_t earnedGold = unitPrice * static_cast<uint32_t>(sellCount);
+
+            // Satıcıdan / satıcı sandığından altını düş
+            if (vendorChest && !vendorChest->As<RE::Actor>()) {
+                int32_t chestGold = ItemEvaluator::GetItemCount(vendorChest, goldItem);
+                int32_t fromChest = std::min(chestGold, static_cast<int32_t>(earnedGold));
+                if (fromChest > 0) {
+                    vendorChest->RemoveItem(goldItem, fromChest, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                }
+                int32_t remGold = static_cast<int32_t>(earnedGold) - fromChest;
+                if (remGold > 0) {
+                    chosenVendor->actor->RemoveItem(goldItem, remGold, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                }
+            } else {
+                chosenVendor->actor->RemoveItem(goldItem, static_cast<int32_t>(earnedGold), RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+            }
 
             // Eşyayı takipçinin envanterinden çıkar
             follower->RemoveItem(boundObj, sellCount, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
@@ -1775,8 +1838,7 @@ namespace FollowerUnbound
             logger::info("Selling: {} sold {}x {} to {} for {} gold.",
                 follower->GetName(), sellCount, boundObj->GetName(), chosenVendor->actor->GetName(), earnedGold);
 
-            // Normal durumda tek yığın satarak doğal davranır; aşırı yüklüyse hızlıca 3 yığına kadar satmaya devam eder
-            if (!overEncumbered || salesThisCall >= kMaxSalesPerCall) {
+            if (salesThisCall >= kMaxSalesPerCall) {
                 return;
             }
         }
@@ -1822,14 +1884,38 @@ namespace FollowerUnbound
                 }
                 if (!chosenVendor || !chosenVendor->actor) continue;
 
+                auto [vendorGold, vendorChest] = GetVendorGoldAndChest(chosenVendor->actor);
+                if (vendorGold <= 0) continue;
+
                 int32_t sellCount = overEncumbered ? bpCount : std::min(bpCount, static_cast<int32_t>(batchMult));
                 if (sellCount <= 0) continue;
 
                 uint32_t unitPrice = CalculateGameSellPrice(priceActor, baseVal);
+                if (unitPrice == 0) unitPrice = 1;
+
+                uint32_t maxCanAfford = static_cast<uint32_t>(vendorGold) / unitPrice;
+                if (maxCanAfford == 0) continue;
+                sellCount = std::min(sellCount, static_cast<int32_t>(maxCanAfford));
+                if (sellCount <= 0) continue;
+
                 uint32_t earnedGold = unitPrice * static_cast<uint32_t>(sellCount);
 
                 bpCount -= sellCount;
                 if (bpCount <= 0) toErase.push_back(bpID);
+
+                if (vendorChest && !vendorChest->As<RE::Actor>()) {
+                    int32_t chestGold = ItemEvaluator::GetItemCount(vendorChest, goldItem);
+                    int32_t fromChest = std::min(chestGold, static_cast<int32_t>(earnedGold));
+                    if (fromChest > 0) {
+                        vendorChest->RemoveItem(goldItem, fromChest, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                    }
+                    int32_t remGold = static_cast<int32_t>(earnedGold) - fromChest;
+                    if (remGold > 0) {
+                        chosenVendor->actor->RemoveItem(goldItem, remGold, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                    }
+                } else {
+                    chosenVendor->actor->RemoveItem(goldItem, static_cast<int32_t>(earnedGold), RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                }
 
                 follower->AddObjectToContainer(goldItem, nullptr, static_cast<int32_t>(earnedGold), nullptr);
                 econ->AddGold(formID, static_cast<int32_t>(earnedGold));
@@ -1845,7 +1931,7 @@ namespace FollowerUnbound
                 logger::info("Selling: {} sold {}x {} from backpack to {} for {} gold.",
                     follower->GetName(), sellCount, boundObj->GetName(), chosenVendor->actor->GetName(), earnedGold);
 
-                if (!overEncumbered || salesThisCall >= kMaxSalesPerCall) break;
+                if (salesThisCall >= kMaxSalesPerCall) break;
             }
             for (auto id : toErase) profile.backpackItems.erase(id);
         }
@@ -1889,9 +1975,28 @@ namespace FollowerUnbound
                 }
                 if (!chosenVendor || !chosenVendor->actor) { ++ci; continue; }
 
+                auto [vendorGold, vendorChest] = GetVendorGoldAndChest(chosenVendor->actor);
+                if (vendorGold <= 0) { ++ci; continue; }
+
                 const uint32_t unitPrice = CalculateGameSellPrice(priceActor, baseVal);
+                if (unitPrice == 0 || static_cast<uint32_t>(vendorGold) < unitPrice) { ++ci; continue; }
+
                 const uint32_t earnedGold = unitPrice * static_cast<uint32_t>(custom.count);
                 profile.backpackCustom.erase(profile.backpackCustom.begin() + ci);
+
+                if (vendorChest && !vendorChest->As<RE::Actor>()) {
+                    int32_t chestGold = ItemEvaluator::GetItemCount(vendorChest, goldItem);
+                    int32_t fromChest = std::min(chestGold, static_cast<int32_t>(earnedGold));
+                    if (fromChest > 0) {
+                        vendorChest->RemoveItem(goldItem, fromChest, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                    }
+                    int32_t remGold = static_cast<int32_t>(earnedGold) - fromChest;
+                    if (remGold > 0) {
+                        chosenVendor->actor->RemoveItem(goldItem, remGold, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                    }
+                } else {
+                    chosenVendor->actor->RemoveItem(goldItem, static_cast<int32_t>(earnedGold), RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                }
 
                 follower->AddObjectToContainer(goldItem, nullptr, static_cast<int32_t>(earnedGold), nullptr);
                 econ->AddGold(formID, static_cast<int32_t>(earnedGold));
@@ -1904,7 +2009,7 @@ namespace FollowerUnbound
                 }
                 logger::info("Selling: {} sold custom {}x {} from backpack to {} for {} gold.",
                     follower->GetName(), custom.count, boundObj->GetName(), chosenVendor->actor->GetName(), earnedGold);
-                if (!overEncumbered || salesThisCall >= kMaxSalesPerCall) break;
+                if (salesThisCall >= kMaxSalesPerCall) break;
             }
         }
     }

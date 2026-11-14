@@ -121,6 +121,10 @@ namespace FollowerUnbound
         protectSoulGems            = readBool("Selling", "ProtectSoulGems",            true);
         transactionBatchMultiplier = static_cast<uint32_t>(std::clamp(readInt("Selling", "TransactionBatchMultiplier", 5), 1, 20));
 
+        // ── VIRTUAL BACKPACK LIMIT ──
+        enableBackpackWeightLimit  = readBool("Backpack", "EnableBackpackWeightLimit", true);
+        backpackWeightLimit        = readFloat("Backpack", "BackpackWeightLimit",      150.0f);
+
         // ── NOTIFICATION TOGGLES ──
         enableNotifications       = readBool("Notifications", "EnableNotifications",       true);
         notificationMode          = static_cast<uint32_t>(std::clamp(readInt("Notifications", "NotificationMode", 0), 0, 2));
@@ -236,6 +240,10 @@ namespace FollowerUnbound
         writeBool("Selling", "SellGems",                   sellGems);
         writeBool("Selling", "ProtectSoulGems",            protectSoulGems);
         writeInt("Selling",  "TransactionBatchMultiplier", static_cast<int>(transactionBatchMultiplier));
+
+        // ── VIRTUAL BACKPACK LIMIT ──
+        writeBool("Backpack", "EnableBackpackWeightLimit", enableBackpackWeightLimit);
+        writeFloat("Backpack", "BackpackWeightLimit",      backpackWeightLimit);
 
         // ── NOTIFICATION TOGGLES ──
         writeBool("Notifications", "EnableNotifications",       enableNotifications);
