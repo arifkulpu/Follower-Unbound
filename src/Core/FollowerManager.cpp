@@ -1068,6 +1068,10 @@ namespace
                 }
             }
         }
+
+        // 10 Takipçi Yuvası & Vanilla PlayerFollowerCount Senkronizasyonu
+        SyncFollowerSlots();
+        SyncPlayerFollowerCount();
     }
 
     void FollowerManager::Update(float deltaGameHours)
@@ -1617,6 +1621,134 @@ namespace
                 actor->GetName(), bookName, book->GetFormID(), spellName, spell->GetFormID(), requiredMagicka);
 
             break; // Seans başına 1 kitap okur, sonraki kitap 10-12 saniye sonra
+        }
+    }
+
+    
+    void FollowerManager::EnsureFollowerSlotsLoaded()
+    {
+        if (_followerSlotsLoaded) return;
+        auto* data = RE::TESDataHandler::GetSingleton();
+        if (!data) return;
+
+        constexpr std::string_view kPlugin = "FollowerUnboundTrade.esp";
+        constexpr RE::FormID kFirstFactId = 0x83D;
+        constexpr RE::FormID kFirstQuestId = 0x847;
+
+        bool allOk = true;
+        for (int i = 0; i < 10; ++i) {
+            _followerSlots[i].faction = data->LookupForm<RE::TESFaction>(kFirstFactId + i, kPlugin);
+            _followerSlots[i].quest = data->LookupForm<RE::TESQuest>(kFirstQuestId + i, kPlugin);
+            if (!_followerSlots[i].faction || !_followerSlots[i].quest) {
+                allOk = false;
+            }
+        }
+        if (allOk) {
+            _followerSlotsLoaded = true;
+            logger::info("FollowerManager: Successfully initialized all 10 multi-follower recruitment slots from {}", kPlugin);
+        }
+    }
+
+    void FollowerManager::SyncFollowerSlots()
+    {
+        EnsureFollowerSlotsLoaded();
+        if (!_followerSlotsLoaded) return;
+
+        // Aktif (insansı) takipçileri topla
+        std::vector<RE::Actor*> activeFollowers;
+        {
+            std::shared_lock lock(_mutex);
+            for (const auto& [fid, prof] : _profiles) {
+                if (prof && !prof->isAnimal) {
+                    if (auto* actor = RE::TESForm::LookupByID<RE::Actor>(fid)) {
+                        if (!actor->IsDead()) {
+                            activeFollowers.push_back(actor);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 1. Artık takipçi olmayan veya yeri değişen aktörlerin yuvalarını temizle
+        for (int i = 0; i < 10; ++i) {
+            RE::FormID assignedFid = _slotAssignedActors[i];
+            if (assignedFid == 0) continue;
+
+            bool stillActive = false;
+            for (auto* actor : activeFollowers) {
+                if (actor->GetFormID() == assignedFid) {
+                    stillActive = true;
+                    break;
+                }
+            }
+
+            if (!stillActive) {
+                // Yuvayı boşalt
+                if (auto* oldActor = RE::TESForm::LookupByID<RE::Actor>(assignedFid)) {
+                    oldActor->RemoveFromFaction(_followerSlots[i].faction);
+                }
+                if (_followerSlots[i].quest->IsEnabled()) {
+                    _followerSlots[i].quest->Stop();
+                }
+                logger::info("FollowerManager: Cleared follower slot {} (actor {:08X} dismissed)", i + 1, assignedFid);
+                _slotAssignedActors[i] = 0;
+            }
+        }
+
+        // 2. Henüz bir yuvaya atanmamış aktif takipçileri boş yuvalara yerleştir
+        for (auto* actor : activeFollowers) {
+            RE::FormID fid = actor->GetFormID();
+            bool alreadyAssigned = false;
+            for (int i = 0; i < 10; ++i) {
+                if (_slotAssignedActors[i] == fid) {
+                    alreadyAssigned = true;
+                    break;
+                }
+            }
+            if (alreadyAssigned) continue;
+
+            // Boş yuva bul
+            for (int i = 0; i < 10; ++i) {
+                if (_slotAssignedActors[i] == 0) {
+                    _slotAssignedActors[i] = fid;
+                    actor->AddToFaction(_followerSlots[i].faction, 0);
+                    if (!_followerSlots[i].quest->IsEnabled()) {
+                        _followerSlots[i].quest->Start();
+                    }
+                    actor->EvaluatePackage();
+                    logger::info("FollowerManager: Assigned {} [{:08X}] to multi-follower slot {} (AI follow quest started)",
+                        actor->GetName(), fid, i + 1);
+                    break;
+                }
+            }
+        }
+    }
+
+    void FollowerManager::SyncPlayerFollowerCount()
+    {
+        // Vanilla PlayerFollowerCount global (0x000BCC98)
+        auto* global = RE::TESForm::LookupByID<RE::TESGlobal>(0x000BCC98);
+        if (!global) return;
+
+        // İnsansı takipçi sayısını say
+        size_t humanoidCount = 0;
+        {
+            std::shared_lock lock(_mutex);
+            for (const auto& [fid, prof] : _profiles) {
+                if (prof && !prof->isAnimal) {
+                    humanoidCount++;
+                }
+            }
+        }
+
+        // Eğer 10'dan az takipçimiz varsa: PlayerFollowerCount'u 0 tut ki
+        // vanilla 'Beni takip et' diyaloğu tüm NPC'lerde aktif kalsın ve yeni takipçi işe alınabilsin!
+        // 10'a ulaşıldığında: 1 (veya 10) yaparak diyalog alımını sınırla.
+        float targetValue = (humanoidCount < 10) ? 0.0f : static_cast<float>(humanoidCount);
+        if (global->value != targetValue) {
+            global->value = targetValue;
+            logger::info("FollowerManager: Synced PlayerFollowerCount global -> {:.0f} (Active followers: {}/10)",
+                targetValue, humanoidCount);
         }
     }
 

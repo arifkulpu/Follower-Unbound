@@ -81,11 +81,25 @@ namespace FollowerUnbound
 
         void Clear();
 
+        // 10 Takipçi Yuvası (Multi-Follower Framework)
+        void EnsureFollowerSlotsLoaded();
+        void SyncFollowerSlots();
+        void SyncPlayerFollowerCount();
+
     private:
         FollowerManager() = default;
         ~FollowerManager() = default;
         FollowerManager(const FollowerManager&) = delete;
         FollowerManager& operator=(const FollowerManager&) = delete;
+
+        struct FollowerSlotForms
+        {
+            RE::TESFaction* faction{ nullptr };
+            RE::TESQuest*   quest{ nullptr };
+        };
+        std::array<FollowerSlotForms, 10> _followerSlots{};
+        std::array<RE::FormID, 10> _slotAssignedActors{};
+        bool _followerSlotsLoaded{ false };
 
         mutable std::shared_mutex _mutex;
         std::unordered_map<RE::FormID, std::shared_ptr<FollowerProfile>> _profiles;

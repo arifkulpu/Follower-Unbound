@@ -89,6 +89,41 @@ Bu sürümle birlikte; takipçilerin tüccarlarla uzaktan sihirli bir şekilde a
 - Co-save serileştirme sürümü v24'e güncellendi.
 - Eski kayıt dosyalarındaki veriler ve kullanıcı ayarları kaybolmadan geriye dönük tam uyumluluk sağlandı.
 
+
+### 6. Dahili Çoklu Takipçi İşe Alım Sistemi (10 Takipçi Desteği - NFF/EFF Gerektirmez)
+- **Harici Çerçeve Bağımlılığı Olmadan 10 Takipçi:**
+  - Nether's Follower Framework (NFF), Amazing Follower Tweaks (AFT) veya EFF gibi harici modlara ihtiyaç duymadan, Skyrim'in orijinal diyaloglarıyla 10 takipçiye kadar işe alma imkânı.
+- **Dinamik Vanilla PlayerFollowerCount Senkronizasyonu:**
+  - Aktif insansı takipçi sayısı 10'dan az olduğu sürece oyun motorunun `PlayerFollowerCount` global değişkeni 0 tutulur; böylece tüm vanilya ve modlu takipçilerde "Beni takip et. Yardımına ihtiyacım var." işe alım diyaloğu her zaman görünür kalır.
+  - Takipçi sayısı 10'a ulaştığında alım otomatik olarak kapanır; bir takipçi gruptan çıkarıldığında diyaloglar anında tekrar aktifleşir.
+- **10 Eşzamanlı Takip Yuvası & AI Görevleri (`FollowerUnboundTrade.esp`):**
+  - Eklentimiz içerisine 10 adet bağımsız takipçi yuvası ve takip görevi eklendi (`FU_FollowerSlotFaction1..10`, `FU_FollowerSlotQuest1..10`).
+  - İşe alınan her takipçi boş bir yuvaya yerleştirilerek kendine ait takip yapay zekasına (`PlayerFollowerPackage`) kavuşur; vanilya Skyrim'in yeni takipçi alındığında eskisini unutması sorunu tamamen ortadan kalkar.
+- **ESL Bayraklı (ESPFE):**
+  - 254 mod sınırından yemez, yükleme sırasında slot harcamaz.
+
+---
+
+### 7. Büyü Kitabı Okuma & Mana Gereksinimi Sistemi
+- **Kitap Başına 10 Saniye Okuma Süresi:**
+  - Takipçiler buldukları büyü kitaplarını anında tüketmez; yalnızca güvenli alanlarda (şehirler, kasabalar ve oyuncu evleri) kitap başına 10 saniye okuma animasyonu gerçekleştirirler.
+- **Kademeli Mana (Magicka) Şartı:**
+  - Çırak (Apprentice / Novice): En az **125 Magicka**
+  - Kalfa (Adept): En az **250 Magicka**
+  - Uzman / Usta (Expert / Master): En az **400 Magicka**
+  - Manası yetersiz olan takipçiler büyü kitabını tüketmez, harcamaz.
+- **Öğrenilen Büyülerin Kalıcı Kaydı:**
+  - Takipçilerin öğrendiği büyüler `learnedSpells` listesine kaydedilir ve co-save sürümü 25'e yükseltilerek save dosyalarında kalıcı olarak korunur.
+
+---
+
+### 8. Çatışma Sonrası Otomatik İyileşme (İksir & Şifa Büyüsü)
+- **Savaş Çıkışı Can Doldurma:**
+  - Takipçiler savaştan çıktıklarında sağlıkları %95'in altındaysa bekleme yapmadan hemen kendi canlarını doldurur.
+- **Şifa Büyüsü & İksir Önceliği:**
+  - Takipçi Şifa büyülerini biliyorsa ve yeterli manası varsa kendini büyüyle iyileştirir; manası yoksa veya büyü bilmiyorsa envanterindeki can iksirlerini kullanarak canını tamamen doldurur.
+
+---
 ---
 
 ================================================================================
@@ -173,6 +208,39 @@ Highlights include the new **Follower Walk to Merchant & Trade Voice System** wi
 - **Direct Equipment Unassign (Toggle):**
   - Clicking an already-assigned hand button (`[Primary Right]`, `[Primary Left]`, etc.) immediately unequips the weapon and clears the assignment.
 
+
+### 7. Native Multi-Follower Recruitment (Up to 10 Companions - No NFF/EFF Required)
+- **Framework-Free 10-Follower Recruitment:**
+  - Enables recruiting up to 10 companions using native Skyrim dialogues without requiring NFF, AFT, or EFF.
+- **Dynamic Vanilla PlayerFollowerCount Sync:**
+  - The vanilla `PlayerFollowerCount` global variable is dynamically kept at 0 while active humanoid followers are under 10, keeping the "Follow me. I need your help." dialogue option accessible on all NPCs.
+  - Once 10 followers are reached, recruitment is capped; dismissing any follower automatically frees a slot.
+- **10 Dedicated Follower Slots & Quests (`FollowerUnboundTrade.esp`):**
+  - Features 10 independent follower slot factions and quests (`FU_FollowerSlotFaction1..10`, `FU_FollowerSlotQuest1..10`) with dedicated `PlayerFollowerPackage` follow AI.
+  - Prevents the vanilla engine bug where recruiting a second companion caused the previous one to lose follow AI.
+- **ESL-Flagged (ESPFE):**
+  - Occupies no master load order slot and stays within the ESL FormID range.
+
+---
+
+### 8. Spell Tome Reading Delay & Magicka Requirements
+- **10-Second Reading Duration per Tome:**
+  - Followers do not instantly consume spell books; reading takes 10 seconds per book with full reading animations and only triggers in safe areas (towns, cities, player homes).
+- **Tiered Magicka Requirements:**
+  - Novice / Apprentice: Minimum **125 Magicka**
+  - Adept: Minimum **250 Magicka**
+  - Expert / Master: Minimum **400 Magicka**
+- **Persistent Learned Spells:**
+  - Learned spells are stored in `learnedSpells` and serialized via co-save version 25.
+
+---
+
+### 9. Out-of-Combat Recovery (Healing Spells & Health Potions)
+- **Post-Combat Health Check:**
+  - When combat ends, companions with <95% HP immediately check their recovery options.
+  - Prioritizes casting known Healing spells if Magicka allows; otherwise consumes health potions to restore full health.
+
+---
 ---
 
 ### 6. Save Game Backward Compatibility
