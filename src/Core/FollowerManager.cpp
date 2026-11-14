@@ -115,6 +115,9 @@ namespace FollowerUnbound
         });
         if (hasFollowerFactionName) return true;
 
+        // Modumuzun kendi 10 adet çoklu takipçi yuvası fraksiyonları (FU_FollowerSlotFaction1..10)
+        if (FollowerManager::GetSingleton()->IsInFollowerSlot(actor)) return true;
+
         // Animal / Pet / Dog Follower Factions (0x000282C9: AnimalFollowerFaction, 0x000282CC: CurrentAnimalFollowerFaction)
         static auto* animalFollowerFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x000282C9);
         if (animalFollowerFaction && actor->IsInFaction(animalFollowerFaction)) return true;
@@ -1719,6 +1722,19 @@ namespace
             _followerSlotsLoaded = true;
             logger::info("FollowerManager: Successfully initialized all 10 multi-follower recruitment slots from {}", kPlugin);
         }
+    }
+
+    bool FollowerManager::IsInFollowerSlot(RE::Actor* actor)
+    {
+        if (!actor) return false;
+        EnsureFollowerSlotsLoaded();
+        if (!_followerSlotsLoaded) return false;
+        for (int i = 0; i < 10; ++i) {
+            if (_followerSlots[i].faction && actor->IsInFaction(_followerSlots[i].faction)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     void FollowerManager::SyncFollowerSlots()

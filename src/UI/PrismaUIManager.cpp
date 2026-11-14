@@ -458,6 +458,8 @@ namespace FollowerUnbound
     void PrismaUIManager::ShowView()
     {
         if (!IsAvailable()) return;
+        // Menü açılırken güncel takipçi durumunu tara ve yuvaları senkronize et
+        FollowerManager::GetSingleton()->ScanForActiveFollowers();
         SendState();
         _api->Show(_view);
         _api->Focus(_view, true, false);

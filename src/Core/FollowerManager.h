@@ -85,6 +85,7 @@ namespace FollowerUnbound
         void EnsureFollowerSlotsLoaded();
         void SyncFollowerSlots();
         void SyncPlayerFollowerCount();
+        bool IsInFollowerSlot(RE::Actor* actor);
 
     private:
         FollowerManager() = default;
