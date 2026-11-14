@@ -47,6 +47,8 @@ namespace FollowerUnbound
 
     // Returns true only when the actor is genuinely a player follower right now.
     // Checks both the teammate flag and the vanilla CurrentFollowerFaction (0x5C84E).
+    // Returns true only when the actor is genuinely a player follower right now.
+    // Checks both the teammate flag, vanilla CurrentFollowerFaction, and popular follower frameworks (NFF, EFF, AFT).
     static bool IsActualFollower(RE::Actor* actor)
     {
         if (!actor || actor->IsPlayerRef() || actor->IsDead()) return false;
@@ -54,12 +56,39 @@ namespace FollowerUnbound
         // Primary check: engine teammate flag (set by ALL follower frameworks + vanilla)
         if (actor->IsPlayerTeammate()) return true;
 
-        // Secondary: vanilla CurrentFollowerFaction
-        auto followerFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x0005C84E);
+        // Secondary: vanilla CurrentFollowerFaction (0x0005C84E)
+        static auto* followerFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x0005C84E);
         if (followerFaction && actor->IsInFaction(followerFaction)) return true;
 
+        // Nether's Follower Framework (NFF) Faction check (nwsFF_FollowerFac: local ID 0x16EB3 in nwsFollowerFramework.esp)
+        static auto* nffFollowerFaction = []() -> RE::TESFaction* {
+            if (auto* dataHandler = RE::TESDataHandler::GetSingleton()) {
+                return dataHandler->LookupForm<RE::TESFaction>(0x00016EB3, "nwsFollowerFramework.esp");
+            }
+            return nullptr;
+        }();
+        if (nffFollowerFaction && actor->IsInFaction(nffFollowerFaction)) return true;
+
+        // Extensible Follower Framework (EFF) Faction check (FollowerFaction: 0x00000EB4 in EFFCore.esm)
+        static auto* effFollowerFaction = []() -> RE::TESFaction* {
+            if (auto* dataHandler = RE::TESDataHandler::GetSingleton()) {
+                return dataHandler->LookupForm<RE::TESFaction>(0x00000EB4, "EFFCore.esm");
+            }
+            return nullptr;
+        }();
+        if (effFollowerFaction && actor->IsInFaction(effFollowerFaction)) return true;
+
+        // Amazing Follower Tweaks (AFT) / IAFT Faction check (TweakFollowerFaction: 0x00001802 in AmazingFollowerTweaks.esp)
+        static auto* aftFollowerFaction = []() -> RE::TESFaction* {
+            if (auto* dataHandler = RE::TESDataHandler::GetSingleton()) {
+                return dataHandler->LookupForm<RE::TESFaction>(0x00001802, "AmazingFollowerTweaks.esp");
+            }
+            return nullptr;
+        }();
+        if (aftFollowerFaction && actor->IsInFaction(aftFollowerFaction)) return true;
+
         // Vanilla DialogueFollower quest (0x750BA) alias check
-        auto followerQuest = RE::TESForm::LookupByID<RE::TESQuest>(0x000750BA);
+        static auto* followerQuest = RE::TESForm::LookupByID<RE::TESQuest>(0x000750BA);
         if (followerQuest) {
             for (auto alias : followerQuest->aliases) {
                 auto refAlias = alias ? skyrim_cast<RE::BGSRefAlias*>(alias) : nullptr;
@@ -70,15 +99,31 @@ namespace FollowerUnbound
             }
         }
 
+        // Faction list iterate check (modlu takipçi çerçevelerinin "follower" fraksiyonları)
+        bool hasFollowerFactionName = false;
+        actor->VisitFactions([&](RE::TESFaction* faction, std::int8_t rank) {
+            if (hasFollowerFactionName || !faction || rank < 0) return false;
+            if (const char* name = faction->GetName()) {
+                std::string fname(name);
+                std::transform(fname.begin(), fname.end(), fname.begin(), ::tolower);
+                if (fname == "current follower" || fname == "framework follower" || fname == "player follower") {
+                    hasFollowerFactionName = true;
+                    return true;
+                }
+            }
+            return false;
+        });
+        if (hasFollowerFactionName) return true;
+
         // Animal / Pet / Dog Follower Factions (0x000282C9: AnimalFollowerFaction, 0x000282CC: CurrentAnimalFollowerFaction)
-        auto animalFollowerFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x000282C9);
+        static auto* animalFollowerFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x000282C9);
         if (animalFollowerFaction && actor->IsInFaction(animalFollowerFaction)) return true;
 
-        auto currentAnimalFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x000282CC);
+        static auto* currentAnimalFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x000282CC);
         if (currentAnimalFaction && actor->IsInFaction(currentAnimalFaction)) return true;
 
         // Player Horse check: Player owns or rides this horse
-        auto playerHorseFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x00068DFA); // PlayerHorseFaction
+        static auto* playerHorseFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x00068DFA); // PlayerHorseFaction
         if (playerHorseFaction && actor->IsInFaction(playerHorseFaction)) return true;
 
         return false;
