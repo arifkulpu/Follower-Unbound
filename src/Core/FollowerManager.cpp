@@ -136,13 +136,27 @@ namespace FollowerUnbound
     {
         if (!actor) return false;
 
+        // 0. Positive Humanoid / NPC check: If the actor, base, or race explicitly has ActorTypeNPC (0x00013794),
+        // it is GUARANTEED to be a humanoid character (even if custom modded race lacks FaceGen flag).
+        static const RE::FormID kActorTypeNPC = 0x00013794;
+        if (actor->HasKeywordString("ActorTypeNPC")) {
+            return false;
+        }
+        auto base = actor->GetActorBase();
+        if (base && (base->HasKeywordString("ActorTypeNPC") || base->HasKeywordID(kActorTypeNPC))) {
+            return false;
+        }
+        auto race = actor->GetRace();
+        if (race && (race->HasKeywordString("ActorTypeNPC") || race->HasKeywordID(kActorTypeNPC))) {
+            return false;
+        }
+
         // 1. Explicit Animal / Creature keyword check on Actor
         if (actor->HasKeywordString("ActorTypeAnimal") || actor->HasKeywordString("ActorTypeCreature")) {
             return true;
         }
 
         // 2. Keyword check on ActorBase
-        auto base = actor->GetActorBase();
         if (base) {
             if (base->HasKeywordString("ActorTypeAnimal") || base->HasKeywordString("ActorTypeCreature") ||
                 base->HasKeywordID(0x00013795) || base->HasKeywordID(0x00013796)) {
@@ -150,7 +164,6 @@ namespace FollowerUnbound
             }
         }
 
-        auto race = actor->GetRace();
         if (!race) return false;
 
         // 3. Keyword check on Race
@@ -187,17 +200,28 @@ namespace FollowerUnbound
             }
         }
 
-        // (ActorBase EditorID alt dizi eşleşmesi kaldırıldı: "cat", "cow", "elk" gibi kısa kelimeler
-        //  normal NPC EditorID'lerinde de geçebilir. Hayvanlar ırk adı/EditorID'si ve FaceGen
-        //  kontrolüyle zaten yakalanıyor.)
-
-        // 6. Humanoid check: FaceGenHead is present on all humanoid races (including Khajiit, Argonian, Elves, Men)
+        // 6. Humanoid check fallback:
+        // FaceGenHead is present on all vanilla humanoid races (including Khajiit, Argonian, Elves, Men).
+        // Modded custom races (like Goblins, Dwarves, custom mesh races) might omit FaceGenHead,
+        // but if they don't match any animal keywords or animal flags, and their skeleton/biped is humanoid,
+        // or if they can open doors, they should NOT be treated as animals!
         bool hasFaceGen = race->data.flags.all(RE::RACE_DATA::Flag::kFaceGenHead);
-        if (!hasFaceGen) {
-            return true; // No FaceGen head -> animal / creature
+        if (hasFaceGen) {
+            return false;
         }
 
-        return false;
+        // If no FaceGen, check if it's explicitly child or human skeleton/biped
+        if (race->data.flags.all(RE::RACE_DATA::Flag::kChild)) {
+            return false;
+        }
+
+        // If it can't open doors or has animal tags, it already returned true above.
+        // For remaining actors without FaceGen: if base is ActorCharacter (humanoid base type), don't treat as animal.
+        if (base && base->GetFormType() == RE::FormType::NPC) {
+            return false;
+        }
+
+        return true; // Unknown creature
     }
 
     bool FollowerManager::IsHumanoidRace(RE::Actor* actor)
@@ -1166,8 +1190,10 @@ namespace
     {
         auto calendar = RE::Calendar::GetSingleton();
         if (!calendar) return;
-        _lastGameTimeDays = calendar->GetDaysPassed();
-        logger::info("InitGameTime: zaman başlatıldı ({:.4f} oyun günü)", _lastGameTimeDays);
+        float days = calendar->GetDaysPassed();
+        float hour = calendar->GetHour();
+        _lastGameTimeDays = days + (hour / 24.0f);
+        logger::info("InitGameTime: zaman başlatıldı ({:.4f} gün, saat {:.2f})", _lastGameTimeDays, hour);
         // Oyun yüklendi: kayıtta açık kalmış bir ticaret sahnesi/quest'i varsa kapat
         TradeManager::GetSingleton()->AbortAll("load");
     }
@@ -1177,18 +1203,29 @@ namespace
         auto calendar = RE::Calendar::GetSingleton();
         if (!calendar) return;
 
-        float currentDays = calendar->GetDaysPassed();
+        float days = calendar->GetDaysPassed();
+        float hour = calendar->GetHour();
+        // Skyrim'de GameDaysPassed tam gün geçişlerinde veya beklemede artarken, GameHour
+        // normal oynanışta her saniye akar (timescale hızında).
+        // Bu yüzden gerçek akıcı oyun zamanı = gün + (saat / 24).
+        float currentDays = days + (hour / 24.0f);
 
         // _lastGameTimeDays henüz başlatılmamışsa (InitGameTime çağrılmadı)
         // sadece zamanı kaydet, tick yapma.
         if (_lastGameTimeDays <= 0.0f) {
             _lastGameTimeDays = currentDays;
-            logger::warn("UpdateGameTimeNeeds: ilk çağrı — zaman sıfırdan başlatıldı ({:.4f})", currentDays);
+            logger::info("UpdateGameTimeNeeds: ilk çağrı — zaman sıfırdan başlatıldı ({:.4f})", currentDays);
             return;
         }
 
         float deltaDays = currentDays - _lastGameTimeDays;
-        if (deltaDays <= 0.0f) return;   // Zaman geçmemiş, hiçbir şey yapma
+        // Gün dönümü veya geriye sarma koruması
+        if (deltaDays < 0.0f) {
+            deltaDays = 0.0f;
+            _lastGameTimeDays = currentDays;
+            return;
+        }
+        if (deltaDays < 0.00001f) return;   // Çok ufak fraksiyon, bekle
 
         _lastGameTimeDays = currentDays;
         float deltaHours = deltaDays * 24.0f;
@@ -1199,7 +1236,7 @@ namespace
         float thirstRate  = settings->ThirstRatePerHour();
         float fatigueRate = settings->FatigueRatePerHour();
 
-        logger::debug("UpdateGameTimeNeeds: {:.2f} oyun saati geçti | hız H:{:.2f} T:{:.2f} F:{:.2f}",
+        logger::debug("UpdateGameTimeNeeds: {:.3f} oyun saati geçti | hız H:{:.2f} T:{:.2f} F:{:.2f}",
             deltaHours, hungerRate, thirstRate, fatigueRate);
 
         auto consumableAI = ConsumableAI::GetSingleton();
@@ -1774,6 +1811,8 @@ namespace
                 // Yuvayı boşalt
                 if (auto* oldActor = RE::TESForm::LookupByID<RE::Actor>(assignedFid)) {
                     oldActor->RemoveFromFaction(_followerSlots[i].faction);
+                    oldActor->GetActorRuntimeData().boolBits.reset(RE::Actor::BOOL_BITS::kPlayerTeammate);
+                    oldActor->EvaluatePackage();
                 }
                 if (_followerSlots[i].quest->IsEnabled()) {
                     _followerSlots[i].quest->Stop();
@@ -1800,9 +1839,19 @@ namespace
                 if (_slotAssignedActors[i] == 0) {
                     _slotAssignedActors[i] = fid;
                     actor->AddToFaction(_followerSlots[i].faction, 0);
-                    if (!_followerSlots[i].quest->IsEnabled()) {
+
+                    // Ensure engine teammate status is true so game behaves properly
+                    if (!actor->IsPlayerTeammate()) {
+                        actor->GetActorRuntimeData().boolBits.set(RE::Actor::BOOL_BITS::kPlayerTeammate);
+                    }
+
+                    // Reset and start slot quest to guarantee alias condition fills for this actor
+                    if (_followerSlots[i].quest->IsEnabled()) {
+                        _followerSlots[i].quest->Reset();
+                    } else {
                         _followerSlots[i].quest->Start();
                     }
+
                     actor->EvaluatePackage();
                     logger::info("FollowerManager: Assigned {} [{:08X}] to multi-follower slot {} (AI follow quest started)",
                         actor->GetName(), fid, i + 1);
