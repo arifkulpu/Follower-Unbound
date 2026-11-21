@@ -1,0 +1,16 @@
+Scriptname ARJ_NPCPromptPlayerAliasScript extends ReferenceAlias
+{Player alias bootstraps/re-registers the SkyPrompt controller on loading saves.}
+
+ARJ_NPCPromptQuestScript Property Controller Auto
+
+Event OnInit()
+    If Controller != None
+        Controller.Arm()
+    EndIf
+EndEvent
+
+Event OnPlayerLoadGame()
+    If Controller != None
+        Controller.Arm()
+    EndIf
+EndEvent
