@@ -53,6 +53,21 @@ namespace FollowerUnbound
     {
         if (!actor || actor->IsPlayerRef() || actor->IsDead()) return false;
 
+        // Geçici görev refakatçileri (Escort NPCs):
+        // Maurice Jondrelle (Base: 0x0001C605, Ref: 0x0001C606, Quest T03 dunEldergleamT03: 0x0001C48E)
+        // Eldergleam Sanctuary görevinde Maurice oyuncuya refakatçi olur ancak görev bitince
+        // Bethesda Teammate bayrağını temizlemez. Bu nedenle T03 aşaması >= 40 ise takipçi sayılmaz.
+        auto base = actor->GetActorBase();
+        if (base && base->GetFormID() == 0x0001C605) {
+            static auto* t03Quest = RE::TESForm::LookupByID<RE::TESQuest>(0x0001C48E);
+            if (t03Quest && (t03Quest->currentStage >= 40 || t03Quest->IsCompleted())) {
+                if (actor->IsPlayerTeammate()) {
+                    actor->GetActorRuntimeData().boolBits.reset(RE::Actor::BOOL_BITS::kPlayerTeammate);
+                }
+                return false;
+            }
+        }
+
         // Primary check: engine teammate flag (set by ALL follower frameworks + vanilla)
         if (actor->IsPlayerTeammate()) return true;
 
@@ -272,6 +287,7 @@ namespace FollowerUnbound
         }
 
         std::shared_ptr<FollowerProfile> storedProfile;
+        bool isBrandNewProfile = false;
         if (auto d = _dormantProfiles.find(formID); d != _dormantProfiles.end() && d->second) {
             // Daha önce takipçi olmuş: atanmış loadout, tercihler ve tasarruf korunur.
             storedProfile = d->second;
@@ -284,7 +300,29 @@ namespace FollowerUnbound
             logger::info("Registered follower {} [{:08X}] restored from dormant profile.", storedProfile->name, formID);
         } else {
             storedProfile = std::make_shared<FollowerProfile>(std::move(profile));
+            isBrandNewProfile = true;
         }
+
+        // İLK DEFA KATILAN TAKİPÇİLER (Starter Supplies & 100% Needs):
+        // İhtiyaçları tamamen %100 doldurulur.
+        storedProfile->needs.hunger = 100.0f;
+        storedProfile->needs.thirst = 100.0f;
+        storedProfile->needs.fatigue = 100.0f;
+
+        // İlk defa katılan insansı takipçilerin envanterine 2 içecek ve 3 orta boy yemek verilir.
+        if (isBrandNewProfile && !isAnimal) {
+            static auto* breadItem = RE::TESForm::LookupByID<RE::TESBoundObject>(0x00065C97); // FoodBread01 (Ekmek Somunu)
+            static auto* drinkItem = RE::TESForm::LookupByID<RE::TESBoundObject>(0x00034CDF); // FoodAle (Bira / İçecek)
+            if (breadItem) {
+                actor->AddObjectToContainer(breadItem, nullptr, 3, nullptr);
+            }
+            if (drinkItem) {
+                actor->AddObjectToContainer(drinkItem, nullptr, 2, nullptr);
+            }
+            logger::info("RegisterFollower: Granted starter supplies (3x FoodBread, 2x Drink) to {} [{:08X}]",
+                storedProfile->name, formID);
+        }
+
         auto [it, inserted] = _profiles.emplace(formID, std::move(storedProfile));
 
         // Kıyafet koruma ayarı açıksa: yeni kaydedilen takipçinin üzerindeki
@@ -1859,6 +1897,15 @@ namespace
                 }
             }
         }
+
+        // Framework Ayarı: Tüm Takipçileri Ölümsüz / Korumalı yap (Essential / Protected)
+        if (Settings::GetSingleton()->frameworkEssential) {
+            for (auto* actor : activeFollowers) {
+                if (actor && !actor->IsDead()) {
+                    actor->GetActorRuntimeData().boolFlags.set(RE::Actor::BOOL_FLAGS::kProtected);
+                }
+            }
+        }
     }
 
     void FollowerManager::SyncPlayerFollowerCount()
@@ -1878,14 +1925,81 @@ namespace
             }
         }
 
-        // Eğer 10'dan az takipçimiz varsa: PlayerFollowerCount'u 0 tut ki
+        // Framework Ayarı: İkna Kabiliyeti (Speechcraft) ile takipçi sınırı ölçekleme
+        size_t maxAllowed = 10;
+        if (Settings::GetSingleton()->frameworkSpeechcraftScaling) {
+            if (auto* player = RE::PlayerCharacter::GetSingleton()) {
+                if (auto* av = player->AsActorValueOwner()) {
+                    float speech = av->GetActorValue(RE::ActorValue::kSpeech);
+                    // 0-25: 1 takipçi, 25-50: 2, 50-75: 3, 75-99: 4, 100: 5 (veya max 10)
+                    maxAllowed = std::clamp(static_cast<size_t>(1 + (speech / 20.0f)), size_t{ 1 }, size_t{ 10 });
+                }
+            }
+        }
+
+        // Eğer izin verilen sayıdan az takipçimiz varsa: PlayerFollowerCount'u 0 tut ki
         // vanilla 'Beni takip et' diyaloğu tüm NPC'lerde aktif kalsın ve yeni takipçi işe alınabilsin!
-        // 10'a ulaşıldığında: 1 (veya 10) yaparak diyalog alımını sınırla.
-        float targetValue = (humanoidCount < 10) ? 0.0f : static_cast<float>(humanoidCount);
+        // Sınıra ulaşıldığında: 1 (veya max) yaparak diyalog alımını sınırla.
+        float targetValue = (humanoidCount < maxAllowed) ? 0.0f : static_cast<float>(humanoidCount);
         if (global->value != targetValue) {
             global->value = targetValue;
-            logger::info("FollowerManager: Synced PlayerFollowerCount global -> {:.0f} (Active followers: {}/10)",
-                targetValue, humanoidCount);
+            logger::info("FollowerManager: Synced PlayerFollowerCount global -> {:.0f} (Active: {}/{})",
+                targetValue, humanoidCount, maxAllowed);
+        }
+    }
+
+    bool FollowerManager::TeleportFollowerToPlayer(RE::FormID formID)
+    {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) return false;
+
+        auto* actor = RE::TESForm::LookupByID<RE::Actor>(formID);
+        if (!actor || actor->IsDead() || actor->IsPlayerRef()) return false;
+
+        // At üzerinde veya sahnede ise ışınlamayı güvenli şekilde yap
+        actor->MoveTo(player);
+        actor->EvaluatePackage();
+        logger::info("TeleportFollowerToPlayer: Teleported {} [{:08X}] to player position.", actor->GetName(), formID);
+        return true;
+    }
+
+    void FollowerManager::UpdateCatchupTeleport()
+    {
+        auto* settings = Settings::GetSingleton();
+        if (!settings->enableFollowerTeleport) return;
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player || player->IsInCombat()) return;
+
+        const auto now = std::chrono::steady_clock::now();
+        const float thresholdDist = settings->followerTeleportDistance;
+        const float delaySec = settings->followerTeleportDelaySeconds;
+
+        auto followers = GetActiveFollowers();
+        for (auto* actor : followers) {
+            if (!actor || actor->IsDead() || actor->IsPlayerRef()) continue;
+            if (actor->IsInCombat() || AnimationManager::IsRidingWithPlayer(actor)) {
+                _farDistanceStartTime.erase(actor->GetFormID());
+                continue;
+            }
+
+            float dist = player->GetPosition().GetDistance(actor->GetPosition());
+            const auto fid = actor->GetFormID();
+
+            if (dist > thresholdDist) {
+                auto it = _farDistanceStartTime.find(fid);
+                if (it == _farDistanceStartTime.end()) {
+                    _farDistanceStartTime[fid] = now;
+                } else {
+                    float elapsed = std::chrono::duration<float>(now - it->second).count();
+                    if (elapsed >= delaySec) {
+                        TeleportFollowerToPlayer(fid);
+                        _farDistanceStartTime.erase(fid);
+                    }
+                }
+            } else {
+                _farDistanceStartTime.erase(fid);
+            }
         }
     }
 
@@ -1895,5 +2009,6 @@ namespace
         _profiles.clear();
         _dormantProfiles.clear();
         _dormantMeta.clear();
+        _farDistanceStartTime.clear();
     }
 }

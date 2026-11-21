@@ -81,6 +81,10 @@ namespace FollowerUnbound
 
         void Clear();
 
+        // Takipçiyi oyuncunun yanına ışınlama (Catch-up / Manual Teleport)
+        bool TeleportFollowerToPlayer(RE::FormID formID);
+        void UpdateCatchupTeleport();
+
         // 10 Takipçi Yuvası (Multi-Follower Framework)
         void EnsureFollowerSlotsLoaded();
         void SyncFollowerSlots();
@@ -118,5 +122,6 @@ namespace FollowerUnbound
         float _lastGameTimeDays{ 0.0f };
         mutable std::mutex _readMutex;
         std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _readingActiveFollowers;
+        std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _farDistanceStartTime;
     };
 }

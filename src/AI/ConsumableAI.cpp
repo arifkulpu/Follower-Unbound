@@ -675,6 +675,12 @@ namespace FollowerUnbound
     {
         if (!follower || follower->IsDead()) return;
 
+        // Geçici görev refakatçileri (Maurice Jondrelle vb.) ihtiyaç debufflarından etkilenmez
+        auto base = follower->GetActorBase();
+        if (base && base->GetFormID() == 0x0001C605) {
+            return;
+        }
+
         auto avOwner = follower->AsActorValueOwner();
         if (!avOwner) return;
 

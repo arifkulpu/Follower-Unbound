@@ -11,13 +11,13 @@
   let buyCategory = 'overview';
   let pickerOpen = false;
   let selectedGear = new Set();
-  const pageTitles = { overview: 'Overview', equipment: 'Equipment', loot: 'Loot rules', economy: 'Trade & supplies', settings: 'Systems' };
+  const pageTitles = { overview: 'Overview', equipment: 'Equipment', framework: 'Follower Unbound Framework', loot: 'Loot rules', economy: 'Trade & supplies', settings: 'Systems' };
   const language = () => state.settings?.uiLanguage === 'tr' ? 'tr' : 'en';
   // The UI was originally authored in English with a few Turkish loadout labels.
   // Keep the markup readable and translate rendered text centrally, including
   // controls created by every tab and the fixed navigation chrome.
   const trText = {
-    'Overview':'Genel bakış','Equipment':'Ekipman','Loot rules':'Yağma kuralları','Trade & supplies':'Ticaret ve malzemeler','Systems':'Sistemler',
+    'Overview':'Genel bakış','Equipment':'Ekipman','Follower Unbound Framework':'Follower Unbound Framework','Framework':'Framework','Loot rules':'Yağma kuralları','Trade & supplies':'Ticaret ve malzemeler','Systems':'Sistemler',
     'MANAGEMENT':'YÖNETİM','YOUR COMPANY':'YOLDAŞLARIN','FOLLOWER ECONOMY':'TAKİPÇİ EKONOMİSİ','FOLLOWER PREFERENCES':'TAKİPÇİ TERCİHLERİ','GLOBAL BEHAVIOR':'GENEL DAVRANIŞ','THE PEOPLE AT YOUR SIDE':'YANINDAKİLER','LOADOUT CONTROL':'EKİPMAN YÖNETİMİ',
     'SELECT COMPANION':'TAKİPÇİ SEÇ','No companion':'Takipçi yok','No follower selected.':'Takipçi seçilmedi.','No active followers found. Press Scan Party to refresh.':'Aktif takipçi bulunamadı. Yenilemek için grubu tara.',
     'Companions, in one place.':'Tüm takipçiler tek yerde.','Review their condition, equipment and daily routines.':'Durumlarını, ekipmanlarını ve günlük rutinlerini incele.','SCAN PARTY':'GRUBU TARA','Active companions':'Aktif takipçiler','Party gold':'Grup altını','Spendable gold':'Harcanabilir altın','Average hunger':'Ortalama açlık','Average thirst':'Ortalama susuzluk','Average fatigue':'Ortalama yorgunluk','Your followers':'Takipçilerin',
@@ -202,7 +202,7 @@
     const totalSaved = humanoids.reduce((n,f)=>n+Number(f.savedGold||0),0);
     $('content').innerHTML=`<div class="hero"><div><span class="eyebrow">THE PEOPLE AT YOUR SIDE</span><h1>Companions, in one place.</h1><p>Review their condition, equipment and daily routines.</p></div><button class="button secondary" data-refresh>SCAN PARTY</button></div>
       <div class="stats">${stat('Active companions',state.followers.length,'Followers and animal allies')}${stat('Party gold',money(totalGold),`${money(totalSpendable)} spendable${totalSaved>0?` · ${money(totalSaved)} saved`:''}`)}${stat('Spendable gold',money(totalSpendable),'Available for supplies & gear')}${stat('Average hunger',`${avgHunger}%`,'Across tracked companions')}${stat('Average thirst',`${avgThirst}%`,'Across tracked companions')}${stat('Average fatigue',`${avgFatigue}%`,'Across tracked companions')}</div>
-      <div class="section-title">Your followers</div><div class="follower-grid">${state.followers.length?state.followers.map(f=>{const race=f.portraitRace||'nord';const portrait=!f.animal?`<img class="follower-portrait" src="assets/portraits/${race}_${f.portraitFemale?'female':'male'}.jpg" alt="${esc(race)} portrait" onerror="this.classList.add('portrait-missing');this.removeAttribute('src')">`:'';return `<article class="follower-card ${Number(f.id)===Number(selectedFollower)?'selected':''}" data-select-follower="${f.id}">${portrait}<div class="follower-card-body"><div class="follower-top"><div><div class="follower-name">${esc(f.name)}</div><div class="follower-sub">${esc(f.role|| (f.animal?'Animal companion':'Companion'))}${f.portraitRace?` · ${esc(f.portraitRace.replace('_',' '))} · ${f.portraitFemale?'Female':'Male'}`:''}</div></div><span class="role-pill">${f.animal?'ANIMAL':'FOLLOWER'}</span></div><div class="bars">${bar('Hunger',f.hunger)}${bar('Thirst',f.thirst,'thirst')}${bar('Fatigue',f.fatigue,'fatigue')}</div><div class="card-foot"><span class="follower-gold-foot" title="Spendable: ${money(f.spendableGold ?? f.gold)} | Saved: ${money(f.savedGold || 0)} | Total: ${money(f.gold)}">${iconImg(iconFor('gold'),'inline-icon')} <b>${money(f.spendableGold ?? f.gold)}</b> <small>spendable</small>${Number(f.savedGold || 0) > 0 ? ` <small class="gold-sub-detail">(${money(f.gold)} total)</small>` : ''}</span><span>Carry ${Math.round(f.carry||0)} / ${Math.round(f.capacity||0)}</span><span class="gold-actions"><button data-gold="100" data-follower="${f.id}">+100</button><button data-gold="500" data-follower="${f.id}">+500</button></span></div></div></article>`}).join(''):`<div class="empty">No active followers found. Press Scan Party to refresh.</div>`}</div>`;
+      <div class="section-title">Your followers</div><div class="follower-grid">${state.followers.length?state.followers.map(f=>{const race=f.portraitRace||'nord';const portrait=!f.animal?`<img class="follower-portrait" src="assets/portraits/${race}_${f.portraitFemale?'female':'male'}.jpg" alt="${esc(race)} portrait" onerror="this.classList.add('portrait-missing');this.removeAttribute('src')">`:'';return `<article class="follower-card ${Number(f.id)===Number(selectedFollower)?'selected':''}" data-select-follower="${f.id}">${portrait}<div class="follower-card-body"><div class="follower-top"><div><div class="follower-name">${esc(f.name)}</div><div class="follower-sub">${esc(f.role|| (f.animal?'Animal companion':'Companion'))}${f.portraitRace?` · ${esc(f.portraitRace.replace('_',' '))} · ${f.portraitFemale?'Female':'Male'}`:''}</div></div><span class="role-pill">${f.animal?'ANIMAL':'FOLLOWER'}</span></div><div class="bars">${bar('Hunger',f.hunger)}${bar('Thirst',f.thirst,'thirst')}${bar('Fatigue',f.fatigue,'fatigue')}</div><div class="card-foot"><span class="follower-gold-foot" title="Spendable: ${money(f.spendableGold ?? f.gold)} | Saved: ${money(f.savedGold || 0)} | Total: ${money(f.gold)}">${iconImg(iconFor('gold'),'inline-icon')} <b>${money(f.spendableGold ?? f.gold)}</b> <small>spendable</small>${Number(f.savedGold || 0) > 0 ? ` <small class="gold-sub-detail">(${money(f.gold)} total)</small>` : ''}</span><span>Carry ${Math.round(f.carry||0)} / ${Math.round(f.capacity||0)}</span><span class="gold-actions"><button type="button" class="button secondary mini-btn" data-teleport="${f.id}" title="${language()==='tr'?'Takipçiyi yanına ışınla':'Teleport follower to your position'}" style="font-size:11px;padding:3px 8px;margin-right:4px">${language()==='tr'?'Yanıma Işınla':'Teleport'}</button><button data-gold="100" data-follower="${f.id}">+100</button><button data-gold="500" data-follower="${f.id}">+500</button></span></div></div></article>`}).join(''):`<div class="empty">No active followers found. Press Scan Party to refresh.</div>`}</div>`;
   };
   const renderEquipment = () => {
     const f=follower(); if(!f){$('content').innerHTML='<div class="empty">No follower selected.</div>';return;}
@@ -598,14 +598,76 @@
     ];
     $('content').innerHTML=`<div class="hero"><div><span class="eyebrow">GLOBAL BEHAVIOR</span><h1>Systems</h1><p>Control companion automation, notifications and global loot behavior.</p></div><div class="settings-actions">${followerPicker(f?.id)}<button class="button secondary" data-refresh>REFRESH STATE</button></div></div><div class="settings-columns">${groups.map(([title,items])=>`<section class="panel"><div class="group-label">${title}</div>${title.includes('NOTIFICATIONS')?`<div class="notification-actions"><button type="button" class="button secondary mini-btn" data-notif-bulk="true">ENABLE ALL</button><button type="button" class="button secondary mini-btn" data-notif-bulk="false">DISABLE ALL</button></div><label class="toggle-row" style="margin-bottom:12px"><span class="toggle-copy-wrap"><span class="toggle-title">${itemLabel('Notification delivery style','notification')}</span><span class="toggle-copy">Consolidate frequent events into single summary alerts to prevent stutter and screen clutter.</span></span><select class="select" data-setting="notificationMode" style="min-width:175px;height:38px;padding:4px 10px;font-size:12px"><option value="0" ${Number(state.settings.notificationMode??0)===0?'selected':''}>Batched (Toplu Özet)</option><option value="1" ${Number(state.settings.notificationMode??0)===1?'selected':''}>Detailed (Ayrıntılı)</option><option value="2" ${Number(state.settings.notificationMode??0)===2?'selected':''}>Critical Only (Sadece Kritik)</option></select></label>`:''}<div class="toggle-grid">${items.map(([key,label,copy])=>globalCheck(label,key,copy)).join('')}</div></section>`).join('')}<section class="panel"><div class="group-label">EQUIPMENT UPGRADES</div><label class="toggle-row"><span><span class="toggle-title">Gear upgrade check chance (%)</span><span class="toggle-copy">Chance (1–100%) that followers look for or offer better weapons and armor.</span></span><input class="number-input" type="number" min="1" max="100" step="1" data-setting="equipmentUpgradeChance" value="${state.settings.equipmentUpgradeChance||35}"></label></section><section class="panel"><div class="group-label">FOLLOWER GOLD SAVINGS</div>${f?`<div class="savings-setting"><div><strong>${esc(f.name)}</strong><span>Saved ${money(f.prefs.savedGold||0)} of ${money(f.prefs.savingsTarget||1000)} gold</span></div><label><span>Target gold (1–10,000)</span><input class="number-input savings-target-input" type="number" min="1" max="10000" step="1" data-pref="savingsTarget" value="${Math.max(1,Math.min(10000,Number(f.prefs.savingsTarget??1000)))}"></label></div>`:'<div class="empty">No follower selected.</div>'}</section><section class="panel"><div class="group-label">LOOT TIMING</div><label class="toggle-row"><span><span class="toggle-title">Post-combat loot delay</span><span class="toggle-copy">Seconds before followers begin looting.</span></span><input class="number-input" type="number" min="0" max="60" step="1" data-setting="lootDelay" value="${state.settings.lootDelay||0}"></label></section><section class="panel"><div class="group-label">HAYALİ SIRT ÇANTASI KAPASİTESİ</div><label class="toggle-row"><span><span class="toggle-title">Kapasite Sınırı (kg)</span><span class="toggle-copy">Hayali çantaya konabilecek maksimum ağırlık (0 = sınırsız).</span></span><input class="number-input" type="number" min="0" max="1000" step="10" data-setting="backpackWeightLimit" value="${state.settings.backpackWeightLimit??150}"></label></section>${renderTradeWalk()}${renderLootWalk()}<section class="panel"><div class="group-label">MENU HOTKEY</div><div class="toggle-row" style="flex-direction:column;align-items:flex-start;gap:10px"><span><span class="toggle-title">Menüyü açma tuşu</span><span class="toggle-copy">Menüyü açmak istediğiniz kısayol tuşunu veya kombinasyonu seçin. Seçtiğiniz anda ayar otomatik olarak kaydedilir.</span></span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="fu-hotkey-label" style="font-size:13px;font-weight:600;padding:6px 16px;border-radius:6px;background:#181a1f;border:1px solid #4a5568;color:#ecc94b;min-width:100px;text-align:center">${state.settings.menuHotkeyText||'Shift + I'}</span><select class="select" id="fu-hotkey-select" data-hotkey-select style="min-width:220px;height:36px;padding:4px 10px;font-size:13px"><option value="">-- Tuş Değiştir --</option><optgroup label="Shift Kombinasyonları"><option value="0x17,1,Shift + I">Shift + I (Varsayılan)</option><option value="0x16,1,Shift + U">Shift + U</option><option value="0x18,1,Shift + O">Shift + O</option><option value="0x19,1,Shift + P">Shift + P</option><option value="0x25,1,Shift + K">Shift + K</option><option value="0x26,1,Shift + L">Shift + L</option><option value="0x31,1,Shift + N">Shift + N</option><option value="0x32,1,Shift + M">Shift + M</option><option value="0x30,1,Shift + B">Shift + B</option><option value="0x23,1,Shift + H">Shift + H</option><option value="0x24,1,Shift + J">Shift + J</option></optgroup><optgroup label="Ctrl Kombinasyonları"><option value="0x17,2,Ctrl + I">Ctrl + I</option><option value="0x16,2,Ctrl + U">Ctrl + U</option><option value="0x18,2,Ctrl + O">Ctrl + O</option><option value="0x19,2,Ctrl + P">Ctrl + P</option><option value="0x25,2,Ctrl + K">Ctrl + K</option><option value="0x26,2,Ctrl + L">Ctrl + L</option><option value="0x31,2,Ctrl + N">Ctrl + N</option><option value="0x32,2,Ctrl + M">Ctrl + M</option><option value="0x30,2,Ctrl + B">Ctrl + B</option><option value="0x23,2,Ctrl + H">Ctrl + H</option><option value="0x24,2,Ctrl + J">Ctrl + J</option></optgroup><optgroup label="Alt Kombinasyonları"><option value="0x17,4,Alt + I">Alt + I</option><option value="0x16,4,Alt + U">Alt + U</option><option value="0x18,4,Alt + O">Alt + O</option><option value="0x25,4,Alt + K">Alt + K</option><option value="0x26,4,Alt + L">Alt + L</option><option value="0x31,4,Alt + N">Alt + N</option></optgroup><optgroup label="Tek Tuşlar"><option value="0x17,0,I">Sadece I</option><option value="0x16,0,U">Sadece U</option><option value="0x18,0,O">Sadece O</option><option value="0x19,0,P">Sadece P</option><option value="0x25,0,K">Sadece K</option><option value="0x26,0,L">Sadece L</option><option value="0x31,0,N">Sadece N</option><option value="0x32,0,M">Sadece M</option><option value="0x30,0,B">Sadece B</option><option value="0x23,0,H">Sadece H</option><option value="0x24,0,J">Sadece J</option></optgroup><optgroup label="Fonksiyon Tuşları (F1-F12)"><option value="0x3B,0,F1">F1</option><option value="0x3C,0,F2">F2</option><option value="0x3D,0,F3">F3</option><option value="0x3E,0,F4">F4</option><option value="0x40,0,F6">F6</option><option value="0x41,0,F7">F7</option><option value="0x42,0,F8">F8</option><option value="0x43,0,F9">F9</option><option value="0x44,0,F10">F10</option><option value="0x57,0,F11">F11</option><option value="0x58,0,F12">F12</option></optgroup></select></div></div></section></div>`;
   };
+  const renderFramework = () => {
+    const s = state.settings || {};
+    const tr = language() === 'tr';
+    const items = [
+      ['enableTeleport', tr ? 'Otomatik Yetişme Işınlanması' : 'Automatic Catch-Up Teleport', tr ? 'Takipçi loot yaparken veya arazide 30 saniyeden fazla geride kalırsa otomatik yanınıza ışınlanır.' : 'Automatically teleports followers if they lag far behind for over 30s.'],
+      ['frameworkEssential', tr ? 'Takipçiler Ölümsüz / Korumalı' : 'Followers are Essential / Protected', tr ? 'Takipçilerin düşmanlar veya tuzaklar tarafından kalıcı olarak ölmesini engeller.' : 'Prevents followers from dying permanently in combat.'],
+      ['frameworkFriendlyFire', tr ? 'Dost Ateşi Koruması' : 'Friendly Fire Protection', tr ? 'Oyuncunun vuruşları veya büyüleri takipçileri düşman yapmaz veya kavgaya sürüklemez.' : 'Player hits and spells will not anger companions.'],
+      ['frameworkSandbox', tr ? 'Güvenli Bölgelerde Gezinme (Sandbox)' : 'Follower Sandbox in Safe Zones', tr ? 'Şehirlerde, hanlarda ve evlerde oyuncu durduğunda takipçiler etrafta gezinir ve oturur.' : 'Followers sit and relax in inns, player homes and towns.'],
+      ['frameworkSpeechcraftScaling', tr ? 'İkna (Speechcraft) ile Takipçi Sayısı' : 'Scale Limit with Speechcraft', tr ? 'Maksimum takipçi kapasitesi oyuncunun İkna kabiliyetine göre dinamik artar.' : 'Follower cap scales with your Speech skill.']
+    ];
+
+    $('content').innerHTML = `
+      <div class="hero">
+        <div>
+          <span class="eyebrow">COMPANION SYSTEM</span>
+          <h1>Follower Unbound Framework</h1>
+          <p>${tr ? 'Çoklu takipçi yönetimi, otomatik yetişme ışınlanması ve koruma kuralları.' : 'Multi-follower management, catch-up teleport and protection rules.'}</p>
+        </div>
+        <button class="button secondary" data-refresh>${tr ? 'GRUBU TARA' : 'SCAN PARTY'}</button>
+      </div>
+      <div class="settings-columns">
+        <section class="panel">
+          <div class="group-label">${tr ? 'FRAMEWORK AYARLARI' : 'FRAMEWORK SETTINGS'}</div>
+          <div class="toggle-grid">
+            ${items.map(([key, label, copy]) => globalCheck(label, key, copy)).join('')}
+          </div>
+        </section>
+        <section class="panel">
+          <div class="group-label">${tr ? 'IŞINLANMA MESAFE & ZAMAN AYARI' : 'TELEPORT DISTANCE & TIMING'}</div>
+          <label class="toggle-row">
+            <span>
+              <span class="toggle-title">${tr ? 'Işınlanma Mesafe Eşiği (Birim)' : 'Teleport Distance Threshold (Units)'}</span>
+              <span class="toggle-copy">${tr ? 'Takipçi bu mesafeyi aştığında 30 saniyelik sayaç başlar (varsayılan: 3000).' : 'Distance beyond which the catch-up timer starts (default: 3000).'}</span>
+            </span>
+            <input class="number-input" type="number" min="500" max="10000" step="250" data-setting="teleportDistance" value="${s.teleportDistance || 3000}">
+          </label>
+          <label class="toggle-row" style="margin-top:10px">
+            <span>
+              <span class="toggle-title">${tr ? 'Işınlanma Bekleme Süresi (Saniye)' : 'Teleport Delay (Seconds)'}</span>
+              <span class="toggle-copy">${tr ? 'Mesafe aşıldıktan kaç saniye sonra ışınlanacak (varsayılan: 30s).' : 'Seconds to wait before teleporting (default: 30s).'}</span>
+            </span>
+            <input class="number-input" type="number" min="5" max="120" step="5" data-setting="teleportDelay" value="${s.teleportDelay || 30}">
+          </label>
+        </section>
+        <section class="panel">
+          <div class="group-label">${tr ? 'ANLIK IŞINLAMA' : 'INSTANT TELEPORT'}</div>
+          <div style="font-size:12px;color:#aaa;margin-bottom:12px">${tr ? 'Herhangi bir takipçiyi hemen yanınıza ışınlayın:' : 'Immediately teleport any active follower to you:'}</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            ${state.followers.length ? state.followers.map(f => `
+              <div style="display:flex;align-items:center;justify-content:space-between;background:#1b1d22;padding:8px 12px;border-radius:6px;border:1px solid #333">
+                <span style="font-weight:600;font-size:13px">${esc(f.name)} <small style="color:#888">(${esc(f.role || 'Follower')})</small></span>
+                <button type="button" class="button secondary mini-btn" data-teleport="${f.id}" style="font-size:11px;padding:4px 10px">${tr ? 'Yanıma Işınla' : 'Teleport to Me'}</button>
+              </div>
+            `).join('') : `<div class="empty">${tr ? 'Aktif takipçi yok.' : 'No active companions.'}</div>`}
+          </div>
+        </section>
+      </div>
+    `;
+  };
+
   const render = () => {
+    const savedScroll = $('content')?.scrollTop || 0;
     if(!state.followers.some(f=>Number(f.id)===Number(selectedFollower))) selectedFollower=state.followers[0]?.id||0;
     $('page-title').textContent=pageTitles[page];
     $('follower-count').textContent=language()==='tr'?`${state.followers.length} takipçi takip ediliyor`:`${state.followers.length} companion${state.followers.length===1?'':'s'} tracked`;
     document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
-    if(page==='overview')renderOverview();else if(page==='equipment')renderEquipment();else if(page==='loot'||page==='economy')renderPrefs(page);else renderSettings();
+    if(page==='overview')renderOverview();else if(page==='equipment')renderEquipment();else if(page==='framework')renderFramework();else if(page==='loot'||page==='economy')renderPrefs(page);else renderSettings();
     localizeRenderedUI();
     if (typeof window.fuSetLanguage === 'function') window.fuSetLanguage(language());
+    if ($('content')) $('content').scrollTop = savedScroll;
   };
   window.fuSetState=(next)=>{state={...state,...next};if(!selectedFollower&&state.followers.length)selectedFollower=state.followers[0].id;render();};
   $('navigation').addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(!b)return;page=b.dataset.page;pickerOpen=false;render();});
@@ -640,6 +702,14 @@
       const toBp=tfBp.dataset.toBackpack==='true';
       send({kind:'transferBackpack',follower:Number(follower()?.id),item:itemId,toBackpack:toBp,key:tfBp.dataset.bpKey||''});
       notify(toBp?(language()==='tr'?'Eşya sırt çantasına aktarıldı.':'Item stashed into backpack.'):(language()==='tr'?'Eşya sırt çantasından envantere alındı.':'Item retrieved from backpack.'));
+      return;
+    }
+    const teleportBtn=e.target.closest('[data-teleport]');
+    if(teleportBtn){
+      e.stopPropagation();
+      const followerId=Number(teleportBtn.dataset.teleport);
+      send({kind:'teleport',follower:followerId});
+      notify(language()==='tr'?'Takipçi yanınıza ışınlanıyor...':'Teleporting follower to you...');
       return;
     }
     const quickEquip=e.target.closest('[data-quick-equip]');if(quickEquip){e.stopPropagation();send({kind:'equipItem',follower:Number(follower()?.id),item:Number(quickEquip.dataset.quickEquip)});notify('Equipment assigned.');return;}

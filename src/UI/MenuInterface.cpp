@@ -59,6 +59,7 @@ namespace FollowerUnbound
         SKSEMenuFramework::AddSectionItem("Follower Purchase Management", RenderPurchaseMenu);
         SKSEMenuFramework::AddSectionItem("Items to be looted", RenderLootMenu);
         SKSEMenuFramework::AddSectionItem("Items to be sold", RenderSellMenu);
+        SKSEMenuFramework::AddSectionItem("Follower Unbound Framework", RenderFrameworkMenu);
         SKSEMenuFramework::AddSectionItem("Settings", RenderSettingsMenu);
         _hudElement = SKSEMenuFramework::AddHudElement(RenderBackgroundTick);
         logger::info("Registered Follower Unbound PrismaUI launcher and legacy SKSEMenuFramework pages.");
@@ -1511,6 +1512,77 @@ namespace FollowerUnbound
         }
     }
 
+    void __stdcall MenuInterface::RenderFrameworkMenu()
+    {
+        using namespace ImGuiMCP;
+        auto* settings = Settings::GetSingleton();
+        auto* manager = FollowerManager::GetSingleton();
+
+        TextColored(ImVec4{ 0.75f, 0.86f, 1.0f, 1.0f }, "FOLLOWER UNBOUND FRAMEWORK (MULTI-FOLLOWER & MANAGEMENT)");
+        TextDisabled("Advanced companion system inspired by Simple Follower Framework with automatic catch-up teleport.");
+        Separator();
+
+        // ═══════════════════════════════════════════════════════════
+        // CATCH-UP TELEPORT SYSTEM
+        // ═══════════════════════════════════════════════════════════
+        TextColored(ImVec4{ 0.9f, 0.8f, 0.3f, 1.0f }, "Catch-Up Teleportation");
+        Checkbox("Enable Automatic Catch-Up Teleport", &settings->enableFollowerTeleport);
+        if (IsItemHovered()) SetTooltip("If a follower gets lost or lags far behind for more than 30 seconds, automatically teleports them to you.");
+
+        if (settings->enableFollowerTeleport) {
+            SliderFloat("Teleport Distance Threshold", &settings->followerTeleportDistance, 500.0f, 10000.0f, "%.0f units");
+            if (IsItemHovered()) SetTooltip("Distance threshold beyond which the 30-second catch-up timer begins (default ~3000 units).");
+
+            SliderFloat("Teleport Delay (seconds)", &settings->followerTeleportDelaySeconds, 5.0f, 120.0f, "%.0f sec");
+            if (IsItemHovered()) SetTooltip("How long the follower must stay far behind before being teleported (default 30 seconds).");
+        }
+
+        Separator();
+
+        // ═══════════════════════════════════════════════════════════
+        // COMPANION FRAMEWORK RULES
+        // ═══════════════════════════════════════════════════════════
+        TextColored(ImVec4{ 0.4f, 0.8f, 0.9f, 1.0f }, "Follower Protection & Combat");
+        Checkbox("Followers are Essential / Protected", &settings->frameworkEssential);
+        if (IsItemHovered()) SetTooltip("Prevents active followers from being killed permanently by enemies or traps.");
+
+        Checkbox("Friendly Fire Protection", &settings->frameworkFriendlyFire);
+        if (IsItemHovered()) SetTooltip("Player weapons and spells will not turn followers hostile or provoke infighting.");
+
+        Checkbox("Follower Sandbox in Safe Zones", &settings->frameworkSandbox);
+        if (IsItemHovered()) SetTooltip("Followers relax, sit, and wander in towns, taverns, and homes when player is idle.");
+
+        Checkbox("Scale Follower Limit with Speechcraft", &settings->frameworkSpeechcraftScaling);
+        if (IsItemHovered()) SetTooltip("Follower limit scales dynamically with your Speechcraft skill (up to 10 companions).");
+
+        Separator();
+
+        // ═══════════════════════════════════════════════════════════
+        // ACTIVE FOLLOWERS & MANUAL TELEPORT
+        // ═══════════════════════════════════════════════════════════
+        TextColored(ImVec4{ 0.3f, 0.9f, 0.4f, 1.0f }, "Active Companions & Instant Teleport");
+        auto followers = manager->GetActiveFollowers();
+        if (followers.empty()) {
+            TextDisabled("No active companions in party.");
+        } else {
+            for (auto* actor : followers) {
+                if (!actor) continue;
+                PushID(static_cast<int>(actor->GetFormID()));
+                Text("%s [0x%08X]", actor->GetName(), actor->GetFormID());
+                SameLine();
+                if (Button("Teleport to Me")) {
+                    manager->TeleportFollowerToPlayer(actor->GetFormID());
+                }
+                PopID();
+            }
+        }
+
+        Separator();
+        if (Button("Save Framework Settings")) {
+            settings->Save();
+        }
+    }
+
     void __stdcall MenuInterface::RenderBackgroundTick()
     {
         // SKSEMenuFramework her frame HUD çiziminde bu fonksiyonu çağırır.
@@ -1577,6 +1649,9 @@ namespace FollowerUnbound
                 scanDivider = 0;
                 FollowerManager::GetSingleton()->ScanForActiveFollowers();
             }
+
+            // Takipçi mesafe kontrolü ve yetişme ışınlanması (Catch-up Teleport)
+            FollowerManager::GetSingleton()->UpdateCatchupTeleport();
         }
 
         // 2. Her 3 saniyede bir: Oyun zamanı delta'sını hesapla ve normal oynanışta da ihtiyaçları düşür

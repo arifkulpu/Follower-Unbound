@@ -594,6 +594,13 @@ namespace FollowerUnbound
         const auto kind = a.value("kind", std::string{});
         auto* manager = FollowerManager::GetSingleton();
         if (kind == "refresh") { manager->ScanForActiveFollowers(); return; }
+        if (kind == "teleport") {
+            const auto followerID = a.value("follower", uint32_t{ 0 });
+            if (followerID) {
+                manager->TeleportFollowerToPlayer(followerID);
+            }
+            return;
+        }
         if (kind == "notificationsBulk") {
             auto* s = Settings::GetSingleton();
             const bool enable = a.value("enable", false);
@@ -668,6 +675,17 @@ namespace FollowerUnbound
             FU_SET_BOOL("lootFood", lootFood) FU_SET_BOOL("lootIngredients", lootIngredients)
             FU_SET_BOOL("lootSoulGems", lootSoulGems) FU_SET_BOOL("lootMisc", lootMisc)
             FU_SET_BOOL("backpackWeightLimitEnabled", enableBackpackWeightLimit)
+            FU_SET_BOOL("enableTeleport", enableFollowerTeleport)
+            FU_SET_BOOL("frameworkEssential", frameworkEssential)
+            FU_SET_BOOL("frameworkFriendlyFire", frameworkFriendlyFire)
+            FU_SET_BOOL("frameworkSandbox", frameworkSandbox)
+            FU_SET_BOOL("frameworkSpeechcraftScaling", frameworkSpeechcraftScaling)
+            if (key == "teleportDistance" && v.is_number()) {
+                s->followerTeleportDistance = std::clamp(v.get<float>(), 500.0f, 20000.0f);
+            }
+            if (key == "teleportDelay" && v.is_number()) {
+                s->followerTeleportDelaySeconds = std::clamp(v.get<float>(), 5.0f, 300.0f);
+            }
             if (key == "backpackWeightLimit") {
                 if (v.is_number()) s->backpackWeightLimit = std::max(0.0f, v.get<float>());
             }
@@ -916,6 +934,13 @@ namespace FollowerUnbound
             {"lootArrows",settings->lootArrows},{"lootPotions",settings->lootPotions},
             {"lootFood",settings->lootFood},{"lootIngredients",settings->lootIngredients},
             {"lootSoulGems",settings->lootSoulGems},{"lootMisc",settings->lootMisc},
+            {"enableTeleport",settings->enableFollowerTeleport},
+            {"teleportDistance",settings->followerTeleportDistance},
+            {"teleportDelay",settings->followerTeleportDelaySeconds},
+            {"frameworkEssential",settings->frameworkEssential},
+            {"frameworkFriendlyFire",settings->frameworkFriendlyFire},
+            {"frameworkSandbox",settings->frameworkSandbox},
+            {"frameworkSpeechcraftScaling",settings->frameworkSpeechcraftScaling},
             {"backpackWeightLimitEnabled",settings->enableBackpackWeightLimit},
             {"backpackWeightLimit",settings->backpackWeightLimit},
             {"notificationMode",settings->notificationMode},

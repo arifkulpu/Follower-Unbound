@@ -125,6 +125,15 @@ namespace FollowerUnbound
         enableBackpackWeightLimit  = readBool("Backpack", "EnableBackpackWeightLimit", true);
         backpackWeightLimit        = readFloat("Backpack", "BackpackWeightLimit",      150.0f);
 
+        // ── FRAMEWORK & TELEPORT ──
+        enableFollowerTeleport       = readBool("Framework", "EnableFollowerTeleport", true);
+        followerTeleportDistance     = std::clamp(readFloat("Framework", "FollowerTeleportDistance", 3000.0f), 500.0f, 20000.0f);
+        followerTeleportDelaySeconds = std::clamp(readFloat("Framework", "FollowerTeleportDelaySeconds", 30.0f), 5.0f, 300.0f);
+        frameworkEssential           = readBool("Framework", "FrameworkEssential", true);
+        frameworkFriendlyFire        = readBool("Framework", "FrameworkFriendlyFire", true);
+        frameworkSandbox             = readBool("Framework", "FrameworkSandbox", true);
+        frameworkSpeechcraftScaling  = readBool("Framework", "FrameworkSpeechcraftScaling", false);
+
         // ── NOTIFICATION TOGGLES ──
         enableNotifications       = readBool("Notifications", "EnableNotifications",       true);
         notificationMode          = static_cast<uint32_t>(std::clamp(readInt("Notifications", "NotificationMode", 0), 0, 2));
@@ -244,6 +253,15 @@ namespace FollowerUnbound
         // ── VIRTUAL BACKPACK LIMIT ──
         writeBool("Backpack", "EnableBackpackWeightLimit", enableBackpackWeightLimit);
         writeFloat("Backpack", "BackpackWeightLimit",      backpackWeightLimit);
+
+        // ── FRAMEWORK & TELEPORT ──
+        writeBool("Framework", "EnableFollowerTeleport",       enableFollowerTeleport);
+        writeFloat("Framework", "FollowerTeleportDistance",     followerTeleportDistance);
+        writeFloat("Framework", "FollowerTeleportDelaySeconds", followerTeleportDelaySeconds);
+        writeBool("Framework", "FrameworkEssential",           frameworkEssential);
+        writeBool("Framework", "FrameworkFriendlyFire",        frameworkFriendlyFire);
+        writeBool("Framework", "FrameworkSandbox",             frameworkSandbox);
+        writeBool("Framework", "FrameworkSpeechcraftScaling",  frameworkSpeechcraftScaling);
 
         // ── NOTIFICATION TOGGLES ──
         writeBool("Notifications", "EnableNotifications",       enableNotifications);

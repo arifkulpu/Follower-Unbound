@@ -76,6 +76,15 @@ namespace FollowerUnbound
         bool enableBackpackWeightLimit{ true }; // Hayali çanta ağırlık sınırı sistemi
         float backpackWeightLimit{ 150.0f };    // Hayali çanta maksimum taşıma kapasitesi (0 = sınırsız)
 
+        // ── FOLLOWER UNBOUND FRAMEWORK & CATCH-UP TELEPORT ──
+        bool enableFollowerTeleport{ true };         // Geride kalan takipçileri otomatik ışınla
+        float followerTeleportDistance{ 3000.0f };   // Otomatik ışınlanma mesafe eşiği (units, ~40m)
+        float followerTeleportDelaySeconds{ 30.0f }; // Mesafenin aşılmasından sonra beklenecek süre (saniye)
+        bool frameworkEssential{ true };             // Takipçileri Ölümsüz / Korumalı yap (Essential / Protected)
+        bool frameworkFriendlyFire{ true };          // Takipçilere dost ateşi koruması (oyuncu vuruşları düşman etmez)
+        bool frameworkSandbox{ true };               // Oyuncu durduğunda takipçilerin çevrede gezinmesi (Sandbox modu)
+        bool frameworkSpeechcraftScaling{ false };   // İkna kabiliyeti (Speechcraft) ile takipçi sınırı ölçekleme
+
         // ── NOTIFICATION TOGGLES ──
         // Subsystem runs normally; only the HUD notification is suppressed when false.
         bool enableNotifications{ true };         // Master toggle for all notifications

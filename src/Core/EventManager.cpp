@@ -509,6 +509,16 @@ namespace FollowerUnbound
         auto cause = a_event->cause ? a_event->cause->As<RE::Actor>() : nullptr;
         CombatTracker::GetSingleton()->NotifyCombatActivity(cause, target);
 
+        // Simple Follower Framework - Dost Ateşi (Friendly Fire) Koruması
+        // Oyuncunun takipçilere kazara vurması takipçilerin düşmanlaşmasını veya misilleme yapmasını engeller
+        if (target && cause && cause->IsPlayerRef()) {
+            if (Settings::GetSingleton()->frameworkFriendlyFire) {
+                if (FollowerManager::GetSingleton()->IsFollower(target->GetFormID())) {
+                    target->StopCombat();
+                }
+            }
+        }
+
         // TESHitEvent sırasında oyun motoru hasar/zırh/ekipman hesaplamalarının ortasındadır.
         // Burada doğrudan DrinkPotion/RemoveItem çağırmak, FollowerEquipControl gibi harici
         // modların ekipman kancalarıyla (hooks) çakışarak STACK_OVERFLOW çökmesine yol açabilir.

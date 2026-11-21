@@ -20,6 +20,7 @@ namespace FollowerUnbound
         static void __stdcall RenderLootMenu();
         static void __stdcall RenderSellMenu();
         static void __stdcall RenderSettingsMenu();
+        static void __stdcall RenderFrameworkMenu();
         static void __stdcall RenderBackgroundTick();
 
     private:
