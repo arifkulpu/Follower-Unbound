@@ -955,6 +955,19 @@ namespace
         }
         // Motor çağrısı kilit dışında (kilit altında EquipObject deadlock riski taşır).
         if (auto* actor = RE::TESForm::LookupByID<RE::Actor>(targetFormID)) {
+            // Oyunu kayıttan yüklediğimizde motor teammate flag'ini ve fraksiyonları sıfırlamış olabilir.
+            // Aktif kayıtlı takipçinin teammate bayrağını ve CurrentFollowerFaction üyeliğini koru!
+            if (!applied->isAnimal) {
+                static auto* vanillaFollowerFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x0005C84E);
+                if (vanillaFollowerFaction && !actor->IsInFaction(vanillaFollowerFaction)) {
+                    actor->AddToFaction(vanillaFollowerFaction, 0);
+                }
+                if (!actor->IsPlayerTeammate()) {
+                    actor->GetActorRuntimeData().boolBits.set(RE::Actor::BOOL_BITS::kPlayerTeammate);
+                }
+                actor->EvaluatePackage();
+            }
+
             for (auto spellID : applied->learnedSpells) {
                 if (auto* sp = RE::TESForm::LookupByID<RE::SpellItem>(spellID)) {
                     if (!actor->HasSpell(sp)) actor->AddSpell(sp);
@@ -1849,6 +1862,10 @@ namespace
                 // Yuvayı boşalt
                 if (auto* oldActor = RE::TESForm::LookupByID<RE::Actor>(assignedFid)) {
                     oldActor->RemoveFromFaction(_followerSlots[i].faction);
+                    static auto* vanillaFollowerFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x0005C84E);
+                    if (vanillaFollowerFaction) {
+                        oldActor->RemoveFromFaction(vanillaFollowerFaction);
+                    }
                     oldActor->GetActorRuntimeData().boolBits.reset(RE::Actor::BOOL_BITS::kPlayerTeammate);
                     oldActor->EvaluatePackage();
                 }
@@ -1877,6 +1894,16 @@ namespace
                 if (_slotAssignedActors[i] == 0) {
                     _slotAssignedActors[i] = fid;
                     actor->AddToFaction(_followerSlots[i].faction, 0);
+
+                    // Hem kendi yuvamıza hem de vanilla CurrentFollowerFaction'a (0x0005C84E) ekle!
+                    // Böylece:
+                    // 1) Skyrim motoru oyunu kaydedip yüklediğinde NPC'yi gerçek takipçi olarak tanır.
+                    // 2) Vanilla diyaloglarında "Beni takip et" seçeneği gizlenir (çünkü zaten takipçidir).
+                    // 3) NPC'ler save load sonrasında da oyuncuyu takip etmeye devam eder.
+                    static auto* vanillaFollowerFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x0005C84E);
+                    if (vanillaFollowerFaction && !actor->IsInFaction(vanillaFollowerFaction)) {
+                        actor->AddToFaction(vanillaFollowerFaction, 0);
+                    }
 
                     // Ensure engine teammate status is true so game behaves properly
                     if (!actor->IsPlayerTeammate()) {

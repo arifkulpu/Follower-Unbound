@@ -234,10 +234,16 @@
 .equip-prompt-header-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .equip-prompt-slot-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;background:rgba(220,170,70,0.18);border:1px solid rgba(220,170,70,0.45);color:#ffd885;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase}
 .slot-tag{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);color:#e2e8f0;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;letter-spacing:0.04em}
-.follower-gold-foot{display:inline-flex;align-items:center;gap:5px;min-width:0;white-space:nowrap}
+/* Follower card footer styling: clean alignment for gold, carry weight and actions */
+.card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;border-top:1px solid #29312b;margin-top:13px;padding-top:11px;color:#8d978d;font-size:11px}
+.follower-gold-foot{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-size:11px}
 .follower-gold-foot b{color:#f6d289;font-weight:700}
-.follower-gold-foot small{color:#a2ab9e;font-size:11px}
-.follower-gold-foot .gold-sub-detail{opacity:0.8;font-size:10px;color:#859182}
+.follower-gold-foot small{color:#a2ab9e;font-size:10px}
+.follower-gold-foot .gold-sub-detail{opacity:0.8;font-size:10px;color:#859182;margin-left:2px}
+.follower-carry-foot{display:inline-flex;align-items:center;white-space:nowrap;font-size:11px;color:#9aa599}
+.card-foot .gold-actions{display:flex;align-items:center;gap:5px;margin-left:auto;flex-wrap:nowrap}
+.card-foot .gold-actions button{white-space:nowrap}
+
 
 /* Equipment cards grow with their contents so names, icons and controls stay inside. */
 .equipment-gear-list{grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));grid-auto-rows:max-content;align-items:start;justify-content:stretch}
