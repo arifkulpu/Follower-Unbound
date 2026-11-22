@@ -235,15 +235,15 @@
 .equip-prompt-slot-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;background:rgba(220,170,70,0.18);border:1px solid rgba(220,170,70,0.45);color:#ffd885;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase}
 .slot-tag{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);color:#e2e8f0;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;letter-spacing:0.04em}
 /* Follower card footer styling: clean grid/flex alignment for gold, carry weight and actions */
-.card-foot{display:grid;grid-template-columns:auto 1fr auto;align-items:center;column-gap:12px;row-gap:6px;border-top:1px solid #29312b;margin-top:12px;padding-top:10px;color:#8d978d;font-size:11px}
-.follower-gold-foot{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-size:11px}
+.card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid #29312b;margin-top:10px;padding-top:8px;color:#8d978d;font-size:10px;flex-wrap:nowrap}
+.follower-gold-foot{display:inline-flex;align-items:center;gap:3px;white-space:nowrap;font-size:10px;flex-shrink:1;min-width:0}
 .follower-gold-foot b{color:#f6d289;font-weight:700}
-.follower-gold-foot small{color:#a2ab9e;font-size:10px}
-.follower-gold-foot .gold-sub-detail{opacity:0.8;font-size:10px;color:#859182;margin-left:2px}
-.follower-carry-foot{display:inline-flex;align-items:center;justify-self:center;white-space:nowrap;font-size:11px;color:#9aa599}
-.card-foot .gold-actions{display:inline-flex;align-items:center;gap:5px;justify-self:end;flex-wrap:nowrap}
-.card-foot .gold-actions button{white-space:nowrap;padding:4px 8px;font-size:11px;height:26px;display:inline-flex;align-items:center;justify-content:center}
-.card-foot .gold-actions .teleport-btn{background:linear-gradient(135deg,#2e3b2f,#1e2620);border-color:#526d55;color:#cce7cf;font-weight:600}
+.follower-gold-foot small{color:#a2ab9e;font-size:9px}
+.follower-gold-foot .gold-sub-detail{opacity:0.75;font-size:9px;color:#859182}
+.follower-carry-foot{display:inline-flex;align-items:center;white-space:nowrap;font-size:10px;color:#9aa599;margin:0 4px;flex-shrink:0}
+.card-foot .gold-actions{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;margin-left:auto}
+.card-foot .gold-actions button{white-space:nowrap;padding:2px 7px;font-size:10px;height:24px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center}
+.card-foot .gold-actions .teleport-btn{background:linear-gradient(135deg,#2e3b2f,#1e2620);border-color:#526d55;color:#cce7cf;font-weight:600;padding:2px 8px}
 .card-foot .gold-actions .teleport-btn:hover{border-color:#78a87d;color:#e8fbe9}
 
 
