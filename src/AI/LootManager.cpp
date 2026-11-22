@@ -933,8 +933,14 @@ namespace FollowerUnbound
             else if (auto* alchemy = item->As<RE::AlchemyItem>()) {
                 if (alchemy->IsPoison()) enabled = settings->lootPotions;
                 else enabled = settings->lootPotions || settings->lootFood;
-            } else if (item->As<RE::IngredientItem>()) enabled = settings->lootIngredients;
-            else if (item->As<RE::TESSoulGem>()) enabled = settings->lootSoulGems;
+            } else if (item->As<RE::IngredientItem>()) {
+                // Tuz (Salt Pile: 0x34CDF) ve yemek yapımında kullanılan malzemeler lootFood açıksa da toplanır
+                if (item->GetFormID() == 0x00034CDF && settings->lootFood) {
+                    enabled = true;
+                } else {
+                    enabled = settings->lootIngredients;
+                }
+            } else if (item->As<RE::TESSoulGem>()) enabled = settings->lootSoulGems;
             if (!enabled) continue;
 
             const float itemWeight = item->GetWeight();

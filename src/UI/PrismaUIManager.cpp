@@ -114,7 +114,8 @@ namespace FollowerUnbound
                 {"allowCraftTorches",p.allowCraftTorches},
                 {"savingsEnabled",p.savingsEnabled},{"savingsTarget",p.savingsTarget},
                 {"savingsPercent",p.savingsPercent},{"savedGold",p.savedGold},
-                {"allowCraftPotions",p.allowCraftPotions},{"allowUpgradeEquipment",p.allowUpgradeEquipment},
+                {"allowCraftPotions",p.allowCraftPotions},{"allowCraftFood",p.allowCraftFood},
+                {"allowUpgradeEquipment",p.allowUpgradeEquipment},
                 {"receiveQuestRewards",p.receiveQuestRewards},{"rewardSharePercent",p.rewardSharePercent},
                 {"preferredArmorType",p.preferredArmorType},
                 {"primaryWeaponStyle",p.primaryWeaponStyle},
@@ -215,7 +216,7 @@ namespace FollowerUnbound
             FU_BOOL_PREF("buyCurePoisonPotions", buyCurePoisonPotions) FU_UINT_PREF("maxCurePoisonPotions", maxCurePoisonPotions, 0, 25)
             FU_BOOL_PREF("allowCraftBolts", allowCraftBolts) FU_BOOL_PREF("allowCraftTorches", allowCraftTorches)
             FU_BOOL_PREF("savingsEnabled", savingsEnabled) FU_UINT_PREF("savingsPercent", savingsPercent, 0, 100)
-            FU_BOOL_PREF("allowCraftPotions", allowCraftPotions) FU_BOOL_PREF("allowUpgradeEquipment", allowUpgradeEquipment)
+            FU_BOOL_PREF("allowCraftPotions", allowCraftPotions) FU_BOOL_PREF("allowCraftFood", allowCraftFood) FU_BOOL_PREF("allowUpgradeEquipment", allowUpgradeEquipment)
             FU_BOOL_PREF("receiveQuestRewards", receiveQuestRewards)
             FU_UINT_PREF("preferredArmorType", preferredArmorType, 0, 3)
             FU_UINT_PREF("primaryWeaponStyle", primaryWeaponStyle, 0, 5)

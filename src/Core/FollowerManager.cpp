@@ -13,13 +13,19 @@
 
 namespace FollowerUnbound
 {
-    static bool HasNearbyCraftingStation(RE::Actor* actor, bool alchemy)
-    {
-        if (!actor || !actor->Is3DLoaded()) return false;
-        auto* cell = actor->GetParentCell();
-        if (!cell) return false;
+    enum class CraftStationType {
+        Forge,
+        Alchemy,
+        Cooking
+    };
 
-        bool found = false;
+    static RE::TESObjectREFR* FindNearbyCraftingStation(RE::Actor* actor, CraftStationType type)
+    {
+        if (!actor || !actor->Is3DLoaded()) return nullptr;
+        auto* cell = actor->GetParentCell();
+        if (!cell) return nullptr;
+
+        RE::TESObjectREFR* foundRef = nullptr;
         // Skyrim units: 400 units is roughly a small room's working distance.
         cell->ForEachReferenceInRange(actor->GetPosition(), 400.0f, [&](RE::TESObjectREFR* ref) {
             if (!ref) return RE::BSContainer::ForEachResult::kContinue;
@@ -28,16 +34,33 @@ namespace FollowerUnbound
             if (!keywords) return RE::BSContainer::ForEachResult::kContinue;
 
             // Use editor IDs so this also recognizes equivalent stations added by mods.
-            const bool matches = alchemy
-                ? (keywords->HasKeywordString("WICraftingAlchemy") || keywords->HasKeywordString("CraftingAlchemyWorkbench"))
-                : (keywords->HasKeywordString("CraftingSmithingForge"));
+            bool matches = false;
+            switch (type) {
+            case CraftStationType::Alchemy:
+                matches = keywords->HasKeywordString("WICraftingAlchemy") || keywords->HasKeywordString("CraftingAlchemyWorkbench");
+                break;
+            case CraftStationType::Cooking:
+                matches = keywords->HasKeywordString("CraftingCookpot") || keywords->HasKeywordString("CraftTypeCookpot") ||
+                          keywords->HasKeywordString("isCookingSpit") || keywords->HasKeywordString("isSmallCookingPot");
+                break;
+            case CraftStationType::Forge:
+            default:
+                matches = keywords->HasKeywordString("CraftingSmithingForge");
+                break;
+            }
+
             if (matches) {
-                found = true;
+                foundRef = ref;
                 return RE::BSContainer::ForEachResult::kStop;
             }
             return RE::BSContainer::ForEachResult::kContinue;
         });
-        return found;
+        return foundRef;
+    }
+
+    static bool HasNearbyCraftingStation(RE::Actor* actor, CraftStationType type)
+    {
+        return FindNearbyCraftingStation(actor, type) != nullptr;
     }
 
     void FollowerManager::Initialize()
@@ -965,6 +988,11 @@ namespace
                 if (!actor->IsPlayerTeammate()) {
                     actor->GetActorRuntimeData().boolBits.set(RE::Actor::BOOL_BITS::kPlayerTeammate);
                 }
+                if (auto* av = actor->AsActorValueOwner()) {
+                    if (av->GetActorValue(RE::ActorValue::kWaitingForPlayer) != 0.0f) {
+                        av->SetActorValue(RE::ActorValue::kWaitingForPlayer, 0.0f);
+                    }
+                }
                 actor->EvaluatePackage();
             }
 
@@ -1447,12 +1475,17 @@ namespace
     {
         if (!actor || actor->IsDead() || actor->IsInCombat() || profile.isAnimal) return;
         if (!profile.preferences.allowCraftPotions && !profile.preferences.allowCraftArrows &&
-            !profile.preferences.allowCraftBolts && !profile.preferences.allowCraftTorches) return;
+            !profile.preferences.allowCraftBolts && !profile.preferences.allowCraftTorches &&
+            !profile.preferences.allowCraftFood) return;
 
-        const bool nearForge = (profile.preferences.allowCraftArrows || profile.preferences.allowCraftBolts || profile.preferences.allowCraftTorches)
-            ? HasNearbyCraftingStation(actor, false) : false;
-        const bool nearAlchemy = profile.preferences.allowCraftPotions
-            ? HasNearbyCraftingStation(actor, true) : false;
+        auto* alchemyStation = profile.preferences.allowCraftPotions ? FindNearbyCraftingStation(actor, CraftStationType::Alchemy) : nullptr;
+        auto* forgeStation = (profile.preferences.allowCraftArrows || profile.preferences.allowCraftBolts || profile.preferences.allowCraftTorches)
+            ? FindNearbyCraftingStation(actor, CraftStationType::Forge) : nullptr;
+        auto* cookingStation = profile.preferences.allowCraftFood ? FindNearbyCraftingStation(actor, CraftStationType::Cooking) : nullptr;
+
+        const bool nearForge = (forgeStation != nullptr);
+        const bool nearAlchemy = (alchemyStation != nullptr);
+        const bool nearCooking = (cookingStation != nullptr);
 
         // Ok veya arbalet kullanıcısı mı ya da cephane üretimi açık mı?
         bool isRangedClass = (profile.role == FollowerRole::Archer ||
@@ -1480,6 +1513,25 @@ namespace
         static auto* magickaPotionObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0003EAE1);
         static auto* staminaPotionObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x00039BE8);
 
+        // Yemek Malzemeleri:
+        static auto* saltPileObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x00034CDF); // Salt Pile (Tuz)
+        static auto* potatoObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x00064B41);   // Patates
+        static auto* cabbageObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x00064B3F);  // Lahana
+        static auto* leekObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x000669A5);     // Pırasa
+        static auto* tomatoObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x00064B42);   // Domates
+        static auto* appleObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x00064B2E);    // Kırmızı Elma
+        static auto* rawBeefObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x00065C99);  // Çiğ Dana Eti
+        static auto* rawVenisonObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x000669A2); // Çiğ Geyik Eti
+
+        // Yemek Çıktıları:
+        static auto* vegSoupObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x000F431E);       // Sebze Çorbası
+        static auto* beefStewObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x000F4314);      // Dana Güveç
+        static auto* venisonStewObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x000F431D);   // Geyik Güveç
+        static auto* appleCabbageStewObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x000EBA01); // Elmalı Lahana Güveci
+        static auto* cabbagePotatoSoupObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x000F431B); // Lahana Patates Çorbası
+        static auto* cookedBeefObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x000721E8);    // Pişmiş Et
+        static auto* cookedVenisonObj = RE::TESForm::LookupByID<RE::TESBoundObject>(0x000722BD); // Pişmiş Geyik Eti
+
         // Çıktı FormID'leri:
         // Iron Arrow: 0x0001397D (1 Firewood + 1 Iron Ingot -> 24 Arrows)
         // Steel Arrow: 0x0001397E (1 Firewood + 1 Steel Ingot -> 24 Arrows)
@@ -1495,10 +1547,7 @@ namespace
             return nullptr;
         }();
 
-        // Use simple vanilla recipes that share the restorative effect:
-        // Blue Mountain Flower + Wheat, Red Mountain Flower + White Cap,
-        // and Purple Mountain Flower + Pine Thrush Egg. Craft one potion per
-        // update, respecting each follower's existing potion-stock target.
+        // 1. SİMYA MASASI İLE İKSİR ÜRETİMİ (Simya Tezgahını Kullanarak)
         if (profile.preferences.allowCraftPotions && nearAlchemy) {
             struct PotionRecipe { RE::TESBoundObject* first; RE::TESBoundObject* second; RE::TESBoundObject* result; int32_t stock; uint32_t target; const char* label; };
             const auto stock = ShoppingAI::GetSupplyCounts(actor);
@@ -1513,10 +1562,75 @@ namespace
                 actor->RemoveItem(recipe.first, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
                 actor->RemoveItem(recipe.second, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
                 actor->AddObjectToContainer(recipe.result, nullptr, 1, nullptr);
+
+                // Tezgah animasyonunu oynat
+                AnimationManager::SendAnimEvent(actor, "IdleAlchemyEnter");
                 if (Settings::GetSingleton()->notifySelling) {
                     notifier->ShowHUDMessage(std::format("{} crafted a {}.", actor->GetName(), recipe.label));
                 }
                 logger::info("Autonomous Crafting: {} crafted {}; potion stock {}/{}.", actor->GetName(), recipe.label, recipe.stock + 1, recipe.target);
+                return;
+            }
+        }
+
+        // 2. OCAK VE KAZANLARDA VANILYA YEMEKLERİ PİŞİRME
+        if (profile.preferences.allowCraftFood && nearCooking) {
+            const auto supplyCounts = ShoppingAI::GetSupplyCounts(actor);
+            const uint32_t curMedium = static_cast<uint32_t>(std::max<int32_t>(0, supplyCounts.foodM));
+            const uint32_t maxMedium = profile.preferences.maxFoodMedium;
+            const uint32_t curLarge = static_cast<uint32_t>(std::max<int32_t>(0, supplyCounts.foodL));
+            const uint32_t maxLarge = profile.preferences.maxFoodLarge;
+
+            struct FoodRecipe {
+                std::vector<RE::TESBoundObject*> ingredients;
+                RE::TESBoundObject* output;
+                bool isLarge;
+                const char* name;
+            };
+
+            const FoodRecipe foodRecipes[] = {
+                // Sebze Çorbası: Lahana + Patates + Pırasa + Domates
+                { { cabbageObj, potatoObj, leekObj, tomatoObj }, vegSoupObj, false, "Vegetable Soup" },
+                // Elmalı Lahana Güveci: Tuz + Elma + Lahana
+                { { saltPileObj, appleObj, cabbageObj }, appleCabbageStewObj, false, "Apple Cabbage Stew" },
+                // Lahana Patates Çorbası: Lahana + Patates + Pırasa + Tuz
+                { { cabbageObj, potatoObj, leekObj, saltPileObj }, cabbagePotatoSoupObj, false, "Cabbage Potato Soup" },
+                // Geyik Güveci: Çiğ Geyik Eti + Tuz + Patates + Pırasa
+                { { rawVenisonObj, saltPileObj, potatoObj, leekObj }, venisonStewObj, false, "Venison Stew" },
+                // Dana Güveci: Çiğ Dana Eti + Patates + Tuz
+                { { rawBeefObj, potatoObj, saltPileObj }, beefStewObj, false, "Beef Stew" },
+                // Pişmiş Dana Eti: Çiğ Dana Eti + Tuz
+                { { rawBeefObj, saltPileObj }, cookedBeefObj, true, "Cooked Beef" },
+                // Pişmiş Geyik Eti: Çiğ Geyik Eti + Tuz
+                { { rawVenisonObj, saltPileObj }, cookedVenisonObj, true, "Cooked Venison" }
+            };
+
+            for (const auto& rec : foodRecipes) {
+                if (!rec.output) continue;
+                if (rec.isLarge && curLarge >= maxLarge) continue;
+                if (!rec.isLarge && curMedium >= maxMedium) continue;
+
+                bool hasAll = true;
+                for (auto* ing : rec.ingredients) {
+                    if (!ing || evaluator->GetItemCount(actor, ing) <= 0) {
+                        hasAll = false;
+                        break;
+                    }
+                }
+                if (!hasAll) continue;
+
+                // Malzemeleri tüket
+                for (auto* ing : rec.ingredients) {
+                    actor->RemoveItem(ing, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
+                }
+                actor->AddObjectToContainer(rec.output, nullptr, 1, nullptr);
+
+                // Pişirme animasyonunu tetikle
+                AnimationManager::SendAnimEvent(actor, "IdleCraftingCookingPotAddIngredient");
+                if (Settings::GetSingleton()->notifySelling) {
+                    notifier->ShowHUDMessage(std::format("{} cooked {}.", actor->GetName(), rec.name));
+                }
+                logger::info("Autonomous Cooking: {} cooked {}.", actor->GetName(), rec.name);
                 return;
             }
         }
@@ -1908,6 +2022,12 @@ namespace
                     // Ensure engine teammate status is true so game behaves properly
                     if (!actor->IsPlayerTeammate()) {
                         actor->GetActorRuntimeData().boolBits.set(RE::Actor::BOOL_BITS::kPlayerTeammate);
+                    }
+
+                    if (auto* av = actor->AsActorValueOwner()) {
+                        if (av->GetActorValue(RE::ActorValue::kWaitingForPlayer) != 0.0f) {
+                            av->SetActorValue(RE::ActorValue::kWaitingForPlayer, 0.0f);
+                        }
                     }
 
                     // Reset and start slot quest to guarantee alias condition fills for this actor

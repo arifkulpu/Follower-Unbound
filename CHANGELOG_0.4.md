@@ -23,12 +23,28 @@ Bu sürümde ilk katılım ikmalleri, geçici görev eskortlarının yönetimi, 
 ---
 
 ### 4. PrismaUI Arayüz Sabitleme & Kart Tasarımı İyileştirmesi
-- **Scroll Jump Giderildi:** PrismaUI menüsünde iksir, yağma, ekipman ve sistem seçenekleri arasında geçiş yapıldığında veya ayar değiştirildiğinde menünün en üste kayması / sıçraması engellendi. Sayfanın kaydırma konumu (`scrollTop`) her seçim ve yeniden çizimde hafızada tutularak sabit kalması sağlandı.
+- **Derin Scroll Hafızası (Scroll Jump Tamamen Çözüldü):** PrismaUI menüsünde iksir, yağma, ekipman ve ekonomi seçenekleri arasında seçim yapıldığında veya checkbox/input değiştirildiğinde arayüzün yukarı zıplaması sorunu kökten çözüldü. `#content` ana sayfasının yanı sıra `.trade-list`, `.buy-supplies-list`, `.gear-list`, `.sale-grid` ve `.craft-list` gibi tüm alt konteynerlerin kaydırma pozisyonları anlık hafızaya alınıp `requestAnimationFrame` ile kusursuz bir şekilde yerinde tutulur.
 - **Takipçi Kartları Footer Optimizasyonu:** Kartların alt kısmında yer alan altın miktarı, taşıma kapasitesi ve ışınlanma butonu yeniden tasarlandı. Metinlerin taşması ve butonların üst üste binmesi engellenerek buton daha kompakt ve şık olan **"Işınla" / "Teleport"** formatına getirildi.
 
 ---
 
-### 5. Takipçi Yetişme Işınlanması & Manuel Işınlama (Catch-Up Teleport)
+### 5. Otonom Üretim: Simya Tezgahları ve Yemek Pişirme Ocakları / Kazanları
+- **Simya Laboratuvarında İksir Üretimi:** Takipçiler artık iksir üretirken yakındaki simya laboratuvarlarını (`WICraftingAlchemy` / `CraftingAlchemyWorkbench`) aktif olarak tespit eder ve simya üretim animasyonunu oynatır (`IdleAlchemyEnter`).
+- **Ocak ve Kazanlarda Vanilla Yemekleri Pişirme:** Takipçiler için otonom yemek pişirme desteği eklendi (`allowCraftFood` tercihi):
+  - 400 oyun birimi içerisindeki pişirme ocaklarını ve kazanlarını (`CraftingCookpot`, `isCookingSpit`, `CraftTypeCookpot`, `isSmallCookingPot`) kullanırlar.
+  - Yemek pişirme animasyonunu (`IdleCraftingCookingPotAddIngredient`) icra ederler.
+  - Hedef stok sınırlarına göre vanilla güveç ve çorbalarını pişirirler: **Sebze Çorbası (Vegetable Soup)**, **Geyik Güveci (Venison Stew)**, **Dana Güveci (Beef Stew)**, **Elmalı Lahana Güveci (Apple Cabbage Stew)**, **Lahana Patates Çorbası (Cabbage Potato Soup)** ve pişmiş etler.
+- **Yemek Malzemesi Toplama Entegrasyonu:** Takipçiler sandıklardan ve dünyadan yemek malzemelerini (özellikle çorba ve güveçlerin ana hammaddesi olan **Tuz / Salt Pile**, patates, lahana, pırasa, elma, domates ve çiğ etleri) yemek yağması (`lootFood`) açık olduğunda otomatik olarak toplayıp biriktirirler.
+
+---
+
+### 6. Güvenli Alanlarda Sandbox (Serbest Gezinme & Dinlenme)
+- **Han, Oyuncu Evi ve Şehir Sandbox Davranışı:** `frameworkSandbox` özelliği açık olduğunda; oyuncu durduğunda veya dinlendiğinde insansı takipçiler robot gibi oyuncuya bakıp dikilmek yerine çevreyle etkileşime girer: sandalyelere oturur, kitap okur, tezgahları inceler ve dinlenirler.
+- **Güvenli Bölge Algılama:** Zindanlar (`LocTypeDungeon`) haricindeki iç mekanlar (hanlar `LocTypeInn`, oyuncu evleri `LocTypePlayerHouse`, tapınaklar `LocTypeTemple`, loncalar `LocTypeGuild`) ve dış mekan şehir/kasabalar anlık olarak algılanır.
+
+---
+
+### 7. Takipçi Yetişme Işınlanması & Manuel Işınlama (Catch-Up Teleport)
 - **Otomatik Yetişme Işınlanması:** Takipçiler yağma (loot) yaparken, navigasyonda takıldığında veya engebeli arazide geride kaldığında, belirlenen mesafenin ötesinde 30 saniyeden fazla kalırlarsa otomatik olarak oyuncunun yanına ışınlanır.
 - **Özelleştirilebilir Mesafe ve Süre:**
   - Işınlanma özelliği ayarlardan açılıp kapatılabilir (`EnableFollowerTeleport`).

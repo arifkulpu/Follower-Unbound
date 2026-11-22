@@ -239,6 +239,9 @@ namespace FollowerUnbound
         uint32_t secondaryRightHand{ 0 };
         uint32_t secondaryLeftHand{ 0 };
         uint32_t secondaryTwoHandType{ 0 };
+
+        // Cooking toggle
+        bool allowCraftFood{ true };
     };
 
     // Hayali çantada ekstra verisi (büyü, temperleme, şarj, özel ad) olan eşya örnekleri.

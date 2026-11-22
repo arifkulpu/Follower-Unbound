@@ -420,6 +420,8 @@ namespace FollowerUnbound
         Checkbox(std::format("Allow Crafting Bolts##{:08X}", formID).c_str(), &pref.allowCraftBolts);
         SameLine();
         Checkbox(std::format("Allow Crafting Potions##{:08X}", formID).c_str(), &pref.allowCraftPotions);
+        SameLine();
+        Checkbox(std::format("Allow Cooking Food##{:08X}", formID).c_str(), &pref.allowCraftFood);
     }
 
     void __stdcall MenuInterface::RenderLootMenu()
