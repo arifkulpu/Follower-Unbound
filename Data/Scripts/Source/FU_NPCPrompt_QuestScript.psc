@@ -1,4 +1,4 @@
-Scriptname FU_NPCPromptQuestScript extends Quest
+Scriptname FU_NPCPrompt_QuestScript extends Quest
 {Follower Unbound NPC interaction prompts for SkyPrompt 2.x / Skyrim SE 1.5.97.
  Requires SkyPrompt, SKSE64 and powerofthree's Papyrus Extender.}
 

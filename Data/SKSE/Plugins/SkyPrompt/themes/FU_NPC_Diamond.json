@@ -1,19 +1,19 @@
 {
-    "anchor": "center",
-    "align": "center",
-    "origin": "crosshair",
-    "width": 240,
-    "height": 160,
-    "padding": 10,
-    "font": "$EverywhereMediumFont",
-    "font_size": 16,
-    "layout": "diamond",
-    "spacing": 36,
-    "background": {
-        "alpha": 0.65,
-        "color": "#0d1117",
-        "border_color": "#d4af37",
-        "border_width": 1,
-        "corner_radius": 8
+  "name": "Follower Unbound Diamond Theme",
+  "description": "NPC Interaction Prompts (Diamond layout around NPC)",
+  "author": "Follower Unbound",
+  "version": "1.0.0",
+  "prompt_alignment": "diamond",
+  "prompt_order": "icon-first",
+  "n_max_buttons": 4,
+  "prompt_size": 24.0,
+  "linespacing": 0.28,
+  "prompt_pivot": "center",
+  "marginX": 0.0,
+  "marginY": -75.0,
+  "special_effects": [
+    {
+      "special_effect": 5
     }
+  ]
 }
