@@ -56,7 +56,7 @@ Bu sürümde ilk katılım ikmalleri, geçici görev eskortlarının yönetimi, 
 
 ---
 
-### 6. Follower Unbound Framework (Simple Follower Framework Özellikleri)
+### 8. Follower Unbound Framework
 PrismaUI ve SKSEMenuFramework menülerine **Follower Unbound Framework** adında özel yeni bir sayfa/bölüm eklendi:
 - **Korumalı / Ölümsüz Mod (Essential / Protected):** Aktif tüm takipçilerin düşmanlar veya tuzaklar tarafından kalıcı olarak ölmesini engelleyen motor seviyesinde koruma bayrağı.
 - **Dost Ateşi Koruması (Friendly Fire Protection):** Oyuncunun kazara takipçiye vurması veya büyü isabet ettirmesi durumunda takipçinin düşmanlaşmasını veya misilleme yapmasını engelleyen koruma sistemi.
@@ -65,7 +65,7 @@ PrismaUI ve SKSEMenuFramework menülerine **Follower Unbound Framework** adında
 
 ---
 
-### 7. Dahili Hızlı Etkileşim Sistemi (Quick NPC Interaction Entegrasyonu)
+### 9 . Dahili Hızlı Etkileşim Sistemi
 - **Ayrı Moda Gerek Kalmadan Dahili Destek:** Quick NPC Interaction (199729) özellikleri başka bir mod gerektirmeksizin doğrudan Follower Unbound'un içine entegre edildi.
 - **SkyPrompt HUD Butonları:** Bir NPC'ye nişan alındığında diyalog açmadan HUD üzerinde doğrudan hızlı elmas tuşları (`F1 - F4`) belirir:
   - Takipçiler için: `Bekle (Wait)`, `Eşya Alışverişi (Exchange Items)`, `Takip Et (Follow Me)`, `Ayrıl (Dismiss)`.
