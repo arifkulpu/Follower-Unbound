@@ -1,5 +1,5 @@
-Scriptname ARJ_NPCPromptQuestScript extends Quest
-{ARJARIM NPC interaction prompts for SkyPrompt 2.x / Skyrim SE 1.5.97.
+Scriptname FU_NPCPromptQuestScript extends Quest
+{Follower Unbound NPC interaction prompts for SkyPrompt 2.x / Skyrim SE 1.5.97.
  Requires SkyPrompt, SKSE64 and powerofthree's Papyrus Extender.}
 
 Quest Property DialogueFollower Auto
@@ -14,7 +14,7 @@ Actor _focusedNPC = None
 Bool _combatPromptMode = False
 Bool _followerPromptMode = False
 Bool _promptsHiddenForMenu = False
-; SMF menu addon writes StorageUtilData/ARJ_NPC_Interactions.json.
+; SMF menu addon writes StorageUtilData/FU_NPC_Interactions.json.
 ; Poll only every 1.6 seconds, never for each crosshair event.
 Bool _featureEnabled = True
 Bool _restoreOnEnable = False
@@ -34,7 +34,7 @@ Function Arm()
     Int id = SkyPrompt.RegisterForSkyPromptEvent(Self as Form, 2, 0)
     If id <= 0
         _clientID = 0
-        Debug.Trace("[ARJ_NPC] SkyPrompt client registration failed; will retry.")
+        Debug.Trace("[FU_NPC] SkyPrompt client registration failed; will retry.")
         RegisterForSingleUpdate(5.0)
         Return
     EndIf
@@ -42,10 +42,10 @@ Function Arm()
         ClearCurrent()
     EndIf
     _clientID = id
-    SkyPrompt.RequestTheme(_clientID, "ARJ_NPC_Diamond")
+    SkyPrompt.RequestTheme(_clientID, "FU_NPC_Diamond")
     SyncFeatureEnabled(True)
     RegisterForSingleUpdate(0.8)
-    Debug.Trace("[ARJ_NPC] Registered SkyPrompt client " + _clientID)
+    Debug.Trace("[FU_NPC] Registered SkyPrompt client " + _clientID)
 EndFunction
 
 
@@ -59,8 +59,8 @@ Function SyncFeatureEnabled(Bool force = False)
     _nextFeatureCheckAt = now + 1.6
     ; JsonUtil keeps external JSON cached. Discard it without saving so
     ; changes made by the native SMF page are visible to Papyrus.
-    JsonUtil.Unload("ARJ_NPC_Interactions", False)
-    Bool shouldEnable = JsonUtil.GetPathIntValue("ARJ_NPC_Interactions", ".Enabled", 1) != 0
+    JsonUtil.Unload("FU_NPC_Interactions", False)
+    Bool shouldEnable = JsonUtil.GetPathIntValue("FU_NPC_Interactions", ".Enabled", 1) != 0
     If shouldEnable != _featureEnabled
         _featureEnabled = shouldEnable
         If !_featureEnabled
@@ -484,7 +484,7 @@ Function TryFollowerCommand(Actor npc, Int eventID)
         Faction current = GetCurrentFollowerFaction()
         If current != None && npc.IsInFaction(current) && npc.GetFactionRank(current) >= 0
             If Game.GetFormFromFile(0x0000434F, "nwsFollowerFramework.esp") != None
-                If ARJ_NFFCompat.DismissFollower(npc)
+                If FU_NFFCompat.DismissFollower(npc)
                     Debug.Notification("Dismiss request sent to NFF.")
                 Else
                     Debug.Notification("NFF could not dismiss this follower.")
@@ -521,7 +521,7 @@ Function TryFollowerCommand(Actor npc, Int eventID)
         Debug.Notification("Follow requested; follower framework may override it.")
     ElseIf eventID == 303
         Debug.Notification("Dismiss requires the follower's owning framework.")
-        Debug.Trace("[ARJ_NPC v0.5.4.1] No safe follower controller found.")
+        Debug.Trace("[FU_NPC v0.5.4.1] No safe follower controller found.")
     EndIf
 EndFunction
 
