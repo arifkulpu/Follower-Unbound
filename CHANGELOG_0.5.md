@@ -35,3 +35,11 @@ Bu sürümde harici mod bağımlılıklarından tamamen arındırılmış bağı
   - `EnableHorseMounting`: Takipçilerin ata biniş/iniş sistemini açıp kapatır (varsayılan: `1`).
   - `EnableMountedCombat`: Takipçilerin at üstünde savaşa katılmasını veya attan inerek yerde savaşmasını belirler (varsayılan: `1`).
 - **OStim Sahne Koruması:** OStim sahneleri sırasında biniş ve iniş kontrolleri dondurularak sahnelerin veya animasyonların kesintiye uğraması engellendi.
+
+---
+
+### 5. Hızlı Seyahat, Hücre Geçişi & Işınlanma İyileştirmeleri (Fast-Travel & Catch-Up Teleport)
+- **Hızlı Seyahat & Hücre Yükleme Senkronizasyonu:** `TESFastTravelEndEvent` ve `TESCellFullyLoadedEvent` olayları üzerinden, oyuncu hızlı seyahat yaptığında (`fast travel`), konsol komutuyla veya yükleme kapısıyla yeni bir alana geçtiğinde geride kalan tüm aktif takipçiler anında oyuncunun yanına taşınır.
+- **PlayerFollowerPackage Yaya Takip Düzeltmesi (ESP):** `PlayerFollowerPackage` (`0x0005C84B`) paketindeki `Must Mount Horse = 1` bayrağı temizlendi (`0x08040000` $\rightarrow$ `0x08000000`). Artık yoldaşlar oyuncu at üstünde değilken at arama kilitlenmesine girmeden oyuncuyu yerde yaya olarak sorunsuz takip eder.
+- **Akıllı Hücre & İç Mekan İntikali:** Takipçi at üzerindeyken oyuncu iç mekana (han, ev, zindan) girdiğinde veya at binilemeyen bir alana ışınlandığında takipçi önce attan indirilir ve oyuncunun yanına intikal ettirilir. Farklı hücre durumlarında 3 saniye içinde yetişme ışınlanması devreye girer.
+- **Yuva Koruması (Slot Safety):** `IsActualFollower` fonksiyonuna `IsInFollowerSlot` kontrolü eklenerek, 10 takipçi yuvasında kayıtlı olan yoldaşların hücre geçişlerinde veya mesafe uzadığında asla yanlışlıkla takibi bırakmaması sağlandı.

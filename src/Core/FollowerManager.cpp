@@ -95,6 +95,9 @@ namespace FollowerUnbound
         // Primary check: engine teammate flag (set by ALL follower frameworks + vanilla)
         if (actor->IsPlayerTeammate()) return true;
 
+        // Follower Unbound multi-follower slot check
+        if (FollowerManager::GetSingleton()->IsInFollowerSlot(actor)) return true;
+
         // Secondary: vanilla CurrentFollowerFaction (0x0005C84E)
         static auto* followerFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x0005C84E);
         if (followerFaction && actor->IsInFaction(followerFaction)) return true;
@@ -2166,9 +2169,24 @@ namespace
         auto* actor = RE::TESForm::LookupByID<RE::Actor>(formID);
         if (!actor || actor->IsDead() || actor->IsPlayerRef()) return false;
 
-        // At üzerinde veya sahnede ise ışınlamayı güvenli şekilde yap
+        // OStim sahnesi aktifse dokunma
+        if (EventManager::IsOstimBusy()) return false;
+
+        // Eğer takipçi at üstündeyse ve oyuncu at üstünde değilse (veya iç mekan hücresindeyse), önce attan indir
+        bool isInterior = player->GetParentCell() ? player->GetParentCell()->IsInteriorCell() : false;
+        if (actor->IsOnMount() && (!player->IsOnMount() || isInterior)) {
+            MountManager::GetSingleton()->DismountHorse(actor);
+        }
+
+        // Bekleme modu değerini sıfırla (eğer takılı kalmışsa)
+        if (auto* av = actor->AsActorValueOwner()) {
+            if (av->GetActorValue(RE::ActorValue::kWaitingForPlayer) != 0.0f) {
+                av->SetActorValue(RE::ActorValue::kWaitingForPlayer, 0.0f);
+            }
+        }
+
         actor->MoveTo(player);
-        actor->EvaluatePackage();
+        actor->EvaluatePackage(false, false);
         logger::info("TeleportFollowerToPlayer: Teleported {} [{:08X}] to player position.", actor->GetName(), formID);
         return true;
     }
@@ -2181,20 +2199,44 @@ namespace
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (!player || player->IsInCombat()) return;
 
+        // OStim sahnesi aktifse ışınlama yapma
+        if (EventManager::IsOstimBusy()) return;
+
         const auto now = std::chrono::steady_clock::now();
         const float thresholdDist = settings->followerTeleportDistance;
         const float delaySec = settings->followerTeleportDelaySeconds;
+        auto* playerCell = player->GetParentCell();
 
         auto followers = GetActiveFollowers();
         for (auto* actor : followers) {
             if (!actor || actor->IsDead() || actor->IsPlayerRef()) continue;
-            if (actor->IsInCombat() || MountManager::IsMountBusy(actor) || AnimationManager::IsRidingWithPlayer(actor)) {
+            if (actor->IsInCombat() || AnimationManager::IsRidingWithPlayer(actor)) {
                 _farDistanceStartTime.erase(actor->GetFormID());
                 continue;
             }
 
-            float dist = player->GetPosition().GetDistance(actor->GetPosition());
+            // Hücre kontrolü: Oyuncu ile takipçi farklı hücrede mi?
+            auto* actorCell = actor->GetParentCell();
+            const bool differentCell = (playerCell && actorCell && playerCell != actorCell);
+
+            // Eğer aynı hücredeyse ve her ikisi de at üstündeyse, atlı takibe izin ver
+            if (!differentCell && player->IsOnMount() && MountManager::IsMountBusy(actor)) {
+                // At üstünde ama çok aşırı uzaksa (örn. 8000+ birim, takılmışsa) ışınla
+                float horseDist = player->GetPosition().GetDistance(actor->GetPosition());
+                if (horseDist < 8000.0f) {
+                    _farDistanceStartTime.erase(actor->GetFormID());
+                    continue;
+                }
+            } else if (!differentCell && MountManager::IsMountBusy(actor) && !player->IsOnMount()) {
+                // Oyuncu at üzerinde değil ama takipçi at üzerinde takılı kalmışsa attan indir
+                MountManager::GetSingleton()->DismountHorse(actor);
+            }
+
+            float dist = differentCell ? 99999.0f : player->GetPosition().GetDistance(actor->GetPosition());
             const auto fid = actor->GetFormID();
+
+            // Farklı hücredeyse bekleme süresi kısa (3 saniye), aynı hücrede mesafe aşılmışsa normal süre
+            const float effectiveDelay = differentCell ? 3.0f : delaySec;
 
             if (dist > thresholdDist) {
                 auto it = _farDistanceStartTime.find(fid);
@@ -2202,7 +2244,7 @@ namespace
                     _farDistanceStartTime[fid] = now;
                 } else {
                     float elapsed = std::chrono::duration<float>(now - it->second).count();
-                    if (elapsed >= delaySec) {
+                    if (elapsed >= effectiveDelay) {
                         TeleportFollowerToPlayer(fid);
                         _farDistanceStartTime.erase(fid);
                     }

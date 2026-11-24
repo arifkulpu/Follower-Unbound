@@ -562,10 +562,26 @@ namespace FollowerUnbound
         if (!a_event) return RE::BSEventNotifyControl::kContinue;
 
         // Hızlı seyahat tamamlandı — geçen zamanı hesapla ve ihtiyaçları güncelle
-        // Takipçiler hemen yememeli: 3 saniye bekleme süresi başlat
         ConsumableAI::GetSingleton()->NotifyWaitEnded();
-        FollowerManager::GetSingleton()->UpdateGameTimeNeeds();
-        logger::info("TESFastTravelEndEvent: follower needs updated after journey, eat delay started.");
+        auto* fm = FollowerManager::GetSingleton();
+        fm->UpdateGameTimeNeeds();
+
+        // Hızlı seyahat sonrası tüm aktif takipçileri oyuncunun yanına getir
+        if (auto* tasks = SKSE::GetTaskInterface()) {
+            tasks->AddTask([]() {
+                auto* player = RE::PlayerCharacter::GetSingleton();
+                if (!player) return;
+                auto* fm = FollowerManager::GetSingleton();
+                auto followers = fm->GetActiveFollowers();
+                for (auto* follower : followers) {
+                    if (follower && !follower->IsDead()) {
+                        fm->TeleportFollowerToPlayer(follower->GetFormID());
+                    }
+                }
+            });
+        }
+
+        logger::info("TESFastTravelEndEvent: follower needs updated after journey, followers teleported to player.");
         return RE::BSEventNotifyControl::kContinue;
     }
 
@@ -574,7 +590,29 @@ namespace FollowerUnbound
         if (!a_event) return RE::BSEventNotifyControl::kContinue;
 
         // Hücre yüklendiğinde / alan değiştirildiğinde zamanı güncelle
-        FollowerManager::GetSingleton()->UpdateGameTimeNeeds();
+        auto* fm = FollowerManager::GetSingleton();
+        fm->UpdateGameTimeNeeds();
+
+        // Hücre geçişi (yükleme kapısı, zindan girişi, ışınlanma vb.) sonrası
+        // eski hücrede kalan takipçileri oyuncunun yeni hücresine taşı
+        if (auto* tasks = SKSE::GetTaskInterface()) {
+            tasks->AddTask([]() {
+                auto* player = RE::PlayerCharacter::GetSingleton();
+                if (!player) return;
+                auto* cell = player->GetParentCell();
+                if (!cell) return;
+
+                auto* fm = FollowerManager::GetSingleton();
+                auto followers = fm->GetActiveFollowers();
+                for (auto* follower : followers) {
+                    if (!follower || follower->IsDead()) continue;
+                    if (follower->GetParentCell() != cell) {
+                        fm->TeleportFollowerToPlayer(follower->GetFormID());
+                    }
+                }
+            });
+        }
+
         return RE::BSEventNotifyControl::kContinue;
     }
 
