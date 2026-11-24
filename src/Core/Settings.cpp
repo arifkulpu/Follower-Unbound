@@ -88,6 +88,7 @@ namespace FollowerUnbound
         enablePoisonSystem   = readBool("Systems", "EnablePoisonSystem",   true);
         enablePetSystem      = readBool("Systems", "EnablePetSystem",      true);
         enableHorseMounting  = readBool("Systems", "EnableHorseMounting",  true);
+        enableMountedCombat  = readBool("Systems", "EnableMountedCombat",  true);
         enableSpellTomeLearning = readBool("Systems", "EnableSpellTomeLearning", true);
         protectEquippedClothing = readBool("Systems", "ProtectEquippedClothing", true);
         promptOnBetterEquipment = readBool("Systems", "PromptOnBetterEquipment", true);
@@ -218,6 +219,7 @@ namespace FollowerUnbound
         writeBool("Systems", "EnablePoisonSystem",   enablePoisonSystem);
         writeBool("Systems", "EnablePetSystem",      enablePetSystem);
         writeBool("Systems", "EnableHorseMounting",  enableHorseMounting);
+        writeBool("Systems", "EnableMountedCombat",  enableMountedCombat);
         writeBool("Systems", "EnableSpellTomeLearning", enableSpellTomeLearning);
         writeBool("Systems", "ProtectEquippedClothing", protectEquippedClothing);
         writeBool("Systems", "PromptOnBetterEquipment", promptOnBetterEquipment);

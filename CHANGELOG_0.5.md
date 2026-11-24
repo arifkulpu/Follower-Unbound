@@ -27,8 +27,11 @@ Bu sürümde harici mod bağımlılıklarından tamamen arındırılmış bağı
 - **Atanan Atı Otomatik Algılama:** *A Horse's Life* modu üzerinden veya oyunun aktör mülkiyet sistemiyle (`SetActorOwner` / `GetActorOwner`) takipçiye atanmış olan binek atları yüksek performanslı aktör listeleri (`ProcessLists::highActorHandles`) üzerinden anlık taranır.
 - **Senkronize Biniş (Auto-Mount):** Oyuncu kendi atına bindiğinde, aktif takipçiler de kendilerine atanmış olan ata doğru yönelir ve binerler (mesafe yakınsa doğrudan biner, uzaktaysa ata doğru ilerler).
 - **At Üstünde Savaş (Mounted Combat):** 
-  - Oyuncu at üzerindeyken savaşa girildiğinde veya savaş başladığında takipçiler atlarından inmez.
-  - At üzerinde kalmaya devam ederek silahlarını çeker, düşman hedeflerine mounted combat ile saldırır ve pozisyonlarını korurlar (`EvaluatePackage`).
-- **Senkronize İniş (Auto-Dismount):** Oyuncu atından indiğinde tüm takipçiler de atlarından anında inerek oyuncunun arkasındaki yaya formasyonuna geri dönerler.
-- **Açma/Kapatma Ayarı (INI Desteği):** `EnableHorseMounting` seçeneği hem `FollowerUnbound.ini` dosyasına hem de C++ ayar yönetimine eklendi; istendiğinde kapatılabilir.
+  - `FU_FollowerMountedPackage` içindeki `kIgnoreCombat` (`0x00100000`) yapay zeka bayrağı kaldırılarak at üzerindeyken düşmanları görmezden gelme sorunu tamamen giderildi.
+  - Oyuncu veya takipçi çatışmaya girdiğinde (`IsInCombat`), takipçi at üzerinde kalmaya devam eder, kınındaki silahını çeker (`DrawWeaponMagicHands`), oyuncunun hedef aldığı düşmana yönelir (`StartCombat`) ve at üzerinden aktif saldırı yapar (`Horsepower` / Vanilla mounted combat ile tam uyumlu).
+  - **Açma/Kapatma Seçeneği (`EnableMountedCombat`):** Takipçilerin at üstünde savaşması istenmiyorsa `FollowerUnbound.ini` üzerinden `EnableMountedCombat=0` yapılarak takipçinin çatışma anında attan inip yerde savaşması, çatışma bittiğinde ise oyuncu hala at üstündeyse otomatik olarak tekrar ata binmesi sağlanabilir.
+- **Senkronize İniş (Auto-Dismount):** Oyuncu atından indiğinde tüm takipçiler de atlarından senkronize şekilde inerek oyuncunun arkasındaki yaya formasyonuna geri dönerler.
+- **Açma/Kapatma Ayarları (INI Desteği):** 
+  - `EnableHorseMounting`: Takipçilerin ata biniş/iniş sistemini açıp kapatır (varsayılan: `1`).
+  - `EnableMountedCombat`: Takipçilerin at üstünde savaşa katılmasını veya attan inerek yerde savaşmasını belirler (varsayılan: `1`).
 - **OStim Sahne Koruması:** OStim sahneleri sırasında biniş ve iniş kontrolleri dondurularak sahnelerin veya animasyonların kesintiye uğraması engellendi.

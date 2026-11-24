@@ -22,6 +22,7 @@ namespace FollowerUnbound
         bool enablePoisonSystem{ true };     // Assassin auto-apply poison to weapon
         bool enablePetSystem{ true };        // Animals/Pets (cats, dogs, horses) have hunger/thirst/fatigue needs
         bool enableHorseMounting{ true };    // Followers mount their assigned horse when player mounts, dismount when player dismounts
+        bool enableMountedCombat{ true };    // Followers fight from horseback when mounted; if false, followers dismount to fight on foot
         bool enableSpellTomeLearning{ true }; // Takipçiler büyü kitaplarını okuyup büyüyü öğrensin
 
         // ── HOTKEY SETTINGS ──

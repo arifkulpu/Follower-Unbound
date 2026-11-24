@@ -135,6 +135,12 @@ namespace FollowerUnbound
     {
         if (!follower) return false;
 
+        if (auto* state = follower->AsActorState()) {
+            if (state->GetSitSleepState() == RE::SIT_SLEEP_STATE::kWantToStand) {
+                return false; // Zaten attan inme animasyonunu yürütüyor
+            }
+        }
+
         CallOnActor(follower, "StopKeepOffsetFromActor", RE::MakeFunctionArguments());
 
         if (IsMountBusy(follower)) {
@@ -183,17 +189,44 @@ namespace FollowerUnbound
         }
         // 2. OYUNCU AT ÜSTÜNDEYKEN: Takipçiler de atlarına binmeli ve at üstünde kalmalı
         else {
+            const bool mountedCombatEnabled = Settings::GetSingleton()->enableMountedCombat;
+
             for (auto* follower : activeFollowers) {
                 if (!follower || follower->IsDead() || !follower->Is3DLoaded()) continue;
 
                 // Takipçi zaten at üstündeyse VEYA ata binme/inme aşamasındaysa:
                 // Asla yeniden MountHorse çağrısı yapma!
                 if (IsMountBusy(follower)) {
-                    // Savaş durumundaysa (Mounted Combat):
-                    // Takipçi at üstünde kalır ve savaş paketini tazeler
+                    // Savaş durumu kontrolü:
                     if (follower->IsInCombat() || player->IsInCombat()) {
-                        follower->EvaluatePackage(false, false);
+                        if (mountedCombatEnabled) {
+                            // At üstünde savaş açık:
+                            // 1. Silah kınındaysa çıkar (DrawWeapon)
+                            if (auto* state = follower->AsActorState(); state && state->GetWeaponState() == RE::WEAPON_STATE::kSheathed) {
+                                follower->DrawWeaponMagicHands(true);
+                            }
+
+                            // 2. Takipçi henüz savaşa girmemiş ama oyuncu savaştaysa, oyuncunun hedefine saldır
+                            if (!follower->IsInCombat()) {
+                                auto targetHandle = player->GetActorRuntimeData().currentCombatTarget;
+                                if (auto targetActor = targetHandle.get()) {
+                                    CallOnActor(follower, "StartCombat", RE::MakeFunctionArguments(static_cast<RE::Actor*>(targetActor.get())));
+                                }
+                            }
+
+                            // 3. AI paketini ve savaş değerlendirmesini tazele
+                            follower->EvaluatePackage(false, false);
+                        } else {
+                            // At üstünde savaş kapalı: Yoldaş atından inip yaya savaşır
+                            logger::info("MountManager: Combat started and mounted combat disabled. {} dismounting to fight.", follower->GetName());
+                            DismountHorse(follower);
+                        }
                     }
+                    continue;
+                }
+
+                // Savaş esnasında mountedCombat kapalıysa, savaş bitene kadar ata binmeye çalışma
+                if (!mountedCombatEnabled && (follower->IsInCombat() || player->IsInCombat())) {
                     continue;
                 }
 
