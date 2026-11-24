@@ -1,5 +1,6 @@
 #include "Core/FollowerManager.h"
 #include "Core/EventManager.h"
+#include "AI/MountManager.h"
 #include "Core/ClassInterface.h"
 #include "Core/Settings.h"
 #include "Core/TNGCompatibility.h"
@@ -1362,6 +1363,8 @@ namespace
             if (!form) continue;
             auto actor = form->As<RE::Actor>();
             if (!actor || actor->IsDead() || !actor->Is3DLoaded()) continue;
+            // At binen veya ata binme/inme aşamasında olan takipçilerin animasyon ve eylemlerini dondur
+            if (MountManager::IsMountBusy(actor)) continue;
 
             // Profil pointer'ı kısa süreli lock ile al
             auto profile = GetProfile(entry.formID);
@@ -1426,6 +1429,8 @@ namespace
             if (!form) continue;
             auto actor = form->As<RE::Actor>();
             if (!actor || actor->IsDead() || !actor->Is3DLoaded()) continue;
+            // At binen veya ata binme/inme aşamasında olan takipçilerin animasyon ve eylemlerini dondur
+            if (MountManager::IsMountBusy(actor)) continue;
 
             auto profile = GetProfile(entry.formID);
             if (!profile) continue;
@@ -2183,7 +2188,7 @@ namespace
         auto followers = GetActiveFollowers();
         for (auto* actor : followers) {
             if (!actor || actor->IsDead() || actor->IsPlayerRef()) continue;
-            if (actor->IsInCombat() || AnimationManager::IsRidingWithPlayer(actor)) {
+            if (actor->IsInCombat() || MountManager::IsMountBusy(actor) || AnimationManager::IsRidingWithPlayer(actor)) {
                 _farDistanceStartTime.erase(actor->GetFormID());
                 continue;
             }

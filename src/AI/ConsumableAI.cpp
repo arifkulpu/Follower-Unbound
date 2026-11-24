@@ -1,5 +1,6 @@
 #include "AI/ConsumableAI.h"
 #include "Core/EventManager.h"
+#include "AI/MountManager.h"
 #include "AI/ItemEvaluator.h"
 #include "AI/AnimationManager.h"
 #include "UI/NotificationManager.h"
@@ -417,7 +418,9 @@ namespace FollowerUnbound
     {
         if (follower && !follower->IsDead() && TryCurePoison(follower)) return;
         // 1. Savaş sırasında, AT SIRTIINDAYKEN veya OStim sahnesi aktifken/bitiş beklemesindeyken yemek yeme ve içme davranışı YAPILMAMALI
-        if (!follower || follower->IsDead() || follower->IsInCombat() || AnimationManager::IsRidingWithPlayer(follower) || EventManager::IsOstimBusy()) return;
+        if (!follower || follower->IsDead() || follower->IsInCombat() ||
+            MountManager::IsMountBusy(follower) ||
+            AnimationManager::IsRidingWithPlayer(follower) || EventManager::IsOstimBusy()) return;
 
         // System toggle
         if (!Settings::GetSingleton()->enableNeedsSystem) return;

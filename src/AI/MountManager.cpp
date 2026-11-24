@@ -23,6 +23,23 @@ namespace FollowerUnbound
             RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> callback;
             return vm->DispatchMethodCall2(handle, "Actor", function, args, callback);
         }
+
+        bool CallOnObject(RE::TESObjectREFR* target, const char* function, RE::BSScript::IFunctionArguments* args)
+        {
+            auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
+            auto* policy = vm ? vm->GetObjectHandlePolicy() : nullptr;
+            if (!policy || !target) {
+                delete args;
+                return false;
+            }
+            const auto handle = policy->GetHandleForObject(target->GetFormType(), target);
+            if (handle == policy->EmptyHandle()) {
+                delete args;
+                return false;
+            }
+            RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> callback;
+            return vm->DispatchMethodCall2(handle, "ObjectReference", function, args, callback);
+        }
     }
 
     RE::Actor* MountManager::FindAssignedHorse(RE::Actor* follower)
@@ -100,21 +117,28 @@ namespace FollowerUnbound
             return false;
         }
 
+        // Zaten bir oturma/biniş aşamasındaysa tekrar tetikleme
+        if (IsMountBusy(follower)) {
+            return false;
+        }
+
         float dist = follower->GetPosition().GetDistance(horse->GetPosition());
-        if (dist <= 400.0f) {
-            // Ata yaklaştı: offset yürümesini durdur ve ata bindir
+        if (dist <= 450.0f) {
+            // Ata yaklaştı: offset yürümesini durdur ve ata binme etkileşimini başlat
             CallOnActor(follower, "StopKeepOffsetFromActor", RE::MakeFunctionArguments());
 
-            bool mounted = follower->PutActorOnMountQuick();
-            if (!mounted) {
-                horse->ActivateRef(follower, 0, nullptr, 1, false);
-            }
-            logger::info("MountManager: {} mounted horse {} (dist={:.0f}).",
+            // 1. Motor seviyesinde aktivasyon (Papyrus VM + ActivateRef)
+            // PutActorOnMountQuick animasyonu ve binek bağlantısını atladığından motor aktörü ekarte ediyordu;
+            // Native Activate etkileşimi takipçiyi tam olarak eyere oturtur ve kRidingMount durumunu korur.
+            horse->ActivateRef(follower, 0, nullptr, 1, false);
+            CallOnObject(horse, "Activate", RE::MakeFunctionArguments(static_cast<RE::TESObjectREFR*>(follower)));
+
+            logger::info("MountManager: {} initiated mount on {} (dist={:.0f}).",
                 follower->GetName(), horse->GetName(), dist);
             return true;
         }
 
-        // Mesafe 400 birimden fazlaysa ata doğru yönlendir
+        // Mesafe 450 birimden fazlaysa ata doğru yönlendir
         auto* args = RE::MakeFunctionArguments(
             static_cast<RE::TESObjectREFR*>(horse),
             0.0f, 90.0f, 0.0f, 0.0f, 0.0f, 0.0f, 350.0f, 20.0f
@@ -132,7 +156,7 @@ namespace FollowerUnbound
         // Her halükarda at hedefine yürümeyi durdur
         CallOnActor(follower, "StopKeepOffsetFromActor", RE::MakeFunctionArguments());
 
-        if (follower->IsOnMount()) {
+        if (IsMountBusy(follower)) {
             CallOnActor(follower, "Dismount", RE::MakeFunctionArguments());
             logger::info("MountManager: {} dismounting horse.", follower->GetName());
             return true;
@@ -178,12 +202,13 @@ namespace FollowerUnbound
         // 2. OYUNCU AT ÜSTÜNDEYKEN: Takipçiler de atlarına binmeli ve at üstünde kalmalı
         else {
             for (auto* follower : activeFollowers) {
-                if (!follower || follower->IsDead()) continue;
+                if (!follower || follower->IsDead() || !follower->Is3DLoaded()) continue;
 
-                // Takipçi zaten at üstündeyse:
-                if (follower->IsOnMount()) {
+                // Takipçi zaten at üstündeyse VEYA ata binme/inme aşamasındaysa:
+                // Asla yeniden MountHorse çağrısı yapma! (Biniş animasyonunu kesintiye uğratıp attan indiriyordu)
+                if (IsMountBusy(follower)) {
                     // Savaş durumundaysa (Mounted Combat):
-                    // Oyuncu at üzerindeyken savaşa girdiğimizde takipçi at üstünde savaşmaya devam eder.
+                    // Takipçi at üstünde savaşmaya devam eder.
                     if (follower->IsInCombat() || player->IsInCombat()) {
                         follower->EvaluatePackage(false, false);
                     }
@@ -193,8 +218,9 @@ namespace FollowerUnbound
                 // Takipçi henüz ata binmemişse, atanan atı bul ve bindir:
                 const auto fid = follower->GetFormID();
                 if (auto it = _lastMountAttempt.find(fid); it != _lastMountAttempt.end()) {
-                    if (std::chrono::duration<float>(now - it->second).count() < 2.5f) {
-                        continue; // 2.5 saniye arayla dene
+                    // Animasyonun ve yolculuğun rahatça tamamlanması için en az 8 saniye bekle
+                    if (std::chrono::duration<float>(now - it->second).count() < 8.0f) {
+                        continue;
                     }
                 }
                 _lastMountAttempt[fid] = now;

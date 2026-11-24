@@ -1,4 +1,5 @@
 #include "AI/AnimationManager.h"
+#include "AI/MountManager.h"
 #include "Core/EventManager.h"
 #include "RE/A/AIProcess.h"
 #include "RE/T/TESIdleForm.h"
@@ -70,7 +71,7 @@ namespace FollowerUnbound
 
     void AnimationManager::PlayEatAnimation(RE::Actor* actor)
     {
-        if (!actor || actor->IsDead() || actor->IsInCombat() || IsRidingWithPlayer(actor)) return;
+        if (!actor || actor->IsDead() || actor->IsInCombat() || MountManager::IsMountBusy(actor) || IsRidingWithPlayer(actor)) return;
         if (EventManager::IsOstimBusy()) return;
 
         if (auto* state = actor->AsActorState()) {
@@ -88,7 +89,7 @@ namespace FollowerUnbound
 
     void AnimationManager::PlayDrinkAnimation(RE::Actor* actor, RE::TESBoundObject* item)
     {
-        if (!actor || actor->IsDead() || actor->IsInCombat() || IsRidingWithPlayer(actor)) return;
+        if (!actor || actor->IsDead() || actor->IsInCombat() || MountManager::IsMountBusy(actor) || IsRidingWithPlayer(actor)) return;
         if (EventManager::IsOstimBusy()) return;
 
         if (auto* state = actor->AsActorState()) {
@@ -128,7 +129,7 @@ namespace FollowerUnbound
 
     void AnimationManager::PlayPotionAnimation(RE::Actor* actor)
     {
-        if (!actor || actor->IsDead() || IsRidingWithPlayer(actor)) return;
+        if (!actor || actor->IsDead() || MountManager::IsMountBusy(actor) || IsRidingWithPlayer(actor)) return;
 
         // Bleedout (yere diz çökme / can çekişme) durumunda asla ayakta iksir animasyonu başlatma!
         if (auto* state = actor->AsActorState()) {
@@ -203,7 +204,7 @@ namespace FollowerUnbound
 
     bool AnimationManager::PlaySmithingAnimation(RE::Actor* actor, RE::TESObjectREFR* forgeRef)
     {
-        if (!actor || actor->IsDead() || actor->IsInCombat() || IsRidingWithPlayer(actor)) return false;
+        if (!actor || actor->IsDead() || actor->IsInCombat() || MountManager::IsMountBusy(actor) || IsRidingWithPlayer(actor)) return false;
         if (!actor->Is3DLoaded()) return false;
 
         if (auto* actorState = actor->AsActorState(); actorState && actorState->IsWeaponDrawn()) {

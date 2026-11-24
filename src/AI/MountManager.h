@@ -18,6 +18,17 @@ namespace FollowerUnbound
             return &instance;
         }
 
+        // Aktörün at üzerinde veya biniş/iniş aşamasında olup olmadığını kontrol eder
+        static bool IsMountBusy(const RE::Actor* actor)
+        {
+            if (!actor) return false;
+            if (actor->IsOnMount()) return true;
+            if (auto* state = const_cast<RE::Actor*>(actor)->AsActorState()) {
+                return state->GetSitSleepState() != RE::SIT_SLEEP_STATE::kNormal;
+            }
+            return false;
+        }
+
         // Periodic update called from game thread tick
         void Update();
 
