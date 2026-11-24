@@ -122,6 +122,8 @@ namespace FollowerUnbound
         float _lastGameTimeDays{ 0.0f };
         mutable std::mutex _readMutex;
         std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _readingActiveFollowers;
+        mutable std::mutex _craftMutex;
+        std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _craftingActiveFollowers;
         std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point> _farDistanceStartTime;
     };
 }

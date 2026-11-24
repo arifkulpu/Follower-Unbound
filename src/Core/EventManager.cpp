@@ -9,6 +9,7 @@
 #include "AI/ItemEvaluator.h"
 #include "Economy/EconomyManager.h"
 #include "UI/NotificationManager.h"
+#include "AI/MountManager.h"
 #include "RE/T/TESFlora.h"
 #include "KingCore/KingCoreAPI.h"
 
@@ -208,6 +209,7 @@ namespace FollowerUnbound
         auto tracker = CombatTracker::GetSingleton();
         if (a_event->newState == RE::ACTOR_COMBAT_STATE::kCombat) {
             tracker->NotifyCombatStart(actor, target);
+            MountManager::GetSingleton()->Update();
         } else {
             tracker->NotifyCombatActivity(actor, target);
         }

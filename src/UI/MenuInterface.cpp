@@ -11,6 +11,7 @@
 #include "AI/LootManager.h"
 #include "AI/DroppedItemRecovery.h"
 #include "AI/AnimationManager.h"
+#include "AI/MountManager.h"
 #include "UI/PrismaUIManager.h"
 #include "UI/EquipPrompt.h"
 
@@ -1627,6 +1628,9 @@ namespace FollowerUnbound
         if (LootManager::GetSingleton()->HasPendingLootWork()) {
             LootManager::GetSingleton()->ScheduleProcessing();
         }
+
+        // At takibi ve biniş yönetimi (A Horse's Life / Vanilla / Follower Mounts)
+        MountManager::GetSingleton()->Update();
 
         // 1. Her saniye: İhtiyaç seansındaki veya aç/susuz takipçilerin tüketimlerini dene
         //    + savaş bitmiş ölüleri otomatik yağlama kuyruğunu işle

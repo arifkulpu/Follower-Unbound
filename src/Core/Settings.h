@@ -21,6 +21,7 @@ namespace FollowerUnbound
         bool enableSellingSystem{ true };    // Auto-sell excess loot/gear to vendors
         bool enablePoisonSystem{ true };     // Assassin auto-apply poison to weapon
         bool enablePetSystem{ true };        // Animals/Pets (cats, dogs, horses) have hunger/thirst/fatigue needs
+        bool enableHorseMounting{ true };    // Followers mount their assigned horse when player mounts, dismount when player dismounts
         bool enableSpellTomeLearning{ true }; // Takipçiler büyü kitaplarını okuyup büyüyü öğrensin
 
         // ── HOTKEY SETTINGS ──

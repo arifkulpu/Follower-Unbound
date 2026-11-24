@@ -34,6 +34,10 @@ namespace FollowerUnbound
         bool PlayReadAnimation(RE::Actor* actor, bool isSitting = false);
         void StopReadAnimation(RE::Actor* actor);
 
+        // Demirci ocağı/örs çekiçleme animasyonu ve ses efekti
+        bool PlaySmithingAnimation(RE::Actor* actor, RE::TESObjectREFR* forgeRef = nullptr);
+        void StopSmithingAnimation(RE::Actor* actor);
+
         // Silahi kinina alir ve animasyon grafini idle'a dondurur.
         // TryAutoEquip sonrasi cagrılarak "silah elde T-pose" sorununu onler.
         // Savaştaki aktörlerde çağrılmaz.

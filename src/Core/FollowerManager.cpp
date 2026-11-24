@@ -1635,6 +1635,60 @@ namespace
             }
         }
 
+        // Devam eden demirci ocağı çalışması kontrolü (4 saniye çekiçleme animasyonu)
+        const auto actorID = actor->GetFormID();
+        const auto now = std::chrono::steady_clock::now();
+        bool stillCrafting = false;
+        bool finishedCrafting = false;
+        {
+            std::lock_guard cl(_craftMutex);
+            if (auto it = _craftingActiveFollowers.find(actorID); it != _craftingActiveFollowers.end()) {
+                float elapsed = std::chrono::duration<float>(now - it->second).count();
+                if (elapsed < 4.0f) {
+                    stillCrafting = true;
+                } else {
+                    finishedCrafting = true;
+                    _craftingActiveFollowers.erase(it);
+                }
+            }
+        }
+        if (stillCrafting) return;
+        if (finishedCrafting) {
+            AnimationManager::GetSingleton()->StopSmithingAnimation(actor);
+            return;
+        }
+
+        // Demirci ocağına yaklaşma ve çekiçleme başlatma yardımcısı
+        auto startForgeWork = [&](RE::TESObjectREFR* forge) {
+            if (!forge) return;
+            // Ocağa doğru yüzünü döndür
+            const auto from = actor->GetPosition();
+            const auto to = forge->GetPosition();
+            actor->data.angle.z = std::atan2(to.x - from.x, to.y - from.y);
+
+            // Eğer mesafe 120 birimden fazlaysa ocağın önüne yürü
+            if (actor->GetPosition().GetDistance(forge->GetPosition()) > 130.0f) {
+                auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
+                auto* policy = vm ? vm->GetObjectHandlePolicy() : nullptr;
+                if (policy) {
+                    const auto handle = policy->GetHandleForObject(RE::FormType::ActorCharacter, actor);
+                    if (handle != policy->EmptyHandle()) {
+                        RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> callback;
+                        auto* args = RE::MakeFunctionArguments(
+                            static_cast<RE::TESObjectREFR*>(forge),
+                            0.0f, 90.0f, 0.0f, 0.0f, 0.0f, 0.0f, 250.0f, 20.0f
+                        );
+                        vm->DispatchMethodCall2(handle, "Actor", "KeepOffsetFromActor", args, callback);
+                    }
+                }
+            }
+
+            // Animasyon ve ses efekti başlat
+            AnimationManager::GetSingleton()->PlaySmithingAnimation(actor, forge);
+            std::lock_guard cl(_craftMutex);
+            _craftingActiveFollowers[actorID] = now;
+        };
+
         // 1. ARBALET OKU (BOLT) ÜRETİMİ
         bool wantsBolts = profile.preferences.allowCraftBolts;
         if (wantsBolts && nearForge && steelBoltObj) {
@@ -1644,6 +1698,7 @@ namespace
                 int32_t steelCount = evaluator->GetItemCount(actor, steelIngotObj);
 
                 if (firewoodCount >= 1 && steelCount >= 1) {
+                    startForgeWork(forgeStation);
                     actor->RemoveItem(firewoodObj, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
                     actor->RemoveItem(steelIngotObj, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
                     actor->AddObjectToContainer(steelBoltObj, nullptr, 10, nullptr);
@@ -1668,6 +1723,7 @@ namespace
                 int32_t ironCount = evaluator->GetItemCount(actor, ironIngotObj);
 
                 if (firewoodCount >= 1 && steelCount >= 1 && steelArrowObj) {
+                    startForgeWork(forgeStation);
                     actor->RemoveItem(firewoodObj, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
                     actor->RemoveItem(steelIngotObj, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
                     actor->AddObjectToContainer(steelArrowObj, nullptr, 24, nullptr);
@@ -1678,6 +1734,7 @@ namespace
                     logger::info("Autonomous Crafting: {} crafted 24x Steel Arrows.", actor->GetName());
                     return;
                 } else if (firewoodCount >= 1 && ironCount >= 1 && ironArrowObj) {
+                    startForgeWork(forgeStation);
                     actor->RemoveItem(firewoodObj, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
                     actor->RemoveItem(ironIngotObj, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
                     actor->AddObjectToContainer(ironArrowObj, nullptr, 24, nullptr);
@@ -1699,6 +1756,7 @@ namespace
             if (currentTorches < targetTorches &&
                 evaluator->GetItemCount(actor, firewoodObj) > 0 &&
                 evaluator->GetItemCount(actor, linenWrapObj) > 0) {
+                startForgeWork(forgeStation);
                 actor->RemoveItem(firewoodObj, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
                 actor->RemoveItem(linenWrapObj, 1, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
                 actor->AddObjectToContainer(torchObj, nullptr, 1, nullptr);

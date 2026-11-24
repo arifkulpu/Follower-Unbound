@@ -201,6 +201,77 @@ namespace FollowerUnbound
         actor->NotifyAnimationGraph("OffsetStop");
     }
 
+    bool AnimationManager::PlaySmithingAnimation(RE::Actor* actor, RE::TESObjectREFR* forgeRef)
+    {
+        if (!actor || actor->IsDead() || actor->IsInCombat() || IsRidingWithPlayer(actor)) return false;
+        if (!actor->Is3DLoaded()) return false;
+
+        if (auto* actorState = actor->AsActorState(); actorState && actorState->IsWeaponDrawn()) {
+            SheatheWeapon(actor);
+        }
+
+        // 1. Demirci çekiç/örs ses efekti çal (ITMHammerSwing / 0x000183B7 veya WPNImpactBladeMetal / 0x000183BF)
+        auto* audioManager = RE::BSAudioManager::GetSingleton();
+        auto* dataHandler = RE::TESDataHandler::GetSingleton();
+        if (audioManager && dataHandler) {
+            auto* soundDesc = dataHandler->LookupForm<RE::BGSSoundDescriptorForm>(0x000183B7, "Skyrim.esm");
+            if (!soundDesc) {
+                soundDesc = dataHandler->LookupForm<RE::BGSSoundDescriptorForm>(0x000183BF, "Skyrim.esm");
+            }
+            if (soundDesc) {
+                RE::BSSoundHandle handle;
+                if (audioManager->BuildSoundDataFromDescriptor(handle, soundDesc)) {
+                    handle.SetPosition(actor->GetPosition());
+                    handle.SetVolume(1.0f);
+                    handle.Play();
+                }
+            }
+        }
+
+        // 2. Idle Form veya Behavior Graph ile çekiçleme/örs animasyonunu tetikle
+        auto* process = actor->GetActorRuntimeData().currentProcess;
+        if (forgeRef && process) {
+            // IdleSmithingAnvil (0x000A2C99) / IdleSmithing (0x000133C1)
+            auto* smithIdle = dataHandler->LookupForm<RE::TESIdleForm>(0x000A2C99, "Skyrim.esm");
+            if (!smithIdle) {
+                smithIdle = dataHandler->LookupForm<RE::TESIdleForm>(0x000133C1, "Skyrim.esm");
+            }
+            if (smithIdle && process->PlayIdle(actor, smithIdle, forgeRef)) {
+                logger::info("SmithingAnim: IdleSmithing started for {} at forge {:08X}.",
+                    actor->GetName(), forgeRef->GetFormID());
+                return true;
+            }
+        }
+
+        // Fallback: Behavior Graph animasyon eventleri
+        if (actor->NotifyAnimationGraph("IdleSmithingAnvil") ||
+            actor->NotifyAnimationGraph("IdleSmithing") ||
+            actor->NotifyAnimationGraph("BlacksmithSharpeningWheelIdle") ||
+            actor->NotifyAnimationGraph("IdleCraftingSmithing") ||
+            actor->NotifyAnimationGraph("AO_IdleTake")) {
+            logger::info("SmithingAnim: Graph event accepted for {}.", actor->GetName());
+            return true;
+        }
+
+        return false;
+    }
+
+    void AnimationManager::StopSmithingAnimation(RE::Actor* actor)
+    {
+        if (!actor || !actor->Is3DLoaded() || IsRidingWithPlayer(actor)) return;
+
+        auto* dataHandler = RE::TESDataHandler::GetSingleton();
+        auto* process = actor->GetActorRuntimeData().currentProcess;
+
+        auto* stopIdle = dataHandler ? dataHandler->LookupForm<RE::TESIdleForm>(0x0010D9EE, "Skyrim.esm") : nullptr;
+        if (stopIdle && process) {
+            process->PlayIdle(actor, stopIdle, nullptr);
+        }
+
+        actor->NotifyAnimationGraph("IdleForceDefaultState");
+        actor->NotifyAnimationGraph("OffsetStop");
+    }
+
     bool AnimationManager::PlayLootAnimation(RE::Actor* actor, RE::TESObjectREFR* target)
     {
         if (!actor || actor->IsDead() || actor->IsInCombat() || IsRidingWithPlayer(actor)) {
