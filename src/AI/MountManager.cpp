@@ -127,11 +127,12 @@ namespace FollowerUnbound
             // Ata yaklaştı: offset yürümesini durdur ve ata binme etkileşimini başlat
             CallOnActor(follower, "StopKeepOffsetFromActor", RE::MakeFunctionArguments());
 
-            // 1. Motor seviyesinde aktivasyon (Papyrus VM + ActivateRef)
-            // PutActorOnMountQuick animasyonu ve binek bağlantısını atladığından motor aktörü ekarte ediyordu;
-            // Native Activate etkileşimi takipçiyi tam olarak eyere oturtur ve kRidingMount durumunu korur.
-            horse->ActivateRef(follower, 0, nullptr, 1, false);
-            CallOnObject(horse, "Activate", RE::MakeFunctionArguments(static_cast<RE::TESObjectREFR*>(follower)));
+            // 1. Motor seviyesinde tekil aktivasyon (ActivateRef, gerekirse Papyrus fallback)
+            // Asla ikisini birden ayni anda cagirma: Cift aktivasyon Skyrim motorunda
+            // biniş animasyonunun ardindan aninda 'attan inme' (dismount) kuyruguna yol aciyordu!
+            if (!horse->ActivateRef(follower, 0, nullptr, 1, false)) {
+                CallOnObject(horse, "Activate", RE::MakeFunctionArguments(static_cast<RE::TESObjectREFR*>(follower)));
+            }
 
             logger::info("MountManager: {} initiated mount on {} (dist={:.0f}).",
                 follower->GetName(), horse->GetName(), dist);
