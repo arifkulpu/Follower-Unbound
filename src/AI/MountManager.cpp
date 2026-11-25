@@ -176,6 +176,24 @@ namespace FollowerUnbound
 
         auto activeFollowers = followerManager->GetActiveFollowers();
 
+        // 0. ŞEHİR / İÇ MEKAN TAHLİYESİ: Eğer bir takipçi atı kapalı şehirde (Whiterun vb.) veya iç mekanda kalmışsa,
+        // atı dışarıdaki ahıra (oyuncunun atının yanına) tahliye et:
+        for (auto* follower : activeFollowers) {
+            if (!follower) continue;
+            auto* horse = FindAssignedHorse(follower);
+            if (horse && horse->Is3DLoaded()) {
+                if (!AllowsMounts(horse->GetParentCell(), horse->GetWorldspace())) {
+                    auto playerMountHandle = player->GetPlayerRuntimeData().lastRiddenMount;
+                    if (auto playerHorse = playerMountHandle.get()) {
+                        if (playerHorse.get() != horse && AllowsMounts(playerHorse->GetParentCell(), playerHorse->GetWorldspace())) {
+                            horse->MoveTo(playerHorse.get());
+                            logger::info("MountManager: Relocated horse {} outside to stables near player's mount.", horse->GetName());
+                        }
+                    }
+                }
+            }
+        }
+
         // 1. OYUNCU ATTAN İNDİĞİNDE: Takipçiler de atlarından inmeli
         if (!isPlayerMounted) {
             if (_playerMountedLastTick) {

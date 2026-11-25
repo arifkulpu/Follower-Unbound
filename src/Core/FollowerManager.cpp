@@ -2172,10 +2172,47 @@ namespace
         // OStim sahnesi aktifse dokunma
         if (EventManager::IsOstimBusy()) return false;
 
-        // Eğer takipçi at üstündeyse ve oyuncu at üstünde değilse (veya iç mekan hücresindeyse), önce attan indir
-        bool isInterior = player->GetParentCell() ? player->GetParentCell()->IsInteriorCell() : false;
-        if (actor->IsOnMount() && (!player->IsOnMount() || isInterior)) {
+        auto* playerCell = player->GetParentCell();
+        auto* playerWorld = player->GetWorldspace();
+        const bool destinationAllowsMounts = MountManager::AllowsMounts(playerCell, playerWorld);
+
+        // Eğer takipçi at üstündeyse ve hedef konumda atlara izin verilmiyorsa (veya oyuncu at üstünde değilse):
+        if (actor->IsOnMount() && (!destinationAllowsMounts || !player->IsOnMount())) {
+            RE::NiPointer<RE::Actor> mount;
+            actor->GetMount(mount);
+
+            // Attan indir
             MountManager::GetSingleton()->DismountHorse(actor);
+
+            // Eğer oyuncunun dışarıdaki ahırda bekleyen bir atı varsa, takipçinin atını da onun yanına bırak
+            if (mount) {
+                auto playerMountHandle = player->GetPlayerRuntimeData().lastRiddenMount;
+                if (auto playerHorse = playerMountHandle.get()) {
+                    if (playerHorse.get() != mount.get() && MountManager::AllowsMounts(playerHorse->GetParentCell(), playerHorse->GetWorldspace())) {
+                        mount->MoveTo(playerHorse.get());
+                    }
+                }
+            }
+
+            // Takipçi atın üzerindeyken MoveTo(player) çağrılırsa motor atı da şehre ışınlar!
+            // Bu nedenle görev kuyruğuna (task) erteleyip iniş tamamlandığında YAYA olarak ışınla:
+            if (auto* tasks = SKSE::GetTaskInterface()) {
+                const auto fid = formID;
+                tasks->AddTask([fid]() {
+                    auto* p = RE::PlayerCharacter::GetSingleton();
+                    auto* a = RE::TESForm::LookupByID<RE::Actor>(fid);
+                    if (!p || !a || a->IsDead()) return;
+
+                    // Eğer hala at üstündeyse tekrar dismount dene
+                    if (a->IsOnMount()) {
+                        MountManager::GetSingleton()->DismountHorse(a);
+                    }
+                    a->MoveTo(p);
+                    a->EvaluatePackage(false, false);
+                    logger::info("TeleportFollowerToPlayer: Teleported {} on foot to player position.", a->GetName());
+                });
+            }
+            return true;
         }
 
         // Bekleme modu değerini sıfırla (eğer takılı kalmışsa)

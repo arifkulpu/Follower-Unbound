@@ -29,6 +29,26 @@ namespace FollowerUnbound
             return false;
         }
 
+        // Verilen hücre ve worldspace'in binek atlarına izin verip vermediğini doğrular
+        // (İç mekanlar ve 5 büyük kapalı şehir [Whiterun, Solitude, Riften, Windhelm, Markarth] atlara kapalıdır)
+        static bool AllowsMounts(const RE::TESObjectCELL* cell, const RE::TESWorldSpace* world)
+        {
+            if (!cell || cell->IsInteriorCell()) return false;
+            if (!world) return false;
+
+            const auto formID = world->GetFormID();
+            if (formID == 0x0001A26F || // WhiterunWorld
+                formID == 0x00037EDF || // SolitudeWorld
+                formID == 0x00016BB4 || // RiftenWorld
+                formID == 0x0001691D || // WindhelmWorld
+                formID == 0x00016D71)   // MarkarthWorld
+            {
+                return false;
+            }
+
+            return true;
+        }
+
         // Periodic update called from game thread tick
         void Update();
 
