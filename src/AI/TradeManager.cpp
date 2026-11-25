@@ -324,6 +324,13 @@ namespace FollowerUnbound
             if (!VendorOpen(merchant)) continue;
             if (merchant->IsHostileToActor(actor)) continue;
 
+            // Farklı worldspace veya biri iç mekanda biri dışarıdaysa yürüyerek ulaşılamaz
+            if (actor->GetWorldspace() != merchant->GetWorldspace()) continue;
+            bool actorInt = actor->GetParentCell() && actor->GetParentCell()->IsInteriorCell();
+            bool merchInt = merchant->GetParentCell() && merchant->GetParentCell()->IsInteriorCell();
+            if (actorInt != merchInt) continue;
+            if (actorInt && actor->GetParentCell() != merchant->GetParentCell()) continue;
+
             const PairKey key{ actor->GetFormID(), merchant->GetFormID() };
             if (const auto allowed = _tradeAllowedDay.find(key); allowed != _tradeAllowedDay.end() && today < allowed->second) continue;
             if (const auto failed = _failedAt.find(key); failed != _failedAt.end() && Secs(failed->second, now) < _config.retrySeconds) continue;

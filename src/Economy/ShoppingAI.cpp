@@ -344,13 +344,24 @@ namespace FollowerUnbound
         // where the follower is shopping); fall back to the follower's cell.
         auto* shoppingInterior = playerCell && playerCell->IsInteriorCell() ? playerCell :
                                  (followerCell && followerCell->IsInteriorCell() ? followerCell : nullptr);
+        auto* followerWorld = follower->GetWorldspace();
 
         auto collect = [&](auto& handles) {
             for (auto& handle : handles) {
                 auto actorPtr = handle.get();
                 auto* candidate = actorPtr ? actorPtr.get() : nullptr;
                 if (!candidate || candidate->IsDead() || candidate == follower || candidate->IsPlayerRef()) continue;
-                if (shoppingInterior && candidate->GetParentCell() != shoppingInterior) continue;
+                if (shoppingInterior) {
+                    if (candidate->GetParentCell() != shoppingInterior) continue;
+                } else {
+                    // Dış mekanda (exterior worldspace, örn. WhiterunWorld vs Tamriel):
+                    // Aday tüccar ile takipçi KESİNLİKLE aynı Worldspace'te olmalıdır!
+                    // Kapalı şehirler (Whiterun, Solitude, Riften vb.) ayrı worldspace'lerdir.
+                    // Farklı worldspace'teki tüccarlara (örn. şehir dışındaki çiftlik/karavan) kapıdan geçmeden ulaşılamaz.
+                    auto* candWorld = candidate->GetWorldspace();
+                    if (followerWorld && candWorld && followerWorld != candWorld) continue;
+                    if (candidate->GetParentCell() && candidate->GetParentCell()->IsInteriorCell()) continue;
+                }
                 // TradeManager: the follower walked to one particular merchant and trades with that one only
                 if (const auto onlyVendor = TradeVendorFilter::Get(); onlyVendor != 0 && candidate->GetFormID() != onlyVendor) continue;
                 const float distance = follower->GetPosition().GetDistance(candidate->GetPosition());
